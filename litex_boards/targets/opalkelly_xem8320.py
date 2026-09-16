@@ -330,19 +330,20 @@ class BaseSoC(SoCCore):
                     dma_drained, dma_error = None, 0
                 self.dma_bench = NativeDMABenchmark(write_port, read_port,
                     drained=dma_drained, databits=16)
+                self.dma_bench._software_ready = CSRStorage(reset=0)
+                self.add_config("SDRAM_DMA_SOFTWARE_ADMISSION")
                 if with_usnative:
-                    dma_allowed = (self.ddrphy._ready.status &
+                    dma_allowed = (self.dma_bench._software_ready.storage &
+                        self.ddrphy._ready.status &
                         (self.ddrphy._training_stage.storage == 5) &
                         (self.ddrphy._training_error.storage == 0) &
                         ~self.ddrphy._bisc_only.storage & self.ddrphy._en_vtc.storage &
                         self.sdram.dfii._control.fields.sel)
                 else:
-                    self.dma_bench._software_ready = CSRStorage(reset=0)
                     dma_allowed = (self.dma_bench._software_ready.storage &
                         self.crg.pll.locked & ~ResetSignal("sys") &
                         self.ddrphy._en_vtc.storage & ~self.ddrphy._rst.storage &
                         self.sdram.dfii._control.fields.sel)
-                    self.add_config("SDRAM_DMA_SOFTWARE_ADMISSION")
                 self.comb += self.dma_bench.allowed.eq(dma_allowed & ~dma_error)
                 self.add_config("SDRAM_NATIVE_DMA_TEST")
 

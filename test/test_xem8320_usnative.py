@@ -103,6 +103,37 @@ class TestXEM8320NativeOptions(unittest.TestCase):
                 usnative_dma_calibration=True, with_led_chaser=False)
         self.assertIn("CONFIG_SDRAM_USNATIVE_DMA_CALIBRATION", soc.constants)
         self.assertNotIn("CONFIG_SDRAM_USNATIVE_DEBUG", soc.constants)
+        self.assertIn("CONFIG_SDRAM_DMA_SOFTWARE_ADMISSION", soc.constants)
+        # Simulate the production admission expression independently of PLLs
+        # and vendor primitives. PHY readiness cannot substitute for memtest.
+        from migen import Module, run_simulation
+        from migen.fhdl.structure import _Assign
+        admission = Module()
+        admission.comb += [statement for statement in soc._fragment.comb
+            if isinstance(statement, _Assign) and statement.l is soc.dma_bench.allowed]
+        self.assertEqual(len(admission._fragment.comb), 1)
+
+        def exercise():
+            yield soc.ddrphy._ready.status.eq(1)
+            yield soc.ddrphy._training_stage.storage.eq(5)
+            yield soc.ddrphy._en_vtc.storage.eq(1)
+            yield soc.sdram.dfii._control.fields.sel.eq(1)
+            yield
+            self.assertEqual((yield soc.dma_bench.allowed), 0)
+            yield soc.dma_bench._software_ready.storage.eq(1)
+            yield
+            self.assertEqual((yield soc.dma_bench.allowed), 1)
+            for blocked in (soc.ddrphy._bisc_only.storage,
+                            soc.ddrphy._training_error.storage,
+                            soc.dma_paired_write.error):
+                yield blocked.eq(1)
+                yield
+                self.assertEqual((yield soc.dma_bench.allowed), 0)
+                yield blocked.eq(0)
+            yield soc.ddrphy._training_stage.storage.eq(2)
+            yield
+            self.assertEqual((yield soc.dma_bench.allowed), 0)
+        run_simulation(admission, exercise())
 
     def test_3200_only_downgrades_the_known_pll_drc(self):
         for frequency in (300e6, 1e9/3, 1100e6/3):

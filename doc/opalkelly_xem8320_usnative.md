@@ -184,3 +184,52 @@ This fabric optimization does not qualify overclocked primitives. Native
 2933.333/3200 MT/s and component 2000 MT/s remain experimental profiles with
 separate clock-period checks. A generated bitstream is not timing or hardware
 qualification; retain setup, hold, pulse-width, and DRC reports.
+
+
+## DMA admission and calibration retry
+
+Both component and native DMA builds include software admission, cleared at
+reset and before full initialization. BIOS grants normal DMA only after the
+final controller-path memory test. This requires matching LiteX firmware with
+`CONFIG_SDRAM_DMA_SOFTWARE_ADMISSION` support. Native PHY training state and
+sticky DMA/paired-port faults remain independent hardware gates. Explicit
+`--usnative-dma-calibration` permits bounded internal DMA during calibration,
+without enabling it by default or depending on `--usnative-debug`.
+
+In debug builds, `sdram_bisc` explicitly runs internal delay calibration while
+holding DDR reset. A BISC PASS is not a DDR pass. Ordinary `sdram_init` always
+retries full training, even after a previous failure or BISC diagnostic.
+
+## Recorded Linux results before combined hardening validation
+
+These historical results belong to the pinned Linux sources, not automatically
+to a later combination with Windows hardening. Vivado 2026.1 Explore results:
+
+| Native profile | Setup / hold / pulse slack (ns) | Hardware result |
+|---|---|---|
+| 2400 normal | +0.309 / +0.011 / +0.039 | Calibration and CPU memory PASS; no DMA |
+| 2667 converted256 | +0.056 / +0.012 / +0.000 | Calibration, CPU memory and full 1 GiB DMA PASS |
+| 2667 paired256 | +0.020 / +0.011 / +0.000 | Calibration, CPU memory and full 1 GiB DMA PASS |
+| 2933 standard128 | +0.063 / +0.017 / -0.034 | Hardware PASS; primitive clock timing FAIL |
+| 3200 converted256, corrected bootstrap | +0.004 / +0.011 / -0.167 | Hardware PASS; primitive clock timing FAIL; PLL VCO warning |
+
+The timing-source commits were LiteDRAM `c6421f1401b8603622801aa64e713d61e86406bb`,
+LiteX `501b2be3807b9f6c629425b26e5f3dcb38b57662`, and litex-boards
+`251283dc9a08f28bbd1f74c43db8992aa6e7d286`. The 3200 correction used LiteX
+`f6210ac1f38fe7c860eefdebb4332192b2c1a274` and litex-boards
+`fbca5d62adde1c1fad0a6fd4c9948be319fba72b`. Its two tested bitfiles were verified
+ROM/equalization updates of the existing routed checkpoint, not fresh PAR:
+
+- Debug SHA256: `24868c9502760473dd87c1f533c34b38c5139a4e727026538fcaf5815ee216d9`.
+- BIOS-quiet SHA256: `a550f6e5c83647659fcb19037b0b94ebd0590256c7248756c045cd0735fd1d6e`.
+
+Each corrected 3200 image passed four full calibrations, six memory tests and
+five DMA checks, with zero DMA errors/faults. Full 1 GiB PRBS31 throughput was
+2.862/2.884 GB/s write/read on converted256. BIOS-quiet retained trace-capable
+FPGA logic. Component-1000 standard and paired passed the tested baselines;
+component-2000 had failing clock timing and was not hardware tested.
+
+These are one-board ambient results, software reboots rather than cold power
+cycles, and sequential write/read traffic. Negative pulse slack is not waived
+by a hardware pass. New combined revisions require fresh implementation and
+hardware evidence; keep bitstreams/checkpoints outside source control.
