@@ -113,6 +113,18 @@ class TestXEM8320NativeOptions(unittest.TestCase):
         self.assertEqual(commands[0], "set_property SEVERITY Warning [get_drc_checks PDRC-182]")
         self.assertEqual(commands[-1], "report_drc -file opalkelly_xem8320_native_final_drc.rpt")
 
+    def test_3200_dq_equalization_is_profile_specific(self):
+        for frequency in (300e6, 1e9/3, 1100e6/3):
+            self.assertNotIn("EQUALIZATION", "\n".join(_native_post_route_commands(frequency)))
+        commands = _native_post_route_commands(400e6)
+        equalization = [command for command in commands if "EQUALIZATION" in command]
+        self.assertEqual(len(equalization), 1)
+        self.assertIn("EQ_LEVEL3", equalization[0])
+        emitted = equalization[0].format(build_name="opalkelly_xem8320")
+        self.assertIn(r"{ddram_dq\[[0-9]+\]}", emitted)
+        self.assertIn("ddram_dq", equalization[0])
+        self.assertNotIn("ddram_dqs", equalization[0])
+
     def test_default_target_keeps_125mhz_component_mode(self):
         # Avoid constructing the component PHY here: this checks the target's
         # defaults without requiring Vivado or an external DDR build.

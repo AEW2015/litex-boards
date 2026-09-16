@@ -164,6 +164,9 @@ def _native_post_route_commands(sys_clk_freq):
         # maximum). Keep the real clocks/timing checks and downgrade only this
         # known experimental 3200 MT/s DRC so a laboratory bitstream is made.
         commands.insert(0, "set_property SEVERITY Warning [get_drc_checks PDRC-182]")
+        # The 3200 profile needs additional DQ receiver equalization to retain
+        # the existing lane-window margin. DQS stays at the platform default.
+        commands.insert(1, r"set_property EQUALIZATION EQ_LEVEL3 [get_ports -regexp {{ddram_dq\[[0-9]+\]}}]")
     return commands
 
 

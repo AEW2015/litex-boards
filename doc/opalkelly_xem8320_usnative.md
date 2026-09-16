@@ -44,6 +44,14 @@ known `PDRC-182` 1600 MHz PLLE4-VCO versus 1500 MHz limit to a warning so an
 experimental bitstream can be generated. It does not waive any other DRC or
 timing check; 2933.333 does not receive this downgrade.
 
+
+The 3200-only target also selects `EQ_LEVEL3` for DQ receivers; DQS remains at
+`EQ_LEVEL2`. Use the matching LiteX firmware change selecting operating RD2/WR3
+and bootstrap TX/RX delays 72/48. The generated reset read phase remains 3.
+Other rates keep their existing settings. All normal calibration margin and
+memory-integrity checks remain required; this does not waive static timing.
+
+
 ```sh
 python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnative --ddr-rate 2400 --build
 python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnative --ddr-rate 2666.667 --usnative-debug --with-dma --dma-data-width 256 --build
