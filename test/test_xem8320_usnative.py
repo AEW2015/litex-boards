@@ -77,6 +77,30 @@ class TestXEM8320NativeOptions(unittest.TestCase):
         self.assertTrue(hasattr(soc, "cpu_cdc0"))
         self.assertFalse(hasattr(soc, "dma_bench"))
 
+    def test_native_dma_calibration_forwards_only_on_complete_paired_dma(self):
+        # Use the component PHY's compatible DFI interface to elaborate the
+        # native DMA/configuration path without a Vivado device query.
+        class USPDDRPHY(usddrphy.USPDDRPHY):
+            def __init__(self, pads, platform, native_clock, native_locked,
+                native_enable, *, sys_clk_freq, **kwargs):
+                super().__init__(pads, memtype="DDR4", sys_clk_freq=sys_clk_freq,
+                    iodelay_clk_freq=500e6)
+                self.software_control = Signal()
+                self.overclock = False
+                self._ready = SimpleNamespace(status=Signal())
+                self._training_stage = SimpleNamespace(storage=Signal(3))
+                self._training_error = SimpleNamespace(storage=Signal())
+                self._bisc_only = SimpleNamespace(storage=Signal())
+                self._en_vtc = SimpleNamespace(storage=Signal())
+
+        with patch("litedram.phy.usnative.USNativeDDRPHY", USPDDRPHY):
+            soc = BaseSoC(sys_clk_freq=300e6, with_usnative=True,
+                with_dma=True, dma_data_width=256,
+                with_dma_bank_group_interleaving=True,
+                usnative_dma_calibration=True, with_led_chaser=False)
+        self.assertIn("CONFIG_SDRAM_USNATIVE_DMA_CALIBRATION", soc.constants)
+        self.assertNotIn("CONFIG_SDRAM_USNATIVE_DEBUG", soc.constants)
+
     def test_3200_only_downgrades_the_known_pll_drc(self):
         for frequency in (300e6, 1e9/3, 1100e6/3):
             with self.subTest(frequency=frequency):
@@ -109,6 +133,10 @@ class TestXEM8320NativeOptions(unittest.TestCase):
             dict(cpu_type='serv'),
             dict(cpu_variant='minimal'),
             dict(uart_name='crossover'),
+            dict(usnative_dma_calibration=True),
+            dict(with_dma=True, dma_data_width=256, usnative_dma_calibration=True),
+            dict(with_dma=True, dma_data_width=128,
+                 with_dma_bank_group_interleaving=True, usnative_dma_calibration=True),
         ]
         with patch('litedram.phy.usnative.ddrphy.query_device') as query:
             for options in cases:
@@ -117,7 +145,7 @@ class TestXEM8320NativeOptions(unittest.TestCase):
             query.assert_not_called()
 
     def test_native_only_flags_require_native_phy(self):
-        for options in (dict(usnative_debug=True),):
+        for options in (dict(usnative_debug=True), dict(usnative_dma_calibration=True)):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 BaseSoC(**options)
 

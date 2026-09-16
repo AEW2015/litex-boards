@@ -174,6 +174,7 @@ class BaseSoC(SoCCore):
         toolchain              = "vivado",
         with_usnative          = False,
         usnative_debug         = False,
+        usnative_dma_calibration = False,
         sdram_debug            = False,
         with_dma               = False,
         dma_data_width         = 128,
@@ -196,6 +197,15 @@ class BaseSoC(SoCCore):
                 raise ValueError("Bank-group DMA requires --with-dma")
             if dma_data_width != 256:
                 raise ValueError("Bank-group DMA requires a 256-bit DMA port")
+        if usnative_dma_calibration:
+            if not with_usnative:
+                raise ValueError("--usnative-dma-calibration requires --with-usnative")
+            if not with_dma:
+                raise ValueError("--usnative-dma-calibration requires --with-dma")
+            if dma_data_width != 256:
+                raise ValueError("--usnative-dma-calibration requires --dma-data-width 256")
+            if not with_dma_bank_group_interleaving:
+                raise ValueError("--usnative-dma-calibration requires --with-dma-bank-group-interleaving")
 
         # Fail before importing the native PHY or starting a device query.
         if with_usnative:
@@ -269,6 +279,8 @@ class BaseSoC(SoCCore):
                 self.add_config("SDRAM_USNATIVE_XEM8320")
                 if usnative_debug:
                     self.add_config("SDRAM_USNATIVE_DEBUG")
+                if usnative_dma_calibration:
+                    self.add_config("SDRAM_USNATIVE_DMA_CALIBRATION")
                 if self.ddrphy.overclock:
                     self.add_config("SDRAM_USNATIVE_OVERCLOCK")
                     self.logger.warning(
@@ -398,6 +410,7 @@ def main():
     viopts.add_argument("--with-video-framebuffer", action="store_true", help="Enable Video Framebuffer (HDMI).")
     parser.add_target_argument("--with-usnative", action="store_true", help="Use experimental USNativeDDRPHY (Vivado only).")
     parser.add_target_argument("--usnative-debug", action="store_true", help="Include native trace hardware and verbose BIOS calibration.")
+    parser.add_target_argument("--usnative-dma-calibration", action="store_true", help="Enable opt-in USNative DMA calibration (requires paired 256-bit DMA).")
     parser.add_target_argument("--sdram-debug", action="store_true", help="Enable component-PHY SDRAM calibration diagnostics.")
     parser.add_target_argument("--vivado", default="vivado", help="Vivado executable for fresh native device queries.")
     parser.add_target_argument("--with-dma", action="store_true", help="Include native DMA test engine and BIOS command.")
@@ -433,6 +446,7 @@ def main():
         toolchain              = args.toolchain,
         with_usnative          = args.with_usnative,
         usnative_debug         = args.usnative_debug,
+        usnative_dma_calibration = args.usnative_dma_calibration,
         sdram_debug            = args.sdram_debug,
         with_dma               = args.with_dma,
         dma_data_width         = args.dma_data_width,

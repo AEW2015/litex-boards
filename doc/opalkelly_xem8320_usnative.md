@@ -48,6 +48,7 @@ timing check; 2933.333 does not receive this downgrade.
 python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnative --ddr-rate 2400 --build
 python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnative --ddr-rate 2666.667 --usnative-debug --with-dma --dma-data-width 256 --build
 python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnative --ddr-rate 2666.667 --usnative-debug --with-dma --dma-data-width 256 --with-dma-bank-group-interleaving --build
+python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnative --ddr-rate 2666.667 --with-dma --dma-data-width 256 --with-dma-bank-group-interleaving --usnative-dma-calibration --build
 python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnative --ddr-rate 2933.333 --overclock --with-dma --build
 python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnative --ddr-rate 3200 --overclock --usnative-debug --with-dma --dma-data-width 256 --build
 ```
@@ -56,12 +57,38 @@ python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnat
 |---|---|
 | `--with-usnative` | Native PHY and normal BIOS calibration; defaults to 2400 MT/s. |
 | `--usnative-debug` | Verbose calibration windows and optional trace hardware. |
+| `--usnative-dma-calibration` | Opt-in DMA calibration. Requires USNative, DMA, a 256-bit port, and paired bank-group interleaving; independent of `--usnative-debug`. |
 | `--sdram-debug` | Component-PHY calibration diagnostics; invalid with `--with-usnative`. |
 | `--with-dma` | DMA integrity/bandwidth engine and `native_dma` BIOS command. Does not run DMA automatically. |
 | `--dma-data-width 128\|256` | Fabric DMA port width; default 128. Requires DMA when selecting 256. |
 | `--with-dma-bank-group-interleaving` | Experimental paired 256-bit DMA path. Requires DMA and `--dma-data-width 256`; works with either PHY. |
 | `--ddr-rate` | Component: 1000 or 2000 MT/s. Native: 2400, 2666.667, 2933.333, or 3200 MT/s. |
 | `--overclock` | Required for component 2000 and native 2933.333/3200; does not waive timing checks. |
+
+### Clean experimental build dependencies
+
+The USNative target requires coordinated changes in all three projects:
+LiteX-Boards supplies the target and flags, LiteDRAM supplies the native PHY and
+paired controller path, and LiteX supplies the BIOS calibration routine. The
+new DMA-calibration flag is currently a local, unpublished change; use matching
+review checkouts until the coordinated branches are published.
+
+With those checkouts in sibling `litex`, `litedram`, and `litex-boards`
+directories, create and activate a virtual environment (`python -m venv .venv`,
+then `.venv\Scripts\Activate.ps1` in PowerShell or `source .venv/bin/activate`
+in Bash). From their parent directory, install into that active environment:
+
+```sh
+python -m pip install -e ./litex -e ./litedram -e ./litex-boards
+```
+
+Use the normal LiteX build prerequisites, including Migen, the VexRiscv CPU data
+package, a RISC-V compiler, Make, and Vivado. Select Vivado on PATH and run a
+build command above with a fresh `--output-dir`. Native device queries run for
+each build; no saved connection map or workstation firmware override is needed.
+`--usnative-dma-calibration` does not enable DMA, debug, or a wider port implicitly.
+Fresh hardware qualification of this entry point and the updated paired-write
+rejection logic is still required; software/RTL generation alone is insufficient.
 
 The physical channel remains x16 and the PHY ratio remains 1:4. In the
 USNative profiles, the CPU clock is half the controller clock (150 to 200 MHz).
@@ -103,6 +130,11 @@ corruption detection followed by repair/reread. Sustained full-range DMA was
 Final setup/hold slack was +0.002/+0.007 ns, with zero failing endpoints,
 zero routing errors and no clock-period/pulse-width violations. This result
 does not qualify other rates or temperature/power-cycle behavior.
+
+This paired result is historical evidence for that earlier configuration. A
+later width-converted 2666.667 MT/s debug run showed an intermittent DMA
+counter failure and remains unqualified. Do not combine that run with the
+historical throughput or calibration evidence above.
 
 ## Component PHY validation
 
