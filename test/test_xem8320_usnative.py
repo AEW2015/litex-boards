@@ -35,6 +35,9 @@ class TestXEM8320NativeOptions(unittest.TestCase):
             dict(sys_clk_freq=1100e6/3),
             dict(dma_data_width=256),
             dict(with_dma=True, dma_data_width=64),
+            dict(with_dma=True, with_dma_bank_group_interleaving=True),
+            dict(with_dma=True, dma_data_width=128, with_dma_bank_group_interleaving=True),
+            dict(dma_data_width=256, with_dma_bank_group_interleaving=True),
             dict(with_video_framebuffer=True),
             dict(integrated_main_ram_size=4096),
             dict(cpu_type='serv'),
@@ -49,6 +52,7 @@ class TestXEM8320NativeOptions(unittest.TestCase):
 
     def test_native_only_flags_require_native_phy(self):
         for options in (dict(usnative_debug=True), dict(with_dma=True),
-                        dict(overclock=True), dict(dma_data_width=256)):
+                        dict(overclock=True), dict(dma_data_width=256),
+                        dict(with_dma_bank_group_interleaving=True)):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 BaseSoC(**options)
