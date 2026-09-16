@@ -233,3 +233,10 @@ These are one-board ambient results, software reboots rather than cold power
 cycles, and sequential write/read traffic. Negative pulse slack is not waived
 by a hardware pass. New combined revisions require fresh implementation and
 hardware evidence; keep bitstreams/checkpoints outside source control.
+
+
+For native 2933/3200, registered refresh/ZQCS timer comparisons are enabled
+independently of paired scheduling. The registered countdown preserves each
+cycle of the original timer, including reload. This removes the long terminal
+count decode from refresh arbitration; it does not relax refresh intervals or
+static clock checks. Lower-rate and component configurations keep their settings.

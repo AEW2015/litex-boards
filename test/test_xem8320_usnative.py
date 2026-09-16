@@ -68,6 +68,8 @@ class TestXEM8320NativeOptions(unittest.TestCase):
             def __init__(self, pads, platform, native_clock, native_locked,
                 native_enable, *, sys_clk_freq, **kwargs):
                 super().__init__(pads, memtype="DDR4", sys_clk_freq=sys_clk_freq,
+                    cl=24 if sys_clk_freq > 333333334 else None,
+                    cwl=16 if sys_clk_freq > 333333334 else None,
                     iodelay_clk_freq=500e6)
                 self.software_control = Signal()
                 self.overclock = False
@@ -79,6 +81,13 @@ class TestXEM8320NativeOptions(unittest.TestCase):
         self.assertFalse(hasattr(soc, "dma_bench"))
         self.assertTrue(soc.sdram.controller.settings.with_registered_row_hit)
         self.assertFalse(soc.sdram.controller.settings.with_bank_group_interleaving)
+        self.assertFalse(soc.sdram.controller.settings.with_registered_refresh_timers)
+
+        with patch("litedram.phy.usnative.USNativeDDRPHY", USPDDRPHY):
+            high_rate = BaseSoC(sys_clk_freq=400e6, with_usnative=True,
+                overclock=True, with_dma=False, with_led_chaser=False)
+        self.assertTrue(high_rate.sdram.controller.settings.with_registered_refresh_timers)
+        self.assertFalse(high_rate.sdram.controller.settings.with_bank_group_interleaving)
 
     def test_native_dma_calibration_forwards_only_on_complete_paired_dma(self):
         # Use the component PHY's compatible DFI interface to elaborate the
@@ -87,6 +96,8 @@ class TestXEM8320NativeOptions(unittest.TestCase):
             def __init__(self, pads, platform, native_clock, native_locked,
                 native_enable, *, sys_clk_freq, **kwargs):
                 super().__init__(pads, memtype="DDR4", sys_clk_freq=sys_clk_freq,
+                    cl=24 if sys_clk_freq > 333333334 else None,
+                    cwl=16 if sys_clk_freq > 333333334 else None,
                     iodelay_clk_freq=500e6)
                 self.software_control = Signal()
                 self.overclock = False

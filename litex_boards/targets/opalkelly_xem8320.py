@@ -276,6 +276,7 @@ class BaseSoC(SoCCore):
                 from litedram.core.controller import ControllerSettings
                 sdram_kwargs["controller_settings"] = ControllerSettings(
                     with_registered_row_hit=with_usnative,
+                    with_registered_refresh_timers=with_usnative and sys_clk_freq > 333333334,
                     with_bank_group_interleaving=with_dma_bank_group_interleaving)
             # Use a registered LUTRAM tag output instead of the BRAM output
             # on the experimental high-frequency cache hit/write-enable path.
