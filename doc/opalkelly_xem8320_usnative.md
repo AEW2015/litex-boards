@@ -1,5 +1,10 @@
 # XEM8320 DDR4 profiles
 
+For the combined Windows/Linux review branches, see the
+[source-pinned validation results](opalkelly_xem8320_usnative_validation.md).
+They include successful 3200 functional tests, remaining primitive timing
+violations, and unresolved converted/optional-calibration 2667 failures.
+
 The default target uses component-mode `USPDDRPHY` (ISERDESE3/OSERDESE3).
 `--ddr-rate 1000` selects its 125 MHz system clock. `--ddr-rate 2000
 --overclock` selects 250 MHz with a phase-related 1 GHz serializer clock and
