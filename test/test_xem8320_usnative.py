@@ -3,14 +3,80 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 
-"""Reject incompatible native build options before any Vivado device query."""
+"""Validate component/native DDR options before any Vivado device query."""
 import unittest
+import subprocess
 from unittest.mock import patch
+from types import SimpleNamespace
 
-from litex_boards.targets.opalkelly_xem8320 import BaseSoC, _native_post_route_commands
+from migen import Signal
+from litedram.phy import usddrphy
+from litex_boards.targets.opalkelly_xem8320 import (
+    BaseSoC, _component_idelay_sim_device, _native_post_route_commands)
 
 
 class TestXEM8320NativeOptions(unittest.TestCase):
+    def setUp(self):
+        # Elaborations are independent of an installed Vivado executable.
+        self.idelay_selector = patch(
+            "litex_boards.targets.opalkelly_xem8320._component_idelay_sim_device",
+            return_value=("ULTRASCALE", None, None))
+        self.idelay_selector.start()
+
+    def tearDown(self):
+        self.idelay_selector.stop()
+
+    def test_component_idelay_uses_implementation_vivado_version(self):
+        # Windows vivado.BAT returns 1 despite emitting this valid banner.
+        completed = SimpleNamespace(returncode=1, stdout="vivado v2026.1 (64-bit)\n")
+        with patch("litex_boards.targets.opalkelly_xem8320.shutil.which",
+                   return_value="C:/Vivado/bin/vivado"), \
+             patch("litex_boards.targets.opalkelly_xem8320.subprocess.run",
+                   return_value=completed) as run:
+            self.assertEqual(_component_idelay_sim_device(),
+                ("ULTRASCALE_PLUS", "2026.1", "C:/Vivado/bin/vivado"))
+        run.assert_called_once_with(["C:/Vivado/bin/vivado", "-version"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, timeout=15, check=False)
+
+    def test_component_idelay_uses_portable_enum_before_2026(self):
+        completed = SimpleNamespace(returncode=0, stdout="Vivado v2025.2 (64-bit)\n")
+        with patch("litex_boards.targets.opalkelly_xem8320.shutil.which",
+                   return_value="C:/Vivado/bin/vivado"), \
+             patch("litex_boards.targets.opalkelly_xem8320.subprocess.run",
+                   return_value=completed):
+            self.assertEqual(_component_idelay_sim_device(),
+                ("ULTRASCALE", "2025.2", "C:/Vivado/bin/vivado"))
+
+    def test_component_idelay_falls_back_without_vivado(self):
+        with patch("litex_boards.targets.opalkelly_xem8320.shutil.which", return_value=None):
+            self.assertEqual(_component_idelay_sim_device(), ("ULTRASCALE", None, None))
+
+    def test_component_dma_elaborates_with_software_admission(self):
+        soc = BaseSoC(sys_clk_freq=125e6, with_dma=True, dma_data_width=128,
+            with_led_chaser=False)
+        self.assertTrue(hasattr(soc, "dma_bench"))
+        self.assertTrue(hasattr(soc.dma_bench, "_software_ready"))
+        self.assertIn("CONFIG_SDRAM_DMA_SOFTWARE_ADMISSION", soc.constants)
+
+    def test_native_without_dma_elaborates_cpu_crossing(self):
+        # Replace the query-dependent PHY with the component PHY's compatible
+        # DFI interface. This elaborates the native CPU CDC branch without a
+        # Vivado device query or generated native core.
+        class USPDDRPHY(usddrphy.USPDDRPHY):
+            def __init__(self, pads, platform, native_clock, native_locked,
+                native_enable, *, sys_clk_freq, **kwargs):
+                super().__init__(pads, memtype="DDR4", sys_clk_freq=sys_clk_freq,
+                    iodelay_clk_freq=500e6)
+                self.software_control = Signal()
+                self.overclock = False
+
+        with patch("litedram.phy.usnative.USNativeDDRPHY", USPDDRPHY):
+            soc = BaseSoC(sys_clk_freq=300e6, with_usnative=True,
+                with_dma=False, with_led_chaser=False)
+        self.assertTrue(hasattr(soc, "cpu_cdc0"))
+        self.assertFalse(hasattr(soc, "dma_bench"))
+
     def test_3200_only_downgrades_the_known_pll_drc(self):
         for frequency in (300e6, 1e9/3, 1100e6/3):
             with self.subTest(frequency=frequency):
@@ -51,8 +117,27 @@ class TestXEM8320NativeOptions(unittest.TestCase):
             query.assert_not_called()
 
     def test_native_only_flags_require_native_phy(self):
-        for options in (dict(usnative_debug=True), dict(with_dma=True),
-                        dict(overclock=True), dict(dma_data_width=256),
-                        dict(with_dma_bank_group_interleaving=True)):
+        for options in (dict(usnative_debug=True),):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 BaseSoC(**options)
+
+    def test_component_dma_validation_does_not_query_vivado(self):
+        cases = [
+            dict(dma_data_width=256),
+            dict(with_dma_bank_group_interleaving=True),
+            dict(with_dma=True, with_dma_bank_group_interleaving=True),
+        ]
+        with patch('litedram.phy.usnative.ddrphy.query_device') as query:
+            for options in cases:
+                with self.subTest(options=options), self.assertRaises(ValueError):
+                    BaseSoC(**options)
+            query.assert_not_called()
+
+    def test_component_2000_requires_explicit_overclock(self):
+        with self.assertRaises(ValueError):
+            BaseSoC(sys_clk_freq=250e6)
+
+    def test_component_debug_preserves_non_native_selection(self):
+        soc = BaseSoC(integrated_main_ram_size=4096, with_led_chaser=False,
+            sdram_debug=True)
+        self.assertNotIn("SDRAM_USNATIVE_XEM8320", soc.constants)
