@@ -274,6 +274,10 @@ class BaseSoC(SoCCore):
                 sdram_kwargs["controller_settings"] = ControllerSettings(
                     with_registered_row_hit=with_usnative,
                     with_bank_group_interleaving=with_dma_bank_group_interleaving)
+            # Use a registered LUTRAM tag output instead of the BRAM output
+            # on the experimental high-frequency cache hit/write-enable path.
+            if with_usnative and sys_clk_freq > 333333334:
+                sdram_kwargs["l2_cache_tag_mem_attrs"] = {("ram_style", "distributed")}
             self.add_sdram("sdram", phy=self.ddrphy, module=module, **sdram_kwargs)
             if with_usnative:
                 self.comb += self.ddrphy.software_control.eq(~self.sdram.dfii._control.fields.sel)
