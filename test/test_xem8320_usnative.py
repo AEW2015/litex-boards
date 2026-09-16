@@ -58,6 +58,7 @@ class TestXEM8320NativeOptions(unittest.TestCase):
         self.assertTrue(hasattr(soc, "dma_bench"))
         self.assertTrue(hasattr(soc.dma_bench, "_software_ready"))
         self.assertIn("CONFIG_SDRAM_DMA_SOFTWARE_ADMISSION", soc.constants)
+        self.assertFalse(soc.sdram.controller.settings.with_registered_row_hit)
 
     def test_native_without_dma_elaborates_cpu_crossing(self):
         # Replace the query-dependent PHY with the component PHY's compatible
@@ -76,6 +77,8 @@ class TestXEM8320NativeOptions(unittest.TestCase):
                 with_dma=False, with_led_chaser=False)
         self.assertTrue(hasattr(soc, "cpu_cdc0"))
         self.assertFalse(hasattr(soc, "dma_bench"))
+        self.assertTrue(soc.sdram.controller.settings.with_registered_row_hit)
+        self.assertFalse(soc.sdram.controller.settings.with_bank_group_interleaving)
 
     def test_native_dma_calibration_forwards_only_on_complete_paired_dma(self):
         # Use the component PHY's compatible DFI interface to elaborate the

@@ -269,10 +269,11 @@ class BaseSoC(SoCCore):
                 else:
                     module = MT40A512M16(sys_clk_freq, "1:4")
             sdram_kwargs = dict(size=0x40000000, l2_cache_size=kwargs.get("l2_size", 8192))
-            if with_dma_bank_group_interleaving:
+            if with_usnative or with_dma_bank_group_interleaving:
                 from litedram.core.controller import ControllerSettings
                 sdram_kwargs["controller_settings"] = ControllerSettings(
-                    with_bank_group_interleaving=True)
+                    with_registered_row_hit=with_usnative,
+                    with_bank_group_interleaving=with_dma_bank_group_interleaving)
             self.add_sdram("sdram", phy=self.ddrphy, module=module, **sdram_kwargs)
             if with_usnative:
                 self.comb += self.ddrphy.software_control.eq(~self.sdram.dfii._control.fields.sel)

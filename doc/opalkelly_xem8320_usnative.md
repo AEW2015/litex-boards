@@ -160,3 +160,19 @@ accounting before PHY reset to make repeated initialization coherent. After full
 placement and routing, a verified ROM-only update added the hardware-timer DMA
 wait; placement, routing, clocks, and constraints were retained. This result
 does not qualify other rates, temperature, or power-cycle behavior.
+
+
+### Controller row-hit timing
+
+Native profiles enable LiteDRAM's `with_registered_row_hit` controller option.
+It precomputes the buffered request's row match, removing that comparison from
+CAS arbitration and command-buffer ready paths without enabling paired
+bank-group scheduling or changing the physical x16/four-phase interface.
+This requires a LiteDRAM revision providing the independent controller option.
+Component profiles retain their existing settings; paired scheduling still
+uses its existing registered row-hit path.
+
+This fabric optimization does not qualify overclocked primitives. Native
+2933.333/3200 MT/s and component 2000 MT/s remain experimental profiles with
+separate clock-period checks. A generated bitstream is not timing or hardware
+qualification; retain setup, hold, pulse-width, and DRC reports.
