@@ -6,6 +6,7 @@
 """Validate component/native DDR options before any Vivado device query."""
 import unittest
 import subprocess
+import re
 from unittest.mock import patch
 from types import SimpleNamespace
 
@@ -69,8 +70,8 @@ class TestXEM8320NativeOptions(unittest.TestCase):
             def __init__(self, pads, platform, native_clock, native_locked,
                 native_enable, *, sys_clk_freq, **kwargs):
                 super().__init__(pads, memtype="DDR4", sys_clk_freq=sys_clk_freq,
-                    cl=24 if sys_clk_freq > 333333334 else None,
-                    cwl=16 if sys_clk_freq > 333333334 else None,
+                    cl=24 if sys_clk_freq > 333333334 else (19 if sys_clk_freq > 300e6 else None),
+                    cwl=16 if sys_clk_freq > 333333334 else (14 if sys_clk_freq > 300e6 else None),
                     iodelay_clk_freq=500e6)
                 self.software_control = Signal()
                 self.overclock = False
@@ -90,6 +91,17 @@ class TestXEM8320NativeOptions(unittest.TestCase):
                 overclock=True, with_dma=False, with_led_chaser=False)
         self.assertTrue(high_rate.sdram.controller.settings.with_registered_refresh_timers)
         self.assertFalse(high_rate.sdram.controller.settings.with_bank_group_interleaving)
+
+        receiver_commands = []
+        for debug in (False, True):
+            with patch("litedram.phy.usnative.USNativeDDRPHY", USPDDRPHY):
+                receiver_soc = BaseSoC(sys_clk_freq=1e9/3, with_usnative=True,
+                    usnative_debug=debug, with_dma=False, with_led_chaser=False)
+            commands = receiver_soc.platform.toolchain.bitstream_commands
+            receiver_commands.append([c for c in commands if "EQUALIZATION" in c])
+            self.assertNotIn("PDRC-182", "\n".join(commands))
+        self.assertEqual(receiver_commands[0], receiver_commands[1])
+        self.assertEqual(len(receiver_commands[0]), 1)
 
     def test_native_dma_calibration_supports_converted_and_paired_dma(self):
         # Use the component PHY's compatible DFI interface to elaborate the
@@ -167,17 +179,19 @@ class TestXEM8320NativeOptions(unittest.TestCase):
         self.assertEqual(commands[0], "set_property SEVERITY Warning [get_drc_checks PDRC-182]")
         self.assertEqual(commands[-1], "report_drc -file opalkelly_xem8320_native_final_drc.rpt")
 
-    def test_3200_dq_equalization_is_profile_specific(self):
-        for frequency in (300e6, 1e9/3, 1100e6/3):
+    def test_dq_equalization_is_profile_specific(self):
+        for frequency in (300e6, 1100e6/3):
             self.assertNotIn("EQUALIZATION", "\n".join(_native_post_route_commands(frequency)))
-        commands = _native_post_route_commands(400e6)
-        equalization = [command for command in commands if "EQUALIZATION" in command]
-        self.assertEqual(len(equalization), 1)
-        self.assertIn("EQ_LEVEL3", equalization[0])
-        emitted = equalization[0].format(build_name="opalkelly_xem8320")
-        self.assertIn(r"{ddram_dq\[[0-9]+\]}", emitted)
-        self.assertIn("ddram_dq", equalization[0])
-        self.assertNotIn("ddram_dqs", equalization[0])
+        for frequency in (1e9/3, 400e6):
+            commands = _native_post_route_commands(frequency)
+            equalization = [command for command in commands if "EQUALIZATION" in command]
+            self.assertEqual(len(equalization), 1)
+            self.assertIn("EQ_LEVEL3", equalization[0])
+            emitted = equalization[0].format(build_name="opalkelly_xem8320")
+            expression = re.search(r"-regexp \{(.+)\}", emitted).group(1)
+            ports = ["ddram_dq[{}]".format(i) for i in range(16)]
+            ports += ["ddram_dqs_p[0]", "ddram_dqs_n[0]", "ddram_dm_n[0]", "ddram_clk_p"]
+            self.assertEqual([p for p in ports if re.search(expression, p)], ports[:16])
 
     def test_default_target_keeps_125mhz_component_mode(self):
         # Avoid constructing the component PHY here: this checks the target's

@@ -258,3 +258,23 @@ calibrate with representative traffic, maintain exclusive buffer ownership, and
 perform the appropriate CPU/cache synchronization when ownership changes. A BIOS
 benchmark result does not provide a general cache-coherent DMA driver. Existing
 CPU/DMA interoperability tests explicitly synchronize caches at each handoff.
+
+### Native 2667 receiver equalization
+
+The XEM8320 native 2666.667 MT/s profile uses DQ-only `EQ_LEVEL3`, independently
+of DMA and debug options. The existing 3200 profile keeps the same setting;
+2400, 2933.333 and component-PHY profiles retain their previous settings. DQS is
+not changed, and the known 3200 PLL DRC waiver remains restricted to 3200.
+
+This change follows a controlled receiver experiment using the same placed and
+routed 2667 paired design and BIOS. Changing only the sixteen DQ ports from
+`EQ_LEVEL2` to `EQ_LEVEL3`, while preserving the final 0.84 V bank reference,
+expanded DQ11's observed DMA window to 32-34 taps during the initial five
+successful starts. The original setting had produced a six-tap intersection
+that correctly failed the required +/-4-tap guards. Setup, hold and pulse-width
+slack stayed at +0.022, +0.012 and +0.000 ns in the controlled derivative.
+
+These observations motivate this XEM8320 profile setting; they do not establish
+an electrical root cause or qualify another board, temperature or voltage.
+The validation report records the completed campaign and final-source builds.
+The measured guard requirements remain unchanged.
