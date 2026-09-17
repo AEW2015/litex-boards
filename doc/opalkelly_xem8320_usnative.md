@@ -276,5 +276,5 @@ slack stayed at +0.022, +0.012 and +0.000 ns in the controlled derivative.
 
 These observations motivate this XEM8320 profile setting; they do not establish
 an electrical root cause or qualify another board, temperature or voltage.
-The validation report records the completed campaign and final-source builds.
-The measured guard requirements remain unchanged.
+Fresh builds from the final source revisions still require separate hardware
+validation. The measured guard requirements remain unchanged.
