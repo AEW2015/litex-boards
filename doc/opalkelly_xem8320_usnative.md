@@ -70,7 +70,7 @@ python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnat
 |---|---|
 | `--with-usnative` | Native PHY and normal BIOS calibration; defaults to 2400 MT/s. |
 | `--usnative-debug` | Verbose calibration windows and optional trace hardware. |
-| `--usnative-dma-calibration` | Opt-in DMA calibration. Requires USNative, DMA, a 256-bit port, and paired bank-group interleaving; independent of `--usnative-debug`. |
+| `--usnative-dma-calibration` | Opt-in DMA calibration. Requires USNative, DMA, and a converted or paired 256-bit port; independent of `--usnative-debug`. |
 | `--sdram-debug` | Component-PHY calibration diagnostics; invalid with `--with-usnative`. |
 | `--with-dma` | DMA integrity/bandwidth engine and `native_dma` BIOS command. Does not run DMA automatically. |
 | `--dma-data-width 128\|256` | Fabric DMA port width; default 128. Requires DMA when selecting 256. |

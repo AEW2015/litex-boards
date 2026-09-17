@@ -89,7 +89,7 @@ class TestXEM8320NativeOptions(unittest.TestCase):
         self.assertTrue(high_rate.sdram.controller.settings.with_registered_refresh_timers)
         self.assertFalse(high_rate.sdram.controller.settings.with_bank_group_interleaving)
 
-    def test_native_dma_calibration_forwards_only_on_complete_paired_dma(self):
+    def test_native_dma_calibration_supports_converted_and_paired_dma(self):
         # Use the component PHY's compatible DFI interface to elaborate the
         # native DMA/configuration path without a Vivado device query.
         class USPDDRPHY(usddrphy.USPDDRPHY):
@@ -112,6 +112,12 @@ class TestXEM8320NativeOptions(unittest.TestCase):
                 with_dma=True, dma_data_width=256,
                 with_dma_bank_group_interleaving=True,
                 usnative_dma_calibration=True, with_led_chaser=False)
+            converted = BaseSoC(sys_clk_freq=300e6, with_usnative=True,
+                with_dma=True, dma_data_width=256,
+                usnative_dma_calibration=True, with_led_chaser=False)
+        self.assertIn("CONFIG_SDRAM_USNATIVE_DMA_CALIBRATION", converted.constants)
+        self.assertFalse(converted.sdram.controller.settings.with_bank_group_interleaving)
+        self.assertNotIn("CONFIG_SDRAM_USNATIVE_DEBUG", converted.constants)
         self.assertIn("CONFIG_SDRAM_USNATIVE_DMA_CALIBRATION", soc.constants)
         self.assertNotIn("CONFIG_SDRAM_USNATIVE_DEBUG", soc.constants)
         self.assertIn("CONFIG_SDRAM_DMA_SOFTWARE_ADMISSION", soc.constants)
@@ -191,7 +197,6 @@ class TestXEM8320NativeOptions(unittest.TestCase):
             dict(cpu_variant='minimal'),
             dict(uart_name='crossover'),
             dict(usnative_dma_calibration=True),
-            dict(with_dma=True, dma_data_width=256, usnative_dma_calibration=True),
             dict(with_dma=True, dma_data_width=128,
                  with_dma_bank_group_interleaving=True, usnative_dma_calibration=True),
         ]
