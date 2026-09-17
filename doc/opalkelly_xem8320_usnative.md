@@ -196,9 +196,10 @@ Both component and native DMA builds include software admission, cleared at
 reset and before full initialization. BIOS grants normal DMA only after the
 final controller-path memory test. This requires matching LiteX firmware with
 `CONFIG_SDRAM_DMA_SOFTWARE_ADMISSION` support. Native PHY training state and
-sticky DMA/paired-port faults remain independent hardware gates. Explicit
-`--usnative-dma-calibration` permits bounded internal DMA during calibration,
-without enabling it by default or depending on `--usnative-debug`.
+sticky DMA/paired-port faults remain independent hardware gates. Native 256-bit
+DMA builds permit bounded internal DMA during calibration automatically;
+`--usnative-dma-calibration` also requests this explicitly. This behavior does
+not depend on `--usnative-debug`.
 
 In debug builds, `sdram_bisc` explicitly runs internal delay calibration while
 holding DDR reset. A BISC PASS is not a DDR pass. Ordinary `sdram_init` always
