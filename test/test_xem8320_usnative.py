@@ -189,9 +189,9 @@ class TestXEM8320NativeOptions(unittest.TestCase):
         self.assertEqual(commands[-1], "report_drc -file opalkelly_xem8320_native_final_drc.rpt")
 
     def test_dq_equalization_is_profile_specific(self):
-        for frequency in (300e6, 1100e6/3):
+        for frequency in (300e6,):
             self.assertNotIn("EQUALIZATION", "\n".join(_native_post_route_commands(frequency)))
-        for frequency in (1e9/3, 400e6):
+        for frequency in (1e9/3, 1100e6/3, 400e6):
             commands = _native_post_route_commands(frequency)
             equalization = [command for command in commands if "EQUALIZATION" in command]
             self.assertEqual(len(equalization), 1)

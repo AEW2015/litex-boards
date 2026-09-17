@@ -50,11 +50,11 @@ experimental bitstream can be generated. It does not waive any other DRC or
 timing check; 2933.333 does not receive this downgrade.
 
 
-The 2666.667 and 3200 targets select `EQ_LEVEL3` for DQ receivers; DQS remains
+The 2666.667, 2933.333 and 3200 targets select `EQ_LEVEL3` for DQ receivers; DQS remains
 at `EQ_LEVEL2`. The 3200 profile additionally uses the matching LiteX firmware
 change selecting operating RD2/WR3 and bootstrap TX/RX delays 72/48. Its
-generated reset read phase remains 3. The 2400 and 2933.333 profiles keep their
-existing receiver settings. All normal calibration margin and memory-integrity
+generated reset read phase remains 3. The 2400 profile keeps its existing
+receiver settings. All normal calibration margin and memory-integrity
 checks remain required; this does not waive static timing.
 
 
@@ -296,8 +296,8 @@ CPU/DMA interoperability tests explicitly synchronize caches at each handoff.
 ### Native 2667 receiver equalization
 
 The XEM8320 native 2666.667 MT/s profile uses DQ-only `EQ_LEVEL3`, independently
-of DMA and debug options. The existing 3200 profile keeps the same setting;
-2400, 2933.333 and component-PHY profiles retain their previous settings. DQS is
+of DMA and debug options. The 2933.333 and 3200 profiles use the same setting;
+2400 and component-PHY profiles retain their previous settings. DQS is
 not changed, and the known 3200 PLL DRC waiver remains restricted to 3200.
 
 This change follows a controlled receiver experiment using the same placed and
@@ -314,3 +314,24 @@ These observations motivate this XEM8320 profile setting; they do not establish
 an electrical root cause or qualify another board, temperature or voltage.
 Fresh builds from the final source revisions still require separate hardware
 validation. The measured guard requirements remain unchanged.
+
+### Experimental 2933 receiver equalization
+
+A 2933.333 MT/s paired256 debug image failed its initial traffic-aware
+calibration with DQ equalization at level 2. The counter/PRBS intersection
+spanned six taps on DQ11 and two taps on DQ14, below the required five samples
+at two-tap spacing. DQ13 had only the minimum eight-tap span.
+
+A controlled derivative changed only the sixteen DQ ports to `EQ_LEVEL3`.
+Firmware and all INIT values, cell placement, routing, clocks, DQS settings
+and 0.84 V Vref were verified unchanged. It passed ten full calibrations,
+ten separate CPU memory tests, seventy DMA checks, four software reboots and
+ten bidirectional CPU/DMA buffer handoffs. DMA testing included full 1 GiB
+counter/PRBS transfers and read-only rechecks, with zero errors or faults.
+The baseline image was restored and passed its BIOS memory test afterward.
+
+This experiment motivates extending DQ-only level 3 to the 2933.333 profile;
+it does not establish temperature, voltage, power-cycle or multi-board
+qualification. Setup/hold/pulse slack remained +0.103/+0.013/-0.034 ns.
+The negative pulse slack remains an explicit overclock limitation, and no
+artificial clock constraints or reduced calibration margins were used.
