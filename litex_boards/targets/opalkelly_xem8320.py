@@ -200,6 +200,9 @@ class BaseSoC(SoCCore):
                 raise ValueError("Bank-group DMA requires --with-dma")
             if dma_data_width != 256:
                 raise ValueError("Bank-group DMA requires a 256-bit DMA port")
+        # The 256-bit performance test exercises traffic that CPU calibration
+        # does not cover. Train that path before admitting benchmark traffic.
+        usnative_dma_calibration |= with_usnative and with_dma and dma_data_width == 256
         if usnative_dma_calibration:
             if not with_usnative:
                 raise ValueError("--usnative-dma-calibration requires --with-usnative")
@@ -418,7 +421,7 @@ def main():
     viopts.add_argument("--with-video-framebuffer", action="store_true", help="Enable Video Framebuffer (HDMI).")
     parser.add_target_argument("--with-usnative", action="store_true", help="Use experimental USNativeDDRPHY (Vivado only).")
     parser.add_target_argument("--usnative-debug", action="store_true", help="Include native trace hardware and verbose BIOS calibration.")
-    parser.add_target_argument("--usnative-dma-calibration", action="store_true", help="Enable opt-in USNative DMA calibration (requires converted or paired 256-bit DMA).")
+    parser.add_target_argument("--usnative-dma-calibration", action="store_true", help="Explicitly request USNative DMA calibration (automatic for native 256-bit DMA builds).")
     parser.add_target_argument("--sdram-debug", action="store_true", help="Enable component-PHY SDRAM calibration diagnostics.")
     parser.add_target_argument("--vivado", default="vivado", help="Vivado executable for fresh native device queries.")
     parser.add_target_argument("--with-dma", action="store_true", help="Include native DMA test engine and BIOS command.")

@@ -70,9 +70,9 @@ python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnat
 |---|---|
 | `--with-usnative` | Native PHY and normal BIOS calibration; defaults to 2400 MT/s. |
 | `--usnative-debug` | Verbose calibration windows and optional trace hardware. |
-| `--usnative-dma-calibration` | Opt-in DMA calibration. Requires USNative, DMA, and a converted or paired 256-bit port; independent of `--usnative-debug`. |
+| `--usnative-dma-calibration` | Explicit request for traffic-aware calibration, automatically enabled for native converted/paired 256-bit DMA builds; independent of debug. |
 | `--sdram-debug` | Component-PHY calibration diagnostics; invalid with `--with-usnative`. |
-| `--with-dma` | DMA integrity/bandwidth engine and `native_dma` BIOS command. Does not run DMA automatically. |
+| `--with-dma` | Performance-test DMA engine and `native_dma` BIOS command. Native 256-bit builds automatically calibrate using DMA traffic at startup; benchmark runs remain explicit commands. |
 | `--dma-data-width 128\|256` | Fabric DMA port width; default 128. Requires DMA when selecting 256. |
 | `--with-dma-bank-group-interleaving` | Experimental paired 256-bit DMA path. Requires DMA and `--dma-data-width 256`; works with either PHY. |
 | `--ddr-rate` | Component: 1000 or 2000 MT/s. Native: 2400, 2666.667, 2933.333, or 3200 MT/s. |
@@ -82,9 +82,8 @@ python -m litex_boards.targets.opalkelly_xem8320 --toolchain vivado --with-usnat
 
 The USNative target requires coordinated changes in all three projects:
 LiteX-Boards supplies the target and flags, LiteDRAM supplies the native PHY and
-paired controller path, and LiteX supplies the BIOS calibration routine. The
-new DMA-calibration flag is currently a local, unpublished change; use matching
-review checkouts until the coordinated branches are published.
+paired controller path, and LiteX supplies the BIOS calibration routine. Use
+matching review branches and record all three source revisions for each build.
 
 With those checkouts in sibling `litex`, `litedram`, and `litex-boards`
 directories, create and activate a virtual environment (`python -m venv .venv`,
@@ -245,3 +244,16 @@ independently of paired scheduling. The registered countdown preserves each
 cycle of the original timer, including reload. This removes the long terminal
 count decode from refresh arbitration; it does not relax refresh intervals or
 static clock checks. Lower-rate and component configurations keep their settings.
+
+## DMA performance-test calibration
+
+Native 256-bit DMA builds automatically run traffic-aware calibration before
+normal benchmark admission. CPU-only and component-PHY builds retain their
+existing startup paths. Training is destructive to scratch DDR, adds startup
+time, and can fail rather than accept insufficient measured margins.
+
+The DMA engine is a performance/integrity example. Applications reusing it must
+calibrate with representative traffic, maintain exclusive buffer ownership, and
+perform the appropriate CPU/cache synchronization when ownership changes. A BIOS
+benchmark result does not provide a general cache-coherent DMA driver. Existing
+CPU/DMA interoperability tests explicitly synchronize caches at each handoff.

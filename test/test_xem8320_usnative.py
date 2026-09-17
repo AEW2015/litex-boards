@@ -59,6 +59,7 @@ class TestXEM8320NativeOptions(unittest.TestCase):
         self.assertTrue(hasattr(soc.dma_bench, "_software_ready"))
         self.assertIn("CONFIG_SDRAM_DMA_SOFTWARE_ADMISSION", soc.constants)
         self.assertFalse(soc.sdram.controller.settings.with_registered_row_hit)
+        self.assertNotIn("CONFIG_SDRAM_USNATIVE_DMA_CALIBRATION", soc.constants)
 
     def test_native_without_dma_elaborates_cpu_crossing(self):
         # Replace the query-dependent PHY with the component PHY's compatible
@@ -79,6 +80,7 @@ class TestXEM8320NativeOptions(unittest.TestCase):
                 with_dma=False, with_led_chaser=False)
         self.assertTrue(hasattr(soc, "cpu_cdc0"))
         self.assertFalse(hasattr(soc, "dma_bench"))
+        self.assertNotIn("CONFIG_SDRAM_USNATIVE_DMA_CALIBRATION", soc.constants)
         self.assertTrue(soc.sdram.controller.settings.with_registered_row_hit)
         self.assertFalse(soc.sdram.controller.settings.with_bank_group_interleaving)
         self.assertFalse(soc.sdram.controller.settings.with_registered_refresh_timers)
@@ -111,10 +113,14 @@ class TestXEM8320NativeOptions(unittest.TestCase):
             soc = BaseSoC(sys_clk_freq=300e6, with_usnative=True,
                 with_dma=True, dma_data_width=256,
                 with_dma_bank_group_interleaving=True,
-                usnative_dma_calibration=True, with_led_chaser=False)
+                with_led_chaser=False)
             converted = BaseSoC(sys_clk_freq=300e6, with_usnative=True,
                 with_dma=True, dma_data_width=256,
+                with_led_chaser=False)
+            explicit = BaseSoC(sys_clk_freq=300e6, with_usnative=True,
+                with_dma=True, dma_data_width=256,
                 usnative_dma_calibration=True, with_led_chaser=False)
+        self.assertIn("CONFIG_SDRAM_USNATIVE_DMA_CALIBRATION", explicit.constants)
         self.assertIn("CONFIG_SDRAM_USNATIVE_DMA_CALIBRATION", converted.constants)
         self.assertFalse(converted.sdram.controller.settings.with_bank_group_interleaving)
         self.assertNotIn("CONFIG_SDRAM_USNATIVE_DEBUG", converted.constants)
