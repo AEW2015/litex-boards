@@ -1,0 +1,15 @@
+{
+  "modules": [
+    "test.test_usnative_layout",
+    "test.test_usnative_mapping",
+    "test.test_usnative_rx_trace",
+    "test.test_init",
+    "test.test_dfi",
+    "test.test_ecp5ddrphy",
+    "test.test_dfi_full_rate",
+    "test.test_dfi_ddr3",
+    "test.test_full_burst_dfirate"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 10.76600000000326
+}

@@ -1,0 +1,15 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version      : Vivado v.2025.2 (win64) Build 6299465 Fri Nov 14 19:35:11 GMT 2025
+| Date              : Wed Oct  7 23:48:26 2026
+| Host              : DESKTOP-I75K8PP running 64-bit major release  (build 9200)
+| Command           : report_pulse_width -all_violators -file C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400_pulse_width.rpt
+| Design            : u250_native_2400
+| Device            : xcu250-figd2104
+| Speed File        : -2L  PRODUCTION 1.28 03-30-2022
+| Design State      : Physopt postRoute
+| Temperature Grade : E
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Pulse Width Report
+

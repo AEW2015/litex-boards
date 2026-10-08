@@ -3,8 +3,13 @@
 /evidence/
 /references/
 /mig_reference/
+/.Xil/
+/clockInfo.txt
+/dfx_runtime.txt
+/tight_setup_hold_pins.txt
 *.log
 !offline_build_evidence/*.log
+!upstream_rebuild_evidence/*.log
 *.jou
 *.str
 *.dmp

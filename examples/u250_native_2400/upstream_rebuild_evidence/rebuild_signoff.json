@@ -1,0 +1,14 @@
+{
+  "overall": "PASS",
+  "scope": "Offline rebuild only; no hardware qualification",
+  "setup_slack_ns": 0.201,
+  "hold_slack_ns": 0.011,
+  "pulse_width_slack_ns": 0.039,
+  "worst_bus_skew_ns": 0.493,
+  "clockless_registers": 0,
+  "unconstrained_internal_endpoints": 0,
+  "routing_errors": 0,
+  "drc_errors": 0,
+  "selected_tests": 141,
+  "note": "Retained CDC/DRC/methodology diagnostics require separate review; CDC need not be clean"
+}

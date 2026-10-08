@@ -1,0 +1,2344 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version      : Vivado v.2025.2 (win64) Build 6299465 Fri Nov 14 19:35:11 GMT 2025
+| Date              : Wed Oct  7 23:30:33 2026
+| Host              : DESKTOP-I75K8PP running 64-bit major release  (build 9200)
+| Command           : report_timing_summary -file C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400_timing_synth.rpt
+| Design            : u250_native_2400
+| Device            : xcu250-figd2104
+| Speed File        : -2L  PRODUCTION 1.28 03-30-2022
+| Design State      : Synthesized
+| Temperature Grade : E
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Summary Report
+
+------------------------------------------------------------------------------------------------
+| Timer Settings
+| --------------
+------------------------------------------------------------------------------------------------
+
+  Enable Multi Corner Analysis               :  Yes
+  Enable Pessimism Removal                   :  Yes
+  Pessimism Removal Resolution               :  Nearest Common Node
+  Enable Input Delay Default Clock           :  No
+  Enable Preset / Clear Arcs                 :  No
+  Disable Flight Delays                      :  No
+  Ignore I/O Paths                           :  No
+  Timing Early Launch at Borrowing Latches   :  No
+  Borrow Time for Max Delay Exceptions       :  Yes
+  Merge Timing Exceptions                    :  Yes
+  Inter-SLR Compensation                     :  Conservative
+
+  Corner  Analyze    Analyze    
+  Name    Max Paths  Min Paths  
+  ------  ---------  ---------  
+  Slow    Yes        Yes        
+  Fast    Yes        Yes        
+
+
+------------------------------------------------------------------------------------------------
+| Report Methodology
+| ------------------
+------------------------------------------------------------------------------------------------
+
+No report available as report_methodology has not been run prior. Run report_methodology on the current design for the summary of methodology violations.
+
+
+
+check_timing report
+
+Table of Contents
+-----------------
+1. checking no_clock (81)
+2. checking constant_clock (0)
+3. checking pulse_width_clock (0)
+4. checking unconstrained_internal_endpoints (170)
+5. checking no_input_delay (0)
+6. checking no_output_delay (1)
+7. checking multiple_clock (0)
+8. checking generated_clocks (0)
+9. checking loops (0)
+10. checking partial_input_delay (0)
+11. checking partial_output_delay (0)
+12. checking latch_loops (0)
+
+1. checking no_clock (81)
+-------------------------
+ There are 80 register/latch pins with no clock driven by root clock pin: BSCANE2/INTERNAL_TCK (HIGH)
+
+ There is 1 register/latch pin with no clock (HIGH)
+
+
+2. checking constant_clock (0)
+------------------------------
+ There are 0 register/latch pins with constant_clock.
+
+
+3. checking pulse_width_clock (0)
+---------------------------------
+ There are 0 register/latch pins which need pulse_width check
+
+
+4. checking unconstrained_internal_endpoints (170)
+--------------------------------------------------
+ There are 170 pins that are not constrained for maximum delay. (HIGH)
+
+ There are 0 pins that are not constrained for maximum delay due to constant clock.
+
+
+5. checking no_input_delay (0)
+------------------------------
+ There are 0 input ports with no input delay specified.
+
+ There are 0 input ports with no input delay but user has a false path constraint.
+
+
+6. checking no_output_delay (1)
+-------------------------------
+ There is 1 port with no output delay specified. (HIGH)
+
+ There are 0 ports with no output delay but user has a false path constraint
+
+ There are 0 ports with no output delay but with a timing clock defined on it or propagating through it
+
+
+7. checking multiple_clock (0)
+------------------------------
+ There are 0 register/latch pins with multiple clocks.
+
+
+8. checking generated_clocks (0)
+--------------------------------
+ There are 0 generated clocks that are not connected to a clock source.
+
+
+9. checking loops (0)
+---------------------
+ There are 0 combinational loops in the design.
+
+
+10. checking partial_input_delay (0)
+------------------------------------
+ There are 0 input ports with partial input delay specified.
+
+
+11. checking partial_output_delay (0)
+-------------------------------------
+ There are 0 ports with partial output delay specified.
+
+
+12. checking latch_loops (0)
+----------------------------
+ There are 0 combinational latch loops in the design through latch input
+
+
+
+------------------------------------------------------------------------------------------------
+| Design Timing Summary
+| ---------------------
+------------------------------------------------------------------------------------------------
+
+    WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
+    -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
+      0.204        0.000                      0                49326       -0.490    -3011.990                  18248                49323        0.039        0.000                       0                 19759  
+
+
+Timing constraints are not met.
+
+
+------------------------------------------------------------------------------------------------
+| Clock Summary
+| -------------
+------------------------------------------------------------------------------------------------
+
+Clock                           Waveform(ns)           Period(ns)      Frequency(MHz)
+-----                           ------------           ----------      --------------
+clk3000_p                       {0.000 1.666}          3.333           300.030         
+  main_clkout0                  {0.000 3.333}          6.666           150.015         
+  main_clkout1                  {0.000 1.666}          3.333           300.030         
+    main_native_clock[0]        {0.000 0.208}          0.417           2400.240        
+      main_native_clock[0]_DIV  {0.000 1.666}          3.333           300.030         
+    main_native_clock[1]        {0.000 0.208}          0.417           2400.240        
+      main_native_clock[1]_DIV  {0.000 1.666}          3.333           300.030         
+    main_native_clock[2]        {0.000 0.208}          0.417           2400.240        
+      main_native_clock[2]_DIV  {0.000 1.666}          3.333           300.030         
+  main_clkout2                  {0.000 3.333}          6.666           150.015         
+
+
+------------------------------------------------------------------------------------------------
+| Intra Clock Table
+| -----------------
+------------------------------------------------------------------------------------------------
+
+Clock                               WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
+-----                               -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
+clk3000_p                                                                                                                                                                         0.500        0.000                       0                     1  
+  main_clkout0                        1.552        0.000                      0                26064       -0.091     -389.250                   7974                26064        2.791        0.000                       0                  9380  
+  main_clkout1                        0.204        0.000                      0                13445       -0.187     -161.781                   3834                13445        0.500        0.000                       0                  7486  
+    main_native_clock[0]                                                                                                                                                          0.039        0.000                       0                     9  
+      main_native_clock[0]_DIV                                                                                                                                                    0.466        0.000                       0                    40  
+    main_native_clock[1]                                                                                                                                                          0.039        0.000                       0                     9  
+      main_native_clock[1]_DIV                                                                                                                                                    0.466        0.000                       0                    40  
+    main_native_clock[2]                                                                                                                                                          0.039        0.000                       0                     7  
+      main_native_clock[2]_DIV                                                                                                                                                    0.466        0.000                       0                    26  
+  main_clkout2                        1.552        0.000                      0                 5336       -0.317      -59.453                    726                 5336        1.201        0.000                       0                  2761  
+
+
+------------------------------------------------------------------------------------------------
+| Inter Clock Table
+| -----------------
+------------------------------------------------------------------------------------------------
+
+From Clock                To Clock                      WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints  
+----------                --------                      -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------  
+main_clkout1              main_clkout0                    1.122        0.000                      0                  636       -0.490     -265.687                    564                  636  
+main_clkout2              main_clkout0                    5.030        0.000                      0                    1       -0.144       -0.144                      1                    1  
+main_clkout0              main_clkout1                    1.355        0.000                      0                 3702       -0.490    -1327.003                   3702                 3702  
+main_clkout2              main_clkout1                    1.274        0.000                      0                 1945       -0.397     -768.144                   1945                 1945  
+main_clkout1              main_native_clock[0]_DIV        1.348        0.000                      0                  384        0.315        0.000                      0                  384  
+main_clkout1              main_native_clock[1]_DIV        1.348        0.000                      0                  384        0.315        0.000                      0                  384  
+main_clkout1              main_native_clock[2]_DIV        1.376        0.000                      0                  224        0.511        0.000                      0                  224  
+main_clkout1              main_clkout2                    2.547        0.000                      0                  456       -0.170      -77.266                    456                  456  
+
+
+------------------------------------------------------------------------------------------------
+| Other Path Groups Table
+| -----------------------
+------------------------------------------------------------------------------------------------
+
+Path Group    From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints  
+----------    ----------    --------          -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------  
+**default**                                     1.753        0.000                      0                    3                                                                        
+
+
+------------------------------------------------------------------------------------------------
+| Timing Details
+| --------------
+------------------------------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  clk3000_p
+  To Clock:  clk3000_p
+
+Setup :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+PW    :            0  Failing Endpoints,  Worst Slack        0.500ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         clk3000_p
+Waveform(ns):       { 0.000 1.666 }
+Period(ns):         3.333
+Sources:            { clk3000_p }
+
+Check Type        Corner  Lib Pin            Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location  Pin
+Min Period        n/a     MMCME4_ADV/CLKIN1  n/a            1.071         3.333       2.262                MMCME4_ADV/CLKIN1
+Max Period        n/a     MMCME4_ADV/CLKIN1  n/a            100.000       3.333       96.667               MMCME4_ADV/CLKIN1
+Low Pulse Width   Slow    MMCME4_ADV/CLKIN1  n/a            1.167         1.667       0.500                MMCME4_ADV/CLKIN1
+High Pulse Width  Slow    MMCME4_ADV/CLKIN1  n/a            1.167         1.667       0.500                MMCME4_ADV/CLKIN1
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout0
+  To Clock:  main_clkout0
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.552ns,  Total Violation        0.000ns
+Hold  :         7974  Failing Endpoints,  Worst Slack       -0.091ns,  Total Violation     -389.250ns
+PW    :            0  Failing Endpoints,  Worst Slack        2.791ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.552ns  (required time - arrival time)
+  Source:                 FDPE_10/C
+                            (rising edge-triggered cell FDPE clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            FDPE_11/D
+                            (rising edge-triggered cell FDPE clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout0
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            2.000ns  (MaxDelay Path 2.000ns)
+  Data Path Delay:        0.272ns  (logic 0.077ns (28.309%)  route 0.195ns (71.691%))
+  Logic Levels:           0  
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    4.128ns
+    Source Clock Delay      (SCD):    3.667ns
+    Clock Pessimism Removal (CPR):    -0.606ns
+  Clock Uncertainty:      0.056ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.000ns
+  Timing Exception:       MaxDelay Path 2.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout0 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.198     1.055    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.083 r  BUFG/O
+                         net (fo=9378, unplaced)      2.584     3.667    from223_clk
+                         FDPE                                         r  FDPE_10/C
+  -------------------------------------------------------------------    -------------------
+                         FDPE (Prop_FDPE_C_Q)         0.077     3.744 r  FDPE_10/Q
+                         net (fo=1, unplaced)         0.195     3.939    builder_xilinxasyncresetsynchronizerimpl5_rst_meta
+                         FDPE                                         r  FDPE_11/D
+  -------------------------------------------------------------------    -------------------
+
+                         max delay                    2.000     2.000    
+    AY37                                              0.000     2.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     2.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     2.507 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     2.547    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     2.547 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     2.859    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                      0.630     3.489 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.176     3.665    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     3.689 r  BUFG/O
+                         net (fo=9378, unplaced)      2.439     6.128    from223_clk
+                         FDPE                                         r  FDPE_11/C
+                         clock pessimism             -0.606     5.522    
+                         clock uncertainty           -0.056     5.466    
+                         FDPE (Setup_FDPE_C_D)        0.025     5.491    FDPE_11
+  -------------------------------------------------------------------
+                         required time                          5.491    
+                         arrival time                          -3.939    
+  -------------------------------------------------------------------
+                         slack                                  1.552    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (VIOLATED) :        -0.091ns  (arrival time - required time)
+  Source:                 main_sdram_bankmachine8_produce_reg[2]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            storage_10_reg_0_7_0_13/RAMA/WADR2
+                            (rising edge-triggered cell RAMD32 clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout0
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (main_clkout0 rise@0.000ns - main_clkout0 rise@0.000ns)
+  Data Path Delay:        0.116ns  (logic 0.038ns (32.759%)  route 0.078ns (67.241%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.145ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    1.821ns
+    Source Clock Delay      (SCD):    2.059ns
+    Clock Pessimism Removal (CPR):    -0.383ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout0 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.364     0.364 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.404    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.404 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.176     0.580    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                      0.230     0.810 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.118     0.928    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.017     0.945 r  BUFG/O
+                         net (fo=9378, unplaced)      1.114     2.059    from223_clk
+                         FDRE                                         r  main_sdram_bankmachine8_produce_reg[2]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.038     2.097 r  main_sdram_bankmachine8_produce_reg[2]/Q
+                         net (fo=33, unplaced)        0.078     2.175    storage_10_reg_0_7_0_13/ADDRH2
+                         RAMD32                                       r  storage_10_reg_0_7_0_13/RAMA/WADR2
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout0 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.460     0.460 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.510    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.510 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.196     0.706    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                     -0.295     0.411 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.132     0.543    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.019     0.562 r  BUFG/O
+                         net (fo=9378, unplaced)      1.259     1.821    storage_10_reg_0_7_0_13/WCLK
+                         RAMD32                                       r  storage_10_reg_0_7_0_13/RAMA/CLK
+                         clock pessimism              0.383     2.204    
+                         RAMD32 (Hold_RAMD32_CLK_WADR2)
+                                                      0.062     2.266    storage_10_reg_0_7_0_13/RAMA
+  -------------------------------------------------------------------
+                         required time                         -2.266    
+                         arrival time                           2.175    
+  -------------------------------------------------------------------
+                         slack                                 -0.091    
+
+
+
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         main_clkout0
+Waveform(ns):       { 0.000 3.333 }
+Period(ns):         6.666
+Sources:            { MMCME4_ADV/CLKOUT0 }
+
+Check Type        Corner  Lib Pin             Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location  Pin
+Min Period        n/a     RAMB36E2/CLKARDCLK  n/a            1.569         6.666       5.097                storage_18_reg_0/CLKARDCLK
+Low Pulse Width   Slow    RAMB36E2/CLKARDCLK  n/a            0.542         3.333       2.791                storage_18_reg_0/CLKARDCLK
+High Pulse Width  Slow    RAMB36E2/CLKARDCLK  n/a            0.542         3.333       2.791                storage_18_reg_0/CLKARDCLK
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout1
+  To Clock:  main_clkout1
+
+Setup :            0  Failing Endpoints,  Worst Slack        0.204ns,  Total Violation        0.000ns
+Hold  :         3834  Failing Endpoints,  Worst Slack       -0.187ns,  Total Violation     -161.781ns
+PW    :            0  Failing Endpoints,  Worst Slack        0.500ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             0.204ns  (required time - arrival time)
+  Source:                 usnative_core/slice_26/native_slice/FIFO_RD_CLK
+                            (rising edge-triggered cell RXTX_BITSLICE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            usnative_core/slice_61/native_slice/FIFO_RD_EN
+                            (rising edge-triggered cell RXTX_BITSLICE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_clkout1
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            3.333ns  (main_clkout1 rise@3.333ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        2.130ns  (logic 0.628ns (29.484%)  route 1.502ns (70.516%))
+  Logic Levels:           5  (LUT4=1 LUT5=1 LUT6=3)
+  Clock Path Skew:        -0.800ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    5.841ns = ( 9.174 - 3.333 ) 
+    Source Clock Delay      (SCD):    6.036ns
+    Clock Pessimism Removal (CPR):    -0.605ns
+  Clock Uncertainty:      0.052ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.077ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     1.061    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.089 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.947     6.036    usnative_core/slice_26/main_clkout_buf1
+    BITSLICE_RX_TX_X0Y86 RXTX_BITSLICE                                r  usnative_core/slice_26/native_slice/FIFO_RD_CLK
+  -------------------------------------------------------------------    -------------------
+    BITSLICE_RX_TX_X0Y86 RXTX_BITSLICE (Prop_RXTX_BITSLICE_BITSLICE_RX_TX_FIFO_RD_CLK_FIFO_EMPTY)
+                                                      0.376     6.412 f  usnative_core/slice_26/native_slice/FIFO_EMPTY
+                         net (fo=2, unplaced)         0.312     6.724    usnative_core/slice_26/fifo_empty[0]
+                         LUT4 (Prop_LUT4_I0_O)        0.100     6.824 f  usnative_core/slice_26/native_slice_i_10__0/O
+                         net (fo=1, unplaced)         0.185     7.009    usnative_core/slice_69/native_slice_9
+                         LUT5 (Prop_LUT5_I4_O)        0.038     7.047 f  usnative_core/slice_69/native_slice_i_5/O
+                         net (fo=2, unplaced)         0.185     7.232    usnative_core/slice_6/native_slice_i_10_0
+                         LUT6 (Prop_LUT6_I5_O)        0.038     7.270 f  usnative_core/slice_6/native_slice_i_13__0/O
+                         net (fo=1, unplaced)         0.185     7.455    usnative_core/slice_16/native_slice_10
+                         LUT6 (Prop_LUT6_I5_O)        0.038     7.493 f  usnative_core/slice_16/native_slice_i_10/O
+                         net (fo=1, unplaced)         0.185     7.678    usnative_core/slice_19/native_slice_17
+                         LUT6 (Prop_LUT6_I5_O)        0.038     7.716 r  usnative_core/slice_19/native_slice_i_1__104/O
+                         net (fo=523, unplaced)       0.450     8.166    usnative_core/slice_61/native_slice_2
+    BITSLICE_RX_TX_X0Y132
+                         RXTX_BITSLICE                                r  usnative_core/slice_61/native_slice/FIFO_RD_EN
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout1 rise edge)
+                                                      3.333     3.333 r  
+    AY37                                              0.000     3.333 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     3.333    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     3.840 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     3.880    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     3.880 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     4.192    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.630     4.822 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.181     5.003    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     5.027 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.147     9.174    usnative_core/slice_61/main_clkout_buf1
+    BITSLICE_RX_TX_X0Y132
+                         RXTX_BITSLICE                                r  usnative_core/slice_61/native_slice/FIFO_RD_CLK
+                         clock pessimism             -0.605     8.569    
+                         clock uncertainty           -0.052     8.517    
+    BITSLICE_RX_TX_X0Y132
+                         RXTX_BITSLICE (Setup_RXTX_BITSLICE_BITSLICE_RX_TX_FIFO_RD_CLK_FIFO_RD_EN)
+                                                     -0.147     8.370    usnative_core/slice_61/native_slice
+  -------------------------------------------------------------------
+                         required time                          8.370    
+                         arrival time                          -8.166    
+  -------------------------------------------------------------------
+                         slack                                  0.204    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (VIOLATED) :        -0.187ns  (arrival time - required time)
+  Source:                 usnative_core/slice_89/native_slice/FIFO_RD_CLK
+                            (rising edge-triggered cell RXTX_BITSLICE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            main_ddrphy_usnativeddrphy_fifo_empty_status_reg[89]/D
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_clkout1
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (main_clkout1 rise@0.000ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        0.258ns  (logic 0.107ns (41.473%)  route 0.151ns (58.527%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.399ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    3.499ns
+    Source Clock Delay      (SCD):    3.377ns
+    Clock Pessimism Removal (CPR):    -0.277ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.364     0.364 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.404    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.404 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.176     0.580    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.230     0.810 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.121     0.931    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.017     0.948 r  BUFG_1/O
+                         net (fo=7484, unplaced)      2.429     3.377    usnative_core/slice_89/main_clkout_buf1
+    BITSLICE_RX_TX_X0Y180
+                         RXTX_BITSLICE                                r  usnative_core/slice_89/native_slice/FIFO_RD_CLK
+  -------------------------------------------------------------------    -------------------
+    BITSLICE_RX_TX_X0Y180
+                         RXTX_BITSLICE (Prop_RXTX_BITSLICE_BITSLICE_RX_TX_FIFO_RD_CLK_FIFO_EMPTY)
+                                                      0.107     3.484 r  usnative_core/slice_89/native_slice/FIFO_EMPTY
+                         net (fo=1, unplaced)         0.151     3.635    main_ddrphy_usnativeddrphy8[89]
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_fifo_empty_status_reg[89]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.460     0.460 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.510    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.510 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.196     0.706    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.295     0.411 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.136     0.547    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.019     0.566 r  BUFG_1/O
+                         net (fo=7484, unplaced)      2.933     3.499    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_fifo_empty_status_reg[89]/C
+                         clock pessimism              0.277     3.776    
+                         FDRE (Hold_FDRE_C_D)         0.046     3.822    main_ddrphy_usnativeddrphy_fifo_empty_status_reg[89]
+  -------------------------------------------------------------------
+                         required time                         -3.822    
+                         arrival time                           3.635    
+  -------------------------------------------------------------------
+                         slack                                 -0.187    
+
+
+
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         main_clkout1
+Waveform(ns):       { 0.000 1.666 }
+Period(ns):         3.333
+Sources:            { MMCME4_ADV/CLKOUT1 }
+
+Check Type        Corner  Lib Pin                    Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location              Pin
+Min Period        n/a     RXTX_BITSLICE/FIFO_RD_CLK  n/a            1.694         3.333       1.639      BITSLICE_RX_TX_X0Y52  usnative_core/slice_0/native_slice/FIFO_RD_CLK
+Max Period        n/a     PLLE4_ADV/CLKIN            n/a            14.286        3.333       10.953                           native_pll_bank61/CLKIN
+Low Pulse Width   Slow    PLLE4_ADV/CLKIN            n/a            1.167         1.666       0.500                            native_pll_bank61/CLKIN
+High Pulse Width  Slow    PLLE4_ADV/CLKIN            n/a            1.167         1.666       0.500                            native_pll_bank61/CLKIN
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_native_clock[0]
+  To Clock:  main_native_clock[0]
+
+Setup :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+PW    :            0  Failing Endpoints,  Worst Slack        0.039ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         main_native_clock[0]
+Waveform(ns):       { 0.000 0.208 }
+Period(ns):         0.417
+Sources:            { native_pll_bank61/CLKOUTPHY }
+
+Check Type        Corner  Lib Pin                   Reference Pin             Required(ns)  Actual(ns)  Slack(ns)  Location               Pin
+Min Period        n/a     BITSLICE_CONTROL/PLL_CLK  n/a                       0.375         0.417       0.042      BITSLICE_CONTROL_X0Y8  usnative_core/control_0/native_control/PLL_CLK
+Low Pulse Width   Slow    BITSLICE_CONTROL/PLL_CLK  n/a                       0.169         0.208       0.039      BITSLICE_CONTROL_X0Y8  usnative_core/control_0/native_control/PLL_CLK
+High Pulse Width  Slow    BITSLICE_CONTROL/PLL_CLK  n/a                       0.169         0.208       0.039      BITSLICE_CONTROL_X0Y8  usnative_core/control_0/native_control/PLL_CLK
+Max Skew          Slow    BITSLICE_CONTROL/PLL_CLK  BITSLICE_CONTROL/RIU_CLK  -0.300        -1.051      0.751      BITSLICE_CONTROL_X0Y8  usnative_core/control_0/native_control/PLL_CLK
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_native_clock[0]_DIV
+  To Clock:  main_native_clock[0]_DIV
+
+Setup :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+PW    :            0  Failing Endpoints,  Worst Slack        0.466ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         main_native_clock[0]_DIV
+Waveform(ns):       { 0.000 1.666 }
+Period(ns):         3.333
+Sources:            { usnative_core/control_0/native_control/RX_DIV4_CLK_Q usnative_core/control_0/native_control/TX_DIV4_CLK_Q usnative_core/control_1/native_control/RX_DIV4_CLK_Q usnative_core/control_1/native_control/TX_DIV4_CLK_Q usnative_core/control_2/native_control/RX_DIV4_CLK_Q usnative_core/control_2/native_control/TX_DIV4_CLK_Q usnative_core/control_3/native_control/RX_DIV4_CLK_Q usnative_core/control_3/native_control/TX_DIV4_CLK_Q usnative_core/control_4/native_control/RX_DIV4_CLK_Q usnative_core/control_4/native_control/TX_DIV4_CLK_Q usnative_core/control_5/native_control/RX_DIV4_CLK_Q usnative_core/control_5/native_control/TX_DIV4_CLK_Q usnative_core/control_6/native_control/RX_DIV4_CLK_Q usnative_core/control_6/native_control/TX_DIV4_CLK_Q usnative_core/control_7/native_control/RX_DIV4_CLK_Q usnative_core/control_7/native_control/TX_DIV4_CLK_Q }
+
+Check Type        Corner  Lib Pin                           Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location              Pin
+Min Period        n/a     RXTX_BITSLICE/TX_BIT_CTRL_IN[26]  n/a            2.667         3.333       0.666      BITSLICE_RX_TX_X0Y52  usnative_core/slice_0/native_slice/TX_BIT_CTRL_IN[26]
+Low Pulse Width   Slow    RXTX_BITSLICE/TX_BIT_CTRL_IN[26]  n/a            1.200         1.666       0.466      BITSLICE_RX_TX_X0Y52  usnative_core/slice_0/native_slice/TX_BIT_CTRL_IN[26]
+High Pulse Width  Slow    RXTX_BITSLICE/TX_BIT_CTRL_IN[26]  n/a            1.200         1.666       0.466      BITSLICE_RX_TX_X0Y52  usnative_core/slice_0/native_slice/TX_BIT_CTRL_IN[26]
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_native_clock[1]
+  To Clock:  main_native_clock[1]
+
+Setup :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+PW    :            0  Failing Endpoints,  Worst Slack        0.039ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         main_native_clock[1]
+Waveform(ns):       { 0.000 0.208 }
+Period(ns):         0.417
+Sources:            { native_pll_bank62/CLKOUTPHY }
+
+Check Type        Corner  Lib Pin                   Reference Pin             Required(ns)  Actual(ns)  Slack(ns)  Location                Pin
+Min Period        n/a     BITSLICE_CONTROL/PLL_CLK  n/a                       0.375         0.417       0.042      BITSLICE_CONTROL_X0Y18  usnative_core/control_10/native_control/PLL_CLK
+Low Pulse Width   Slow    BITSLICE_CONTROL/PLL_CLK  n/a                       0.169         0.208       0.039      BITSLICE_CONTROL_X0Y18  usnative_core/control_10/native_control/PLL_CLK
+High Pulse Width  Slow    BITSLICE_CONTROL/PLL_CLK  n/a                       0.169         0.208       0.039      BITSLICE_CONTROL_X0Y18  usnative_core/control_10/native_control/PLL_CLK
+Max Skew          Slow    BITSLICE_CONTROL/PLL_CLK  BITSLICE_CONTROL/RIU_CLK  -0.300        -0.868      0.568      BITSLICE_CONTROL_X0Y16  usnative_core/control_8/native_control/PLL_CLK
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_native_clock[1]_DIV
+  To Clock:  main_native_clock[1]_DIV
+
+Setup :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+PW    :            0  Failing Endpoints,  Worst Slack        0.466ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         main_native_clock[1]_DIV
+Waveform(ns):       { 0.000 1.666 }
+Period(ns):         3.333
+Sources:            { usnative_core/control_10/native_control/RX_DIV4_CLK_Q usnative_core/control_10/native_control/TX_DIV4_CLK_Q usnative_core/control_11/native_control/RX_DIV4_CLK_Q usnative_core/control_11/native_control/TX_DIV4_CLK_Q usnative_core/control_12/native_control/RX_DIV4_CLK_Q usnative_core/control_12/native_control/TX_DIV4_CLK_Q usnative_core/control_13/native_control/RX_DIV4_CLK_Q usnative_core/control_13/native_control/TX_DIV4_CLK_Q usnative_core/control_14/native_control/RX_DIV4_CLK_Q usnative_core/control_14/native_control/TX_DIV4_CLK_Q usnative_core/control_15/native_control/RX_DIV4_CLK_Q usnative_core/control_15/native_control/TX_DIV4_CLK_Q usnative_core/control_8/native_control/RX_DIV4_CLK_Q usnative_core/control_8/native_control/TX_DIV4_CLK_Q usnative_core/control_9/native_control/RX_DIV4_CLK_Q usnative_core/control_9/native_control/TX_DIV4_CLK_Q }
+
+Check Type        Corner  Lib Pin                           Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location               Pin
+Min Period        n/a     RXTX_BITSLICE/TX_BIT_CTRL_IN[26]  n/a            2.667         3.333       0.666      BITSLICE_RX_TX_X0Y104  usnative_core/slice_40/native_slice/TX_BIT_CTRL_IN[26]
+Low Pulse Width   Slow    RXTX_BITSLICE/TX_BIT_CTRL_IN[26]  n/a            1.200         1.666       0.466      BITSLICE_RX_TX_X0Y104  usnative_core/slice_40/native_slice/TX_BIT_CTRL_IN[26]
+High Pulse Width  Slow    RXTX_BITSLICE/TX_BIT_CTRL_IN[26]  n/a            1.200         1.666       0.466      BITSLICE_RX_TX_X0Y104  usnative_core/slice_40/native_slice/TX_BIT_CTRL_IN[26]
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_native_clock[2]
+  To Clock:  main_native_clock[2]
+
+Setup :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+PW    :            0  Failing Endpoints,  Worst Slack        0.039ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         main_native_clock[2]
+Waveform(ns):       { 0.000 0.208 }
+Period(ns):         0.417
+Sources:            { native_pll_bank63/CLKOUTPHY }
+
+Check Type        Corner  Lib Pin                   Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location                Pin
+Min Period        n/a     BITSLICE_CONTROL/PLL_CLK  n/a            0.375         0.417       0.042      BITSLICE_CONTROL_X0Y26  usnative_core/control_16/native_control/PLL_CLK
+Low Pulse Width   Slow    BITSLICE_CONTROL/PLL_CLK  n/a            0.169         0.208       0.039      BITSLICE_CONTROL_X0Y26  usnative_core/control_16/native_control/PLL_CLK
+High Pulse Width  Slow    BITSLICE_CONTROL/PLL_CLK  n/a            0.169         0.208       0.039      BITSLICE_CONTROL_X0Y26  usnative_core/control_16/native_control/PLL_CLK
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_native_clock[2]_DIV
+  To Clock:  main_native_clock[2]_DIV
+
+Setup :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+PW    :            0  Failing Endpoints,  Worst Slack        0.466ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         main_native_clock[2]_DIV
+Waveform(ns):       { 0.000 1.666 }
+Period(ns):         3.333
+Sources:            { usnative_core/control_16/native_control/RX_DIV4_CLK_Q usnative_core/control_16/native_control/TX_DIV4_CLK_Q usnative_core/control_17/native_control/RX_DIV4_CLK_Q usnative_core/control_17/native_control/TX_DIV4_CLK_Q usnative_core/control_18/native_control/RX_DIV4_CLK_Q usnative_core/control_18/native_control/TX_DIV4_CLK_Q usnative_core/control_19/native_control/RX_DIV4_CLK_Q usnative_core/control_19/native_control/TX_DIV4_CLK_Q usnative_core/control_20/native_control/RX_DIV4_CLK_Q usnative_core/control_20/native_control/TX_DIV4_CLK_Q usnative_core/control_21/native_control/RX_DIV4_CLK_Q usnative_core/control_21/native_control/TX_DIV4_CLK_Q }
+
+Check Type        Corner  Lib Pin                           Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location               Pin
+Min Period        n/a     RXTX_BITSLICE/TX_BIT_CTRL_IN[26]  n/a            2.667         3.333       0.666      BITSLICE_RX_TX_X0Y199  usnative_core/slice_100/native_slice/TX_BIT_CTRL_IN[26]
+Low Pulse Width   Slow    RXTX_BITSLICE/TX_BIT_CTRL_IN[26]  n/a            1.200         1.666       0.466      BITSLICE_RX_TX_X0Y199  usnative_core/slice_100/native_slice/TX_BIT_CTRL_IN[26]
+High Pulse Width  Slow    RXTX_BITSLICE/TX_BIT_CTRL_IN[26]  n/a            1.200         1.666       0.466      BITSLICE_RX_TX_X0Y199  usnative_core/slice_100/native_slice/TX_BIT_CTRL_IN[26]
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout2
+  To Clock:  main_clkout2
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.552ns,  Total Violation        0.000ns
+Hold  :          726  Failing Endpoints,  Worst Slack       -0.317ns,  Total Violation      -59.453ns
+PW    :            0  Failing Endpoints,  Worst Slack        1.201ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.552ns  (required time - arrival time)
+  Source:                 FDPE_6/C
+                            (rising edge-triggered cell FDPE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            FDPE_7/D
+                            (rising edge-triggered cell FDPE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout2
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            2.000ns  (MaxDelay Path 2.000ns)
+  Data Path Delay:        0.272ns  (logic 0.077ns (28.309%)  route 0.195ns (71.691%))
+  Logic Levels:           0  
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    6.137ns
+    Source Clock Delay      (SCD):    5.677ns
+    Clock Pessimism Removal (CPR):    -0.605ns
+  Clock Uncertainty:      0.056ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.000ns
+  Timing Exception:       MaxDelay Path 2.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout2 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.201     1.058    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.086 r  BUFG_2/O
+                         net (fo=2759, unplaced)      4.591     5.677    main_clkout_buf2
+                         FDPE                                         r  FDPE_6/C
+  -------------------------------------------------------------------    -------------------
+                         FDPE (Prop_FDPE_C_Q)         0.077     5.754 r  FDPE_6/Q
+                         net (fo=1, unplaced)         0.195     5.949    builder_xilinxasyncresetsynchronizerimpl3_rst_meta
+                         FDPE                                         r  FDPE_7/D
+  -------------------------------------------------------------------    -------------------
+
+                         max delay                    2.000     2.000    
+    AY37                                              0.000     2.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     2.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     2.507 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     2.547    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     2.547 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     2.859    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                      0.630     3.489 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.178     3.667    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     3.691 r  BUFG_2/O
+                         net (fo=2759, unplaced)      4.446     8.137    main_clkout_buf2
+                         FDPE                                         r  FDPE_7/C
+                         clock pessimism             -0.605     7.532    
+                         clock uncertainty           -0.056     7.476    
+                         FDPE (Setup_FDPE_C_D)        0.025     7.501    FDPE_7
+  -------------------------------------------------------------------
+                         required time                          7.501    
+                         arrival time                          -5.949    
+  -------------------------------------------------------------------
+                         slack                                  1.552    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (VIOLATED) :        -0.317ns  (arrival time - required time)
+  Source:                 main_ddrphy_usnativeddrphy1_reg[2]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            usnative_core/slice_2/native_slice/RX_CE
+                            (rising edge-triggered cell RXTX_BITSLICE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout2
+  Path Type:              Hold (Min at Slow Process Corner)
+  Requirement:            0.000ns  (main_clkout2 rise@0.000ns - main_clkout2 rise@0.000ns)
+  Data Path Delay:        0.188ns  (logic 0.058ns (30.851%)  route 0.130ns (69.149%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.339ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    5.876ns
+    Source Clock Delay      (SCD):    6.137ns
+    Clock Pessimism Removal (CPR):    -0.600ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout2 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     0.507 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.547    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.547 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     0.859    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                      0.630     1.489 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.178     1.667    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     1.691 r  BUFG_2/O
+                         net (fo=2759, unplaced)      4.446     6.137    main_clkout_buf2
+                         FDRE                                         r  main_ddrphy_usnativeddrphy1_reg[2]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.058     6.195 r  main_ddrphy_usnativeddrphy1_reg[2]/Q
+                         net (fo=1, unplaced)         0.130     6.325    usnative_core/slice_2/native_slice_3[0]
+    BITSLICE_RX_TX_X0Y55 RXTX_BITSLICE                                r  usnative_core/slice_2/native_slice/RX_CE
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout2 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.201     1.058    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.086 r  BUFG_2/O
+                         net (fo=2759, unplaced)      4.790     5.876    usnative_core/slice_2/main_clkout_buf2
+    BITSLICE_RX_TX_X0Y55 RXTX_BITSLICE                                r  usnative_core/slice_2/native_slice/RX_CLK
+                         clock pessimism              0.600     6.476    
+    BITSLICE_RX_TX_X0Y55 RXTX_BITSLICE (Hold_RXTX_BITSLICE_BITSLICE_RX_TX_RX_CLK_RX_CE)
+                                                      0.166     6.642    usnative_core/slice_2/native_slice
+  -------------------------------------------------------------------
+                         required time                         -6.642    
+                         arrival time                           6.325    
+  -------------------------------------------------------------------
+                         slack                                 -0.317    
+
+
+
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         main_clkout2
+Waveform(ns):       { 0.000 3.333 }
+Period(ns):         6.666
+Sources:            { MMCME4_ADV/CLKOUT2 }
+
+Check Type        Corner  Lib Pin                   Reference Pin             Required(ns)  Actual(ns)  Slack(ns)  Location                Pin
+Min Period        n/a     BITSLICE_CONTROL/RIU_CLK  n/a                       3.846         6.666       2.820      BITSLICE_CONTROL_X0Y8   usnative_core/control_0/native_control/RIU_CLK
+Low Pulse Width   Slow    BITSLICE_CONTROL/RIU_CLK  n/a                       1.731         3.333       1.602      BITSLICE_CONTROL_X0Y8   usnative_core/control_0/native_control/RIU_CLK
+High Pulse Width  Slow    BITSLICE_CONTROL/RIU_CLK  n/a                       1.731         3.333       1.602      BITSLICE_CONTROL_X0Y8   usnative_core/control_0/native_control/RIU_CLK
+Max Skew          Fast    BITSLICE_CONTROL/RIU_CLK  BITSLICE_CONTROL/PLL_CLK  1.985         0.784       1.201      BITSLICE_CONTROL_X0Y15  usnative_core/control_7/native_control/RIU_CLK
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout1
+  To Clock:  main_clkout0
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.122ns,  Total Violation        0.000ns
+Hold  :          564  Failing Endpoints,  Worst Slack       -0.490ns,  Total Violation     -265.687ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.122ns  (required time - arrival time)
+  Source:                 main_ddrphy_usnativeddrphy_ready_reg/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            main_fullrangedma_settle_reg[0]/CE
+                            (rising edge-triggered cell FDRE clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout0
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            3.333ns  (main_clkout0 rise@6.666ns - main_clkout1 rise@3.333ns)
+  Data Path Delay:        1.574ns  (logic 0.446ns (28.335%)  route 1.128ns (71.665%))
+  Logic Levels:           5  (LUT2=1 LUT3=1 LUT6=3)
+  Clock Path Skew:        -0.400ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    4.128ns = ( 10.794 - 6.666 ) 
+    Source Clock Delay      (SCD):    5.845ns = ( 9.178 - 3.333 ) 
+    Clock Pessimism Removal (CPR):    1.317ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      3.333     3.333 r  
+    AY37                                              0.000     3.333 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     3.333    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     3.921 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     3.971    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     3.971 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     4.317    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     4.190 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     4.394    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     4.422 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.756     9.178    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_ready_reg/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.077     9.255 r  main_ddrphy_usnativeddrphy_ready_reg/Q
+                         net (fo=129, unplaced)       0.245     9.500    main_ddrphy_usnativeddrphy_ready
+                         LUT6 (Prop_LUT6_I0_O)        0.150     9.650 f  main_fullrangedma2[0]_i_26/O
+                         net (fo=1, unplaced)         0.140     9.790    main_fullrangedma2[0]_i_26_n_0
+                         LUT6 (Prop_LUT6_I0_O)        0.090     9.880 f  main_fullrangedma2[0]_i_8/O
+                         net (fo=4, unplaced)         0.149    10.029    main_fullrangedma2[0]_i_8_n_0
+                         LUT2 (Prop_LUT2_I1_O)        0.053    10.082 r  main_fullrangedma_fault_status[1]_i_3/O
+                         net (fo=7, unplaced)         0.210    10.292    main_fullrangedma_fault_status[1]_i_3_n_0
+                         LUT6 (Prop_LUT6_I3_O)        0.038    10.330 f  main_fullrangedma_settle[7]_i_3/O
+                         net (fo=9, unplaced)         0.216    10.546    main_fullrangedma_settle[7]_i_3_n_0
+                         LUT3 (Prop_LUT3_I2_O)        0.038    10.584 r  main_fullrangedma_settle[7]_i_1/O
+                         net (fo=8, unplaced)         0.168    10.752    main_fullrangedma_settle_f_next_value_ce
+                         FDRE                                         r  main_fullrangedma_settle_reg[0]/CE
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout0 rise edge)
+                                                      6.666     6.666 r  
+    AY37                                              0.000     6.666 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     6.666    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     7.173 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     7.213    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     7.213 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     7.525    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                      0.630     8.155 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.176     8.331    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     8.355 r  BUFG/O
+                         net (fo=9378, unplaced)      2.439    10.794    from223_clk
+                         FDRE                                         r  main_fullrangedma_settle_reg[0]/C
+                         clock pessimism              1.317    12.111    
+                         clock uncertainty           -0.176    11.935    
+                         FDRE (Setup_FDRE_C_CE)      -0.061    11.874    main_fullrangedma_settle_reg[0]
+  -------------------------------------------------------------------
+                         required time                         11.874    
+                         arrival time                         -10.752    
+  -------------------------------------------------------------------
+                         slack                                  1.122    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (VIOLATED) :        -0.490ns  (arrival time - required time)
+  Source:                 main_ddrphy_deserializer0_o_pre_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            main_ddrphy_deserializer0_o_pre_d_reg[0]/D
+                            (rising edge-triggered cell FDRE clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout0
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (main_clkout0 rise@0.000ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        0.132ns  (logic 0.038ns (28.788%)  route 0.094ns (71.212%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.400ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    1.821ns
+    Source Clock Delay      (SCD):    3.736ns
+    Clock Pessimism Removal (CPR):    -2.316ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.364     0.364 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.404    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.404 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.176     0.580    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.230     0.810 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.121     0.931    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.017     0.948 r  BUFG_1/O
+                         net (fo=7484, unplaced)      2.788     3.736    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_deserializer0_o_pre_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.038     3.774 r  main_ddrphy_deserializer0_o_pre_reg[0]/Q
+                         net (fo=1, unplaced)         0.094     3.868    main_ddrphy_deserializer0_o_pre[0]
+                         FDRE                                         r  main_ddrphy_deserializer0_o_pre_d_reg[0]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout0 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.460     0.460 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.510    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.510 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.196     0.706    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                     -0.295     0.411 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.132     0.543    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.019     0.562 r  BUFG/O
+                         net (fo=9378, unplaced)      1.259     1.821    from223_clk
+                         FDRE                                         r  main_ddrphy_deserializer0_o_pre_d_reg[0]/C
+                         clock pessimism              2.316     4.136    
+                         clock uncertainty            0.176     4.313    
+                         FDRE (Hold_FDRE_C_D)         0.046     4.359    main_ddrphy_deserializer0_o_pre_d_reg[0]
+  -------------------------------------------------------------------
+                         required time                         -4.359    
+                         arrival time                           3.868    
+  -------------------------------------------------------------------
+                         slack                                 -0.490    
+
+
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout2
+  To Clock:  main_clkout0
+
+Setup :            0  Failing Endpoints,  Worst Slack        5.030ns,  Total Violation        0.000ns
+Hold  :            1  Failing Endpoint ,  Worst Slack       -0.144ns,  Total Violation       -0.144ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             5.030ns  (required time - arrival time)
+  Source:                 builder_xilinxmultiregimpl30_regs1_reg/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            builder_csr_bankarray_interface1_bank_bus_dat_r_reg[7]/D
+                            (rising edge-triggered cell FDRE clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout0
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            6.666ns  (main_clkout0 rise@6.666ns - main_clkout2 rise@0.000ns)
+  Data Path Delay:        1.085ns  (logic 0.371ns (34.194%)  route 0.714ns (65.806%))
+  Logic Levels:           4  (LUT6=4)
+  Clock Path Skew:        -0.400ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    4.128ns = ( 10.794 - 6.666 ) 
+    Source Clock Delay      (SCD):    5.677ns
+    Clock Pessimism Removal (CPR):    1.149ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout2 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.201     1.058    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.086 r  BUFG_2/O
+                         net (fo=2759, unplaced)      4.591     5.677    main_clkout_buf2
+                         FDRE                                         r  builder_xilinxmultiregimpl30_regs1_reg/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.077     5.754 r  builder_xilinxmultiregimpl30_regs1_reg/Q
+                         net (fo=24, unplaced)        0.207     5.961    builder_xilinxmultiregimpl30_regs1
+                         LUT6 (Prop_LUT6_I0_O)        0.150     6.111 r  builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_9/O
+                         net (fo=1, unplaced)         0.137     6.248    builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_9_n_0
+                         LUT6 (Prop_LUT6_I4_O)        0.053     6.301 f  builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_5/O
+                         net (fo=1, unplaced)         0.137     6.438    builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_5_n_0
+                         LUT6 (Prop_LUT6_I0_O)        0.053     6.491 f  builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_2/O
+                         net (fo=1, unplaced)         0.185     6.676    builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_2_n_0
+                         LUT6 (Prop_LUT6_I0_O)        0.038     6.714 r  builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_1/O
+                         net (fo=1, unplaced)         0.048     6.762    builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_1_n_0
+                         FDRE                                         r  builder_csr_bankarray_interface1_bank_bus_dat_r_reg[7]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout0 rise edge)
+                                                      6.666     6.666 r  
+    AY37                                              0.000     6.666 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     6.666    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     7.173 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     7.213    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     7.213 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     7.525    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                      0.630     8.155 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.176     8.331    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     8.355 r  BUFG/O
+                         net (fo=9378, unplaced)      2.439    10.794    from223_clk
+                         FDRE                                         r  builder_csr_bankarray_interface1_bank_bus_dat_r_reg[7]/C
+                         clock pessimism              1.149    11.943    
+                         clock uncertainty           -0.176    11.767    
+                         FDRE (Setup_FDRE_C_D)        0.025    11.792    builder_csr_bankarray_interface1_bank_bus_dat_r_reg[7]
+  -------------------------------------------------------------------
+                         required time                         11.792    
+                         arrival time                          -6.762    
+  -------------------------------------------------------------------
+                         slack                                  5.030    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (VIOLATED) :        -0.144ns  (arrival time - required time)
+  Source:                 builder_xilinxmultiregimpl30_regs1_reg/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            builder_csr_bankarray_interface1_bank_bus_dat_r_reg[7]/D
+                            (rising edge-triggered cell FDRE clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout0
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (main_clkout0 rise@0.000ns - main_clkout2 rise@0.000ns)
+  Data Path Delay:        0.478ns  (logic 0.158ns (33.054%)  route 0.320ns (66.946%))
+  Logic Levels:           4  (LUT6=4)
+  Clock Path Skew:        0.400ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    1.821ns
+    Source Clock Delay      (SCD):    3.655ns
+    Clock Pessimism Removal (CPR):    -2.234ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout2 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.364     0.364 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.404    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.404 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.176     0.580    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                      0.230     0.810 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.119     0.929    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.017     0.946 r  BUFG_2/O
+                         net (fo=2759, unplaced)      2.709     3.655    main_clkout_buf2
+                         FDRE                                         r  builder_xilinxmultiregimpl30_regs1_reg/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.038     3.693 r  builder_xilinxmultiregimpl30_regs1_reg/Q
+                         net (fo=24, unplaced)        0.101     3.794    builder_xilinxmultiregimpl30_regs1
+                         LUT6 (Prop_LUT6_I0_O)        0.060     3.854 r  builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_9/O
+                         net (fo=1, unplaced)         0.066     3.920    builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_9_n_0
+                         LUT6 (Prop_LUT6_I4_O)        0.023     3.943 f  builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_5/O
+                         net (fo=1, unplaced)         0.066     4.009    builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_5_n_0
+                         LUT6 (Prop_LUT6_I0_O)        0.023     4.032 f  builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_2/O
+                         net (fo=1, unplaced)         0.071     4.103    builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_2_n_0
+                         LUT6 (Prop_LUT6_I0_O)        0.014     4.117 r  builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_1/O
+                         net (fo=1, unplaced)         0.016     4.133    builder_csr_bankarray_interface1_bank_bus_dat_r[7]_i_1_n_0
+                         FDRE                                         r  builder_csr_bankarray_interface1_bank_bus_dat_r_reg[7]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout0 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.460     0.460 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.510    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.510 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.196     0.706    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                     -0.295     0.411 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.132     0.543    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.019     0.562 r  BUFG/O
+                         net (fo=9378, unplaced)      1.259     1.821    from223_clk
+                         FDRE                                         r  builder_csr_bankarray_interface1_bank_bus_dat_r_reg[7]/C
+                         clock pessimism              2.234     4.055    
+                         clock uncertainty            0.176     4.231    
+                         FDRE (Hold_FDRE_C_D)         0.046     4.277    builder_csr_bankarray_interface1_bank_bus_dat_r_reg[7]
+  -------------------------------------------------------------------
+                         required time                         -4.277    
+                         arrival time                           4.133    
+  -------------------------------------------------------------------
+                         slack                                 -0.144    
+
+
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout0
+  To Clock:  main_clkout1
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.355ns,  Total Violation        0.000ns
+Hold  :         3702  Failing Endpoints,  Worst Slack       -0.490ns,  Total Violation    -1327.003ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.355ns  (required time - arrival time)
+  Source:                 main_ddrphy_usnativeddrphy_tap_select_storage_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            main_ddrphy_usnativeddrphy_registeredtapstatus0_age_reg[0]/R
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_clkout1
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            3.333ns  (main_clkout1 rise@3.333ns - main_clkout0 rise@0.000ns)
+  Data Path Delay:        1.328ns  (logic 0.356ns (26.807%)  route 0.972ns (73.193%))
+  Logic Levels:           4  (LUT5=2 LUT6=2)
+  Clock Path Skew:        -0.400ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    6.305ns = ( 9.638 - 3.333 ) 
+    Source Clock Delay      (SCD):    3.667ns
+    Clock Pessimism Removal (CPR):    -3.038ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout0 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.198     1.055    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.083 r  BUFG/O
+                         net (fo=9378, unplaced)      2.584     3.667    from223_clk
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_tap_select_storage_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.077     3.744 r  main_ddrphy_usnativeddrphy_tap_select_storage_reg[0]/Q
+                         net (fo=112, unplaced)       0.242     3.986    main_ddrphy_usnativeddrphy_tap_select_storage__0[0]
+                         LUT6 (Prop_LUT6_I0_O)        0.150     4.136 r  main_ddrphy_usnativeddrphy_registeredtapstatus1_age[4]_i_8/O
+                         net (fo=1, unplaced)         0.137     4.273    main_ddrphy_usnativeddrphy_registeredtapstatus1_age[4]_i_8_n_0
+                         LUT5 (Prop_LUT5_I1_O)        0.053     4.326 r  main_ddrphy_usnativeddrphy_registeredtapstatus1_age[4]_i_6/O
+                         net (fo=1, unplaced)         0.185     4.511    main_ddrphy_usnativeddrphy_registeredtapstatus1_age[4]_i_6_n_0
+                         LUT6 (Prop_LUT6_I5_O)        0.038     4.549 r  main_ddrphy_usnativeddrphy_registeredtapstatus1_age[4]_i_3/O
+                         net (fo=2, unplaced)         0.185     4.734    main_ddrphy_usnativeddrphy_csrstatusbridge2_invalidate
+                         LUT5 (Prop_LUT5_I3_O)        0.038     4.772 r  main_ddrphy_usnativeddrphy_registeredtapstatus1_age[4]_i_1/O
+                         net (fo=12, unplaced)        0.223     4.995    main_ddrphy_usnativeddrphy_registeredtapstatus1_age[0]
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_registeredtapstatus0_age_reg[0]/R
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout1 rise edge)
+                                                      3.333     3.333 r  
+    AY37                                              0.000     3.333 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     3.333    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     3.840 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     3.880    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     3.880 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     4.192    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.630     4.822 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.181     5.003    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     5.027 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.611     9.638    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_registeredtapstatus0_age_reg[0]/C
+                         clock pessimism             -3.038     6.600    
+                         clock uncertainty           -0.176     6.424    
+                         FDRE (Setup_FDRE_C_R)       -0.074     6.350    main_ddrphy_usnativeddrphy_registeredtapstatus0_age_reg[0]
+  -------------------------------------------------------------------
+                         required time                          6.350    
+                         arrival time                          -4.995    
+  -------------------------------------------------------------------
+                         slack                                  1.355    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (VIOLATED) :        -0.490ns  (arrival time - required time)
+  Source:                 main_ddrphy_serializer49_i_d_reg[128]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout0  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            main_ddrphy_usnativeddrphy_bitslip0_r1_reg[10]/D
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_clkout1
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (main_clkout1 rise@0.000ns - main_clkout0 rise@0.000ns)
+  Data Path Delay:        0.132ns  (logic 0.038ns (28.788%)  route 0.094ns (71.212%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.400ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    3.499ns
+    Source Clock Delay      (SCD):    2.059ns
+    Clock Pessimism Removal (CPR):    1.040ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout0 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.364     0.364 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.404    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.404 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.176     0.580    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT0)
+                                                      0.230     0.810 r  MMCME4_ADV/CLKOUT0
+                         net (fo=1, unplaced)         0.118     0.928    main_clkout0
+                         BUFGCE (Prop_BUFGCE_I_O)     0.017     0.945 r  BUFG/O
+                         net (fo=9378, unplaced)      1.114     2.059    from223_clk
+                         FDRE                                         r  main_ddrphy_serializer49_i_d_reg[128]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.038     2.097 r  main_ddrphy_serializer49_i_d_reg[128]/Q
+                         net (fo=1, unplaced)         0.094     2.191    main_ddrphy_serializer49_i_d[128]
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_bitslip0_r1_reg[10]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.460     0.460 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.510    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.510 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.196     0.706    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.295     0.411 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.136     0.547    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.019     0.566 r  BUFG_1/O
+                         net (fo=7484, unplaced)      2.933     3.499    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_bitslip0_r1_reg[10]/C
+                         clock pessimism             -1.040     2.459    
+                         clock uncertainty            0.176     2.635    
+                         FDRE (Hold_FDRE_C_D)         0.046     2.681    main_ddrphy_usnativeddrphy_bitslip0_r1_reg[10]
+  -------------------------------------------------------------------
+                         required time                         -2.681    
+                         arrival time                           2.191    
+  -------------------------------------------------------------------
+                         slack                                 -0.490    
+
+
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout2
+  To Clock:  main_clkout1
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.274ns,  Total Violation        0.000ns
+Hold  :         1945  Failing Endpoints,  Worst Slack       -0.397ns,  Total Violation     -768.144ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.274ns  (required time - arrival time)
+  Source:                 usnative_core/slice_5/native_slice/TX_CLK
+                            (rising edge-triggered cell RXTX_BITSLICE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status_reg[1]/D
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_clkout1
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            3.333ns  (main_clkout1 rise@3.333ns - main_clkout2 rise@0.000ns)
+  Data Path Delay:        1.568ns  (logic 0.604ns (38.520%)  route 0.964ns (61.480%))
+  Logic Levels:           4  (LUT5=1 LUT6=3)
+  Clock Path Skew:        -0.340ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    6.305ns = ( 9.638 - 3.333 ) 
+    Source Clock Delay      (SCD):    5.877ns
+    Clock Pessimism Removal (CPR):    -0.768ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout2 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.201     1.058    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.086 r  BUFG_2/O
+                         net (fo=2759, unplaced)      4.791     5.877    usnative_core/slice_5/main_clkout_buf2
+    BITSLICE_RX_TX_X0Y58 RXTX_BITSLICE                                r  usnative_core/slice_5/native_slice/TX_CLK
+  -------------------------------------------------------------------    -------------------
+    BITSLICE_RX_TX_X0Y58 RXTX_BITSLICE (Prop_RXTX_BITSLICE_BITSLICE_RX_TX_TX_CLK_TX_CNTVALUEOUT[1])
+                                                      0.350     6.227 r  usnative_core/slice_5/native_slice/TX_CNTVALUEOUT[1]
+                         net (fo=2, unplaced)         0.409     6.636    usnative_core/slice_5/tx_count[1]
+                         LUT5 (Prop_LUT5_I0_O)        0.125     6.761 f  usnative_core/slice_5/main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status[1]_i_7/O
+                         net (fo=1, unplaced)         0.185     6.946    usnative_core/slice_10/main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status[1]_i_2
+                         LUT6 (Prop_LUT6_I5_O)        0.038     6.984 f  usnative_core/slice_10/main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status[1]_i_5/O
+                         net (fo=1, unplaced)         0.185     7.169    usnative_core/slice_55/main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status_reg[1]_1
+                         LUT6 (Prop_LUT6_I2_O)        0.038     7.207 f  usnative_core/slice_55/main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status[1]_i_2/O
+                         net (fo=1, unplaced)         0.137     7.344    usnative_core/slice_55/main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status[1]_i_2_n_0
+                         LUT6 (Prop_LUT6_I0_O)        0.053     7.397 r  usnative_core/slice_55/main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status[1]_i_1/O
+                         net (fo=1, unplaced)         0.048     7.445    usnative_core_n_194
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status_reg[1]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout1 rise edge)
+                                                      3.333     3.333 r  
+    AY37                                              0.000     3.333 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     3.333    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     3.840 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     3.880    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     3.880 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     4.192    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.630     4.822 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.181     5.003    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     5.027 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.611     9.638    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status_reg[1]/C
+                         clock pessimism             -0.768     8.870    
+                         clock uncertainty           -0.176     8.694    
+                         FDRE (Setup_FDRE_C_D)        0.025     8.719    main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_status_reg[1]
+  -------------------------------------------------------------------
+                         required time                          8.719    
+                         arrival time                          -7.445    
+  -------------------------------------------------------------------
+                         slack                                  1.274    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (VIOLATED) :        -0.397ns  (arrival time - required time)
+  Source:                 main_ddrphy_usnativeddrphy_registeredtapstatus0_local_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Destination:            main_ddrphy_usnativeddrphy_registeredtapstatus0_sampled_reg[0]/D
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_clkout1
+  Path Type:              Hold (Min at Slow Process Corner)
+  Requirement:            0.000ns  (main_clkout1 rise@0.000ns - main_clkout2 rise@0.000ns)
+  Data Path Delay:        0.179ns  (logic 0.058ns (32.402%)  route 0.121ns (67.598%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.340ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    5.845ns
+    Source Clock Delay      (SCD):    6.137ns
+    Clock Pessimism Removal (CPR):    -0.632ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout2 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     0.507 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.547    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.547 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     0.859    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                      0.630     1.489 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.178     1.667    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     1.691 r  BUFG_2/O
+                         net (fo=2759, unplaced)      4.446     6.137    main_clkout_buf2
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_registeredtapstatus0_local_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.058     6.195 r  main_ddrphy_usnativeddrphy_registeredtapstatus0_local_reg[0]/Q
+                         net (fo=1, unplaced)         0.121     6.316    main_ddrphy_usnativeddrphy_registeredtapstatus0_local[0]
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_registeredtapstatus0_sampled_reg[0]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     1.061    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.089 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.756     5.845    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_registeredtapstatus0_sampled_reg[0]/C
+                         clock pessimism              0.632     6.477    
+                         clock uncertainty            0.176     6.654    
+                         FDRE (Hold_FDRE_C_D)         0.060     6.714    main_ddrphy_usnativeddrphy_registeredtapstatus0_sampled_reg[0]
+  -------------------------------------------------------------------
+                         required time                         -6.714    
+                         arrival time                           6.316    
+  -------------------------------------------------------------------
+                         slack                                 -0.397    
+
+
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout1
+  To Clock:  main_native_clock[0]_DIV
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.348ns,  Total Violation        0.000ns
+Hold  :            0  Failing Endpoints,  Worst Slack        0.315ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.348ns  (required time - arrival time)
+  Source:                 main_ddrphy_usnativeddrphy_native_launch_i_dq_tx_data_reg[93]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            usnative_core/slice_8/native_slice/D[5]
+                            (rising edge-triggered cell RXTX_BITSLICE clocked by main_native_clock[0]_DIV  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_native_clock[0]_DIV
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            3.333ns  (main_native_clock[0]_DIV rise@3.333ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        0.457ns  (logic 0.077ns (16.849%)  route 0.380ns (83.151%))
+  Logic Levels:           0  
+  Clock Path Skew:        -1.233ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    6.026ns = ( 9.359 - 3.333 ) 
+    Source Clock Delay      (SCD):    5.845ns
+    Clock Pessimism Removal (CPR):    -1.414ns
+  Clock Uncertainty:      0.153ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.064ns
+    Phase Error              (PE):    0.106ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     1.061    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.089 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.756     5.845    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_native_launch_i_dq_tx_data_reg[93]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.077     5.922 r  main_ddrphy_usnativeddrphy_native_launch_i_dq_tx_data_reg[93]/Q
+                         net (fo=1, unplaced)         0.380     6.302    usnative_core/slice_8/tx_data[5]
+    BITSLICE_RX_TX_X0Y62 RXTX_BITSLICE                                r  usnative_core/slice_8/native_slice/D[5]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_native_clock[0]_DIV rise edge)
+                                                      3.333     3.333 r  
+    AY37                                              0.000     3.333 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     3.333    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     3.840 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     3.880    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     3.880 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     4.192    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.630     4.822 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.181     5.003    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     5.027 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.611     9.638    main_clkout_buf1
+                         PLLE4_ADV (Prop_PLLE4_ADV_CLKIN_CLKOUTPHY)
+                                                     -0.713     8.925 r  native_pll_bank61/CLKOUTPHY
+                         net (fo=8, unplaced)         0.115     9.040    usnative_core/control_1/main_native_clock[0]
+    BITSLICE_CONTROL_X0Y9
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_PLL_CLK_TX_DIV2_CLK_Q)
+                                                      0.106     9.146 r  usnative_core/control_1/native_control/TX_DIV2_CLK_Q
+    BITSLICE_CONTROL_X0Y9
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_TX_DIV2_CLK_Q_TX_DIV4_CLK_Q)
+                                                      0.075     9.221 r  usnative_core/control_1/native_control/TX_DIV4_CLK_Q
+    BITSLICE_CONTROL_X0Y9
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_TX_DIV4_CLK_Q_TX_BIT_CTRL_OUT4[26])
+                                                      0.125     9.346 r  usnative_core/control_1/native_control/TX_BIT_CTRL_OUT4[26]
+                         net (fo=1, estimated)        0.013     9.359    usnative_core/slice_8/TX_BIT_CTRL_OUT4[26]
+    BITSLICE_RX_TX_X0Y62 RXTX_BITSLICE                                r  usnative_core/slice_8/native_slice/TX_BIT_CTRL_IN[26]
+                         clock pessimism             -1.414     7.945    
+                         clock uncertainty           -0.153     7.792    
+    BITSLICE_RX_TX_X0Y62 RXTX_BITSLICE (Setup_RXTX_BITSLICE_BITSLICE_RX_TX_TX_BIT_CTRL_IN[26]_D[5])
+                                                     -0.141     7.651    usnative_core/slice_8/native_slice
+  -------------------------------------------------------------------
+                         required time                          7.651    
+                         arrival time                          -6.302    
+  -------------------------------------------------------------------
+                         slack                                  1.348    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             0.315ns  (arrival time - required time)
+  Source:                 main_ddrphy_usnativeddrphy_native_launch_i_phy_rden_reg[2]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            usnative_core/control_0/native_control/PHY_RDEN[2]
+                            (rising edge-triggered cell BITSLICE_CONTROL clocked by main_native_clock[0]_DIV  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_native_clock[0]_DIV
+  Path Type:              Hold (Min at Slow Process Corner)
+  Requirement:            0.000ns  (main_native_clock[0]_DIV rise@0.000ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        0.229ns  (logic 0.058ns (25.328%)  route 0.171ns (74.673%))
+  Logic Levels:           0  
+  Clock Path Skew:        -0.509ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    5.191ns
+    Source Clock Delay      (SCD):    6.305ns
+    Clock Pessimism Removal (CPR):    -0.605ns
+  Clock Uncertainty:      0.153ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.064ns
+    Phase Error              (PE):    0.106ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     0.507 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.547    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.547 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     0.859    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.630     1.489 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.181     1.670    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     1.694 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.611     6.305    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_native_launch_i_phy_rden_reg[2]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.058     6.363 r  main_ddrphy_usnativeddrphy_native_launch_i_phy_rden_reg[2]/Q
+                         net (fo=1, unplaced)         0.171     6.534    usnative_core/control_0/main_ddrphy_usnativeddrphy_native_launch_i_phy_rden[2]
+    BITSLICE_CONTROL_X0Y8
+                         BITSLICE_CONTROL                             r  usnative_core/control_0/native_control/PHY_RDEN[2]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_native_clock[0]_DIV rise edge)
+                                                      0.000     0.000 f  
+    AY37                                              0.000     0.000 f  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 f  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 f  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     0.857 f  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     1.061    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.089 f  BUFG_1/O
+                         net (fo=7484, unplaced)      4.756     5.845    main_clkout_buf1
+                         PLLE4_ADV (Prop_PLLE4_ADV_CLKIN_CLKOUTPHY)
+                                                     -1.141     4.704 f  native_pll_bank61/CLKOUTPHY
+                         net (fo=8, unplaced)         0.175     4.879    usnative_core/control_0/main_native_clock[0]
+    BITSLICE_CONTROL_X0Y8
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_PLL_CLK_RX_DIV2_CLK_Q)
+                                                      0.193     5.072 r  usnative_core/control_0/native_control/RX_DIV2_CLK_Q
+    BITSLICE_CONTROL_X0Y8
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_RX_DIV2_CLK_Q_RX_DIV4_CLK_Q)
+                                                      0.119     5.191 r  usnative_core/control_0/native_control/RX_DIV4_CLK_Q
+                         clock pessimism              0.605     5.796    
+                         clock uncertainty            0.153     5.949    
+    BITSLICE_CONTROL_X0Y8
+                         BITSLICE_CONTROL (Hold_CONTROL_BITSLICE_CONTROL_RX_DIV4_CLK_Q_PHY_RDEN[2])
+                                                      0.270     6.219    usnative_core/control_0/native_control
+  -------------------------------------------------------------------
+                         required time                         -6.219    
+                         arrival time                           6.534    
+  -------------------------------------------------------------------
+                         slack                                  0.315    
+
+
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout1
+  To Clock:  main_native_clock[1]_DIV
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.348ns,  Total Violation        0.000ns
+Hold  :            0  Failing Endpoints,  Worst Slack        0.315ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.348ns  (required time - arrival time)
+  Source:                 main_ddrphy_usnativeddrphy_native_launch_i_dq_tx_data_reg[453]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            usnative_core/slice_48/native_slice/D[5]
+                            (rising edge-triggered cell RXTX_BITSLICE clocked by main_native_clock[1]_DIV  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_native_clock[1]_DIV
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            3.333ns  (main_native_clock[1]_DIV rise@3.333ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        0.457ns  (logic 0.077ns (16.849%)  route 0.380ns (83.151%))
+  Logic Levels:           0  
+  Clock Path Skew:        -1.233ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    6.026ns = ( 9.359 - 3.333 ) 
+    Source Clock Delay      (SCD):    5.845ns
+    Clock Pessimism Removal (CPR):    -1.414ns
+  Clock Uncertainty:      0.153ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.064ns
+    Phase Error              (PE):    0.106ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     1.061    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.089 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.756     5.845    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_native_launch_i_dq_tx_data_reg[453]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.077     5.922 r  main_ddrphy_usnativeddrphy_native_launch_i_dq_tx_data_reg[453]/Q
+                         net (fo=1, unplaced)         0.380     6.302    usnative_core/slice_48/tx_data[5]
+    BITSLICE_RX_TX_X0Y114
+                         RXTX_BITSLICE                                r  usnative_core/slice_48/native_slice/D[5]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_native_clock[1]_DIV rise edge)
+                                                      3.333     3.333 r  
+    AY37                                              0.000     3.333 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     3.333    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     3.840 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     3.880    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     3.880 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     4.192    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.630     4.822 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.181     5.003    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     5.027 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.611     9.638    main_clkout_buf1
+                         PLLE4_ADV (Prop_PLLE4_ADV_CLKIN_CLKOUTPHY)
+                                                     -0.713     8.925 r  native_pll_bank62/CLKOUTPHY
+                         net (fo=8, unplaced)         0.115     9.040    usnative_core/control_9/main_native_clock[0]
+    BITSLICE_CONTROL_X0Y17
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_PLL_CLK_TX_DIV2_CLK_Q)
+                                                      0.106     9.146 r  usnative_core/control_9/native_control/TX_DIV2_CLK_Q
+    BITSLICE_CONTROL_X0Y17
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_TX_DIV2_CLK_Q_TX_DIV4_CLK_Q)
+                                                      0.075     9.221 r  usnative_core/control_9/native_control/TX_DIV4_CLK_Q
+    BITSLICE_CONTROL_X0Y17
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_TX_DIV4_CLK_Q_TX_BIT_CTRL_OUT4[26])
+                                                      0.125     9.346 r  usnative_core/control_9/native_control/TX_BIT_CTRL_OUT4[26]
+                         net (fo=1, estimated)        0.013     9.359    usnative_core/slice_48/TX_BIT_CTRL_OUT4[26]
+    BITSLICE_RX_TX_X0Y114
+                         RXTX_BITSLICE                                r  usnative_core/slice_48/native_slice/TX_BIT_CTRL_IN[26]
+                         clock pessimism             -1.414     7.945    
+                         clock uncertainty           -0.153     7.792    
+    BITSLICE_RX_TX_X0Y114
+                         RXTX_BITSLICE (Setup_RXTX_BITSLICE_BITSLICE_RX_TX_TX_BIT_CTRL_IN[26]_D[5])
+                                                     -0.141     7.651    usnative_core/slice_48/native_slice
+  -------------------------------------------------------------------
+                         required time                          7.651    
+                         arrival time                          -6.302    
+  -------------------------------------------------------------------
+                         slack                                  1.348    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             0.315ns  (arrival time - required time)
+  Source:                 main_ddrphy_usnativeddrphy_native_launch_i_phy_rden_reg[34]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            usnative_core/control_8/native_control/PHY_RDEN[2]
+                            (rising edge-triggered cell BITSLICE_CONTROL clocked by main_native_clock[1]_DIV  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_native_clock[1]_DIV
+  Path Type:              Hold (Min at Slow Process Corner)
+  Requirement:            0.000ns  (main_native_clock[1]_DIV rise@0.000ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        0.229ns  (logic 0.058ns (25.328%)  route 0.171ns (74.673%))
+  Logic Levels:           0  
+  Clock Path Skew:        -0.509ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    5.191ns
+    Source Clock Delay      (SCD):    6.305ns
+    Clock Pessimism Removal (CPR):    -0.605ns
+  Clock Uncertainty:      0.153ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.064ns
+    Phase Error              (PE):    0.106ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     0.507 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.547    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.547 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     0.859    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.630     1.489 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.181     1.670    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     1.694 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.611     6.305    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_native_launch_i_phy_rden_reg[34]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.058     6.363 r  main_ddrphy_usnativeddrphy_native_launch_i_phy_rden_reg[34]/Q
+                         net (fo=1, unplaced)         0.171     6.534    usnative_core/control_8/main_ddrphy_usnativeddrphy_native_launch_i_phy_rden[2]
+    BITSLICE_CONTROL_X0Y16
+                         BITSLICE_CONTROL                             r  usnative_core/control_8/native_control/PHY_RDEN[2]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_native_clock[1]_DIV rise edge)
+                                                      0.000     0.000 f  
+    AY37                                              0.000     0.000 f  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 f  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 f  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     0.857 f  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     1.061    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.089 f  BUFG_1/O
+                         net (fo=7484, unplaced)      4.756     5.845    main_clkout_buf1
+                         PLLE4_ADV (Prop_PLLE4_ADV_CLKIN_CLKOUTPHY)
+                                                     -1.141     4.704 f  native_pll_bank62/CLKOUTPHY
+                         net (fo=8, unplaced)         0.175     4.879    usnative_core/control_8/main_native_clock[0]
+    BITSLICE_CONTROL_X0Y16
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_PLL_CLK_RX_DIV2_CLK_Q)
+                                                      0.193     5.072 r  usnative_core/control_8/native_control/RX_DIV2_CLK_Q
+    BITSLICE_CONTROL_X0Y16
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_RX_DIV2_CLK_Q_RX_DIV4_CLK_Q)
+                                                      0.119     5.191 r  usnative_core/control_8/native_control/RX_DIV4_CLK_Q
+                         clock pessimism              0.605     5.796    
+                         clock uncertainty            0.153     5.949    
+    BITSLICE_CONTROL_X0Y16
+                         BITSLICE_CONTROL (Hold_CONTROL_BITSLICE_CONTROL_RX_DIV4_CLK_Q_PHY_RDEN[2])
+                                                      0.270     6.219    usnative_core/control_8/native_control
+  -------------------------------------------------------------------
+                         required time                         -6.219    
+                         arrival time                           6.534    
+  -------------------------------------------------------------------
+                         slack                                  0.315    
+
+
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout1
+  To Clock:  main_native_clock[2]_DIV
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.376ns,  Total Violation        0.000ns
+Hold  :            0  Failing Endpoints,  Worst Slack        0.511ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.376ns  (required time - arrival time)
+  Source:                 main_ddrphy_usnativeddrphy_native_launch_i_cke_tx_data_reg[2]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            usnative_core/slice_81/native_slice/D[7]
+                            (rising edge-triggered cell RXTX_BITSLICE clocked by main_native_clock[2]_DIV  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_native_clock[2]_DIV
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            3.333ns  (main_native_clock[2]_DIV rise@3.333ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        0.487ns  (logic 0.077ns (15.811%)  route 0.410ns (84.189%))
+  Logic Levels:           0  
+  Clock Path Skew:        -1.233ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    6.026ns = ( 9.359 - 3.333 ) 
+    Source Clock Delay      (SCD):    5.845ns
+    Clock Pessimism Removal (CPR):    -1.414ns
+  Clock Uncertainty:      0.153ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.064ns
+    Phase Error              (PE):    0.106ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     1.061    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.089 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.756     5.845    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_native_launch_i_cke_tx_data_reg[2]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.077     5.922 r  main_ddrphy_usnativeddrphy_native_launch_i_cke_tx_data_reg[2]/Q
+                         net (fo=8, unplaced)         0.410     6.332    usnative_core/slice_81/tx_data[1]
+    BITSLICE_RX_TX_X0Y170
+                         RXTX_BITSLICE                                r  usnative_core/slice_81/native_slice/D[7]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_native_clock[2]_DIV rise edge)
+                                                      3.333     3.333 r  
+    AY37                                              0.000     3.333 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     3.333    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     3.840 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     3.880    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     3.880 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     4.192    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.630     4.822 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.181     5.003    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     5.027 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.611     9.638    main_clkout_buf1
+                         PLLE4_ADV (Prop_PLLE4_ADV_CLKIN_CLKOUTPHY)
+                                                     -0.713     8.925 r  native_pll_bank63/CLKOUTPHY
+                         net (fo=6, unplaced)         0.100     9.025    usnative_core/control_16/main_native_clock[0]
+    BITSLICE_CONTROL_X0Y26
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_PLL_CLK_TX_DIV2_CLK_Q)
+                                                      0.117     9.142 r  usnative_core/control_16/native_control/TX_DIV2_CLK_Q
+    BITSLICE_CONTROL_X0Y26
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_TX_DIV2_CLK_Q_TX_DIV4_CLK_Q)
+                                                      0.075     9.217 r  usnative_core/control_16/native_control/TX_DIV4_CLK_Q
+    BITSLICE_CONTROL_X0Y26
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_TX_DIV4_CLK_Q_TX_BIT_CTRL_OUT1[26])
+                                                      0.127     9.344 r  usnative_core/control_16/native_control/TX_BIT_CTRL_OUT1[26]
+                         net (fo=1, estimated)        0.015     9.359    usnative_core/slice_81/TX_BIT_CTRL_OUT1[26]
+    BITSLICE_RX_TX_X0Y170
+                         RXTX_BITSLICE                                r  usnative_core/slice_81/native_slice/TX_BIT_CTRL_IN[26]
+                         clock pessimism             -1.414     7.945    
+                         clock uncertainty           -0.153     7.792    
+    BITSLICE_RX_TX_X0Y170
+                         RXTX_BITSLICE (Setup_RXTX_BITSLICE_BITSLICE_RX_TX_TX_BIT_CTRL_IN[26]_D[7])
+                                                     -0.083     7.709    usnative_core/slice_81/native_slice
+  -------------------------------------------------------------------
+                         required time                          7.709    
+                         arrival time                          -6.332    
+  -------------------------------------------------------------------
+                         slack                                  1.376    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             0.511ns  (arrival time - required time)
+  Source:                 main_ddrphy_usnativeddrphy_native_launch_i_adr_tx_data_reg[50]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            usnative_core/slice_88/native_slice/D[2]
+                            (rising edge-triggered cell RXTX_BITSLICE clocked by main_native_clock[2]_DIV  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Path Group:             main_native_clock[2]_DIV
+  Path Type:              Hold (Min at Slow Process Corner)
+  Requirement:            0.000ns  (main_native_clock[2]_DIV rise@0.000ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        0.308ns  (logic 0.058ns (18.831%)  route 0.250ns (81.169%))
+  Logic Levels:           0  
+  Clock Path Skew:        -0.433ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    5.304ns
+    Source Clock Delay      (SCD):    6.305ns
+    Clock Pessimism Removal (CPR):    -0.568ns
+  Clock Uncertainty:      0.153ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.064ns
+    Phase Error              (PE):    0.106ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     0.507 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.547    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.547 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     0.859    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.630     1.489 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.181     1.670    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     1.694 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.611     6.305    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_native_launch_i_adr_tx_data_reg[50]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.058     6.363 r  main_ddrphy_usnativeddrphy_native_launch_i_adr_tx_data_reg[50]/Q
+                         net (fo=2, unplaced)         0.250     6.613    usnative_core/slice_88/tx_data[1]
+    BITSLICE_RX_TX_X0Y179
+                         RXTX_BITSLICE                                r  usnative_core/slice_88/native_slice/D[2]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_native_clock[2]_DIV rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     0.588 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.638    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.638 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     0.984    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     0.857 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     1.061    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     1.089 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.756     5.845    main_clkout_buf1
+                         PLLE4_ADV (Prop_PLLE4_ADV_CLKIN_CLKOUTPHY)
+                                                     -1.141     4.704 r  native_pll_bank63/CLKOUTPHY
+                         net (fo=6, unplaced)         0.138     4.842    usnative_core/control_17/main_native_clock[0]
+    BITSLICE_CONTROL_X0Y27
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_PLL_CLK_TX_DIV2_CLK_Q)
+                                                      0.151     4.993 r  usnative_core/control_17/native_control/TX_DIV2_CLK_Q
+    BITSLICE_CONTROL_X0Y27
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_TX_DIV2_CLK_Q_TX_DIV4_CLK_Q)
+                                                      0.109     5.102 r  usnative_core/control_17/native_control/TX_DIV4_CLK_Q
+    BITSLICE_CONTROL_X0Y27
+                         BITSLICE_CONTROL (Prop_CONTROL_BITSLICE_CONTROL_TX_DIV4_CLK_Q_TX_BIT_CTRL_OUT4[26])
+                                                      0.180     5.282 r  usnative_core/control_17/native_control/TX_BIT_CTRL_OUT4[26]
+                         net (fo=1, estimated)        0.022     5.304    usnative_core/slice_88/TX_BIT_CTRL_OUT4[26]
+    BITSLICE_RX_TX_X0Y179
+                         RXTX_BITSLICE                                r  usnative_core/slice_88/native_slice/TX_BIT_CTRL_IN[26]
+                         clock pessimism              0.568     5.872    
+                         clock uncertainty            0.153     6.025    
+    BITSLICE_RX_TX_X0Y179
+                         RXTX_BITSLICE (Hold_RXTX_BITSLICE_BITSLICE_RX_TX_TX_BIT_CTRL_IN[26]_D[2])
+                                                      0.077     6.102    usnative_core/slice_88/native_slice
+  -------------------------------------------------------------------
+                         required time                         -6.102    
+                         arrival time                           6.613    
+  -------------------------------------------------------------------
+                         slack                                  0.511    
+
+
+
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  main_clkout1
+  To Clock:  main_clkout2
+
+Setup :            0  Failing Endpoints,  Worst Slack        2.547ns,  Total Violation        0.000ns
+Hold  :          456  Failing Endpoints,  Worst Slack       -0.170ns,  Total Violation      -77.266ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             2.547ns  (required time - arrival time)
+  Source:                 main_ddrphy_usnativeddrphy10_reg/C
+                            (rising edge-triggered cell FDSE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            main_ddrphy_usnativeddrphy12_reg/D
+                            (rising edge-triggered cell FDSE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout2
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            3.333ns  (main_clkout2 rise@6.666ns - main_clkout1 rise@3.333ns)
+  Data Path Delay:        0.295ns  (logic 0.077ns (26.102%)  route 0.218ns (73.898%))
+  Logic Levels:           0  
+  Clock Path Skew:        -0.340ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    6.137ns = ( 12.803 - 6.666 ) 
+    Source Clock Delay      (SCD):    5.845ns = ( 9.178 - 3.333 ) 
+    Clock Pessimism Removal (CPR):    -0.632ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      3.333     3.333 r  
+    AY37                                              0.000     3.333 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     3.333    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.588     3.921 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     3.971    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     3.971 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.346     4.317    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                     -0.127     4.190 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.204     4.394    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.028     4.422 r  BUFG_1/O
+                         net (fo=7484, unplaced)      4.756     9.178    main_clkout_buf1
+                         FDSE                                         r  main_ddrphy_usnativeddrphy10_reg/C
+  -------------------------------------------------------------------    -------------------
+                         FDSE (Prop_FDSE_C_Q)         0.077     9.255 r  main_ddrphy_usnativeddrphy10_reg/Q
+                         net (fo=10, unplaced)        0.218     9.473    main_ddrphy_usnativeddrphy_ctrl_reset
+                         FDSE                                         r  main_ddrphy_usnativeddrphy12_reg/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout2 rise edge)
+                                                      6.666     6.666 r  
+    AY37                                              0.000     6.666 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     6.666    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.507     7.173 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     7.213    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     7.213 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.312     7.525    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                      0.630     8.155 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.178     8.333    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.024     8.357 r  BUFG_2/O
+                         net (fo=2759, unplaced)      4.446    12.803    main_clkout_buf2
+                         FDSE                                         r  main_ddrphy_usnativeddrphy12_reg/C
+                         clock pessimism             -0.632    12.171    
+                         clock uncertainty           -0.176    11.995    
+                         FDSE (Setup_FDSE_C_D)        0.025    12.020    main_ddrphy_usnativeddrphy12_reg
+  -------------------------------------------------------------------
+                         required time                         12.020    
+                         arrival time                          -9.473    
+  -------------------------------------------------------------------
+                         slack                                  2.547    
+
+
+
+
+
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (VIOLATED) :        -0.170ns  (arrival time - required time)
+  Source:                 main_ddrphy_usnativeddrphy_payload0_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by main_clkout1  {rise@0.000ns fall@1.666ns period=3.333ns})
+  Destination:            main_ddrphy_usnativeddrphy0_reg[0]/D
+                            (rising edge-triggered cell FDRE clocked by main_clkout2  {rise@0.000ns fall@3.333ns period=6.666ns})
+  Path Group:             main_clkout2
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (main_clkout2 rise@0.000ns - main_clkout1 rise@0.000ns)
+  Data Path Delay:        0.132ns  (logic 0.038ns (28.788%)  route 0.094ns (71.212%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.079ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    3.417ns
+    Source Clock Delay      (SCD):    3.736ns
+    Clock Pessimism Removal (CPR):    -0.399ns
+  Clock Uncertainty:      0.176ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.088ns
+    Phase Error              (PE):    0.120ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock main_clkout1 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.364     0.364 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.040     0.404    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.404 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.176     0.580    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT1)
+                                                      0.230     0.810 r  MMCME4_ADV/CLKOUT1
+                         net (fo=1, unplaced)         0.121     0.931    main_clkout1
+                         BUFGCE (Prop_BUFGCE_I_O)     0.017     0.948 r  BUFG_1/O
+                         net (fo=7484, unplaced)      2.788     3.736    main_clkout_buf1
+                         FDRE                                         r  main_ddrphy_usnativeddrphy_payload0_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_FDRE_C_Q)         0.038     3.774 r  main_ddrphy_usnativeddrphy_payload0_reg[0]/Q
+                         net (fo=1, unplaced)         0.094     3.868    main_ddrphy_usnativeddrphy_payload0[0]
+                         FDRE                                         r  main_ddrphy_usnativeddrphy0_reg[0]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock main_clkout2 rise edge)
+                                                      0.000     0.000 r  
+    AY37                                              0.000     0.000 r  clk3000_p (IN)
+                         net (fo=0)                   0.000     0.000    IBUFDS/I
+    HPIOBDIFFINBUF_X0Y84 DIFFINBUF (Prop_DIFFINBUF_HPIOBDIFFINBUF_DIFF_IN_P_O)
+                                                      0.460     0.460 r  IBUFDS/DIFFINBUF_INST/O
+                         net (fo=1, estimated)        0.050     0.510    IBUFDS/OUT
+    AY37                 IBUFCTRL (Prop_IBUFCTRL_HPIOB_M_I_O)
+                                                      0.000     0.510 r  IBUFDS/IBUFCTRL_INST/O
+                         net (fo=1, unplaced)         0.196     0.706    main_clkin_signal
+                         MMCME4_ADV (Prop_MMCME4_ADV_CLKIN1_CLKOUT2)
+                                                     -0.295     0.411 r  MMCME4_ADV/CLKOUT2
+                         net (fo=1, unplaced)         0.133     0.544    main_clkout2
+                         BUFGCE (Prop_BUFGCE_I_O)     0.019     0.563 r  BUFG_2/O
+                         net (fo=2759, unplaced)      2.854     3.417    main_clkout_buf2
+                         FDRE                                         r  main_ddrphy_usnativeddrphy0_reg[0]/C
+                         clock pessimism              0.399     3.816    
+                         clock uncertainty            0.176     3.992    
+                         FDRE (Hold_FDRE_C_D)         0.046     4.038    main_ddrphy_usnativeddrphy0_reg[0]
+  -------------------------------------------------------------------
+                         required time                         -4.038    
+                         arrival time                           3.868    
+  -------------------------------------------------------------------
+                         slack                                 -0.170    
+
+
+
+
+
+---------------------------------------------------------------------------------------------------
+Path Group:  **default**
+From Clock:  
+  To Clock:  
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.753ns,  Total Violation        0.000ns
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.753ns  (required time - arrival time)
+  Source:                 FDPE_12/C
+                            (rising edge-triggered cell FDPE)
+  Destination:            FDPE_13/D
+  Path Group:             **default**
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            2.000ns  (MaxDelay Path 2.000ns)
+  Data Path Delay:        0.272ns  (logic 0.077ns (28.309%)  route 0.195ns (71.691%))
+  Logic Levels:           1  (FDPE=1)
+  Timing Exception:       MaxDelay Path 2.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         FDPE                         0.000     0.000 r  FDPE_12/C
+                         FDPE (Prop_FDPE_C_Q)         0.077     0.077 r  FDPE_12/Q
+                         net (fo=1, unplaced)         0.195     0.272    builder_xilinxasyncresetsynchronizerimpl6_rst_meta
+                         FDPE                                         r  FDPE_13/D
+  -------------------------------------------------------------------    -------------------
+
+                         max delay                    2.000     2.000    
+                         clock pessimism              0.000     2.000    
+                         FDPE (Setup_fdpe_C_D)        0.025     2.025    FDPE_13
+  -------------------------------------------------------------------
+                         required time                          2.025    
+                         arrival time                          -0.272    
+  -------------------------------------------------------------------
+                         slack                                  1.753    
+
+
+
+
+

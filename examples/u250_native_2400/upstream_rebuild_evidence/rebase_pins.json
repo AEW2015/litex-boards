@@ -1,0 +1,23 @@
+{
+  "fetched_at_utc": "2026-10-08T05:12:49.053547+00:00",
+  "repositories": {
+    "litedram": {
+      "old_head": "00cd8ffa17d74ef19d60728085ec4cfba29f869a",
+      "expected_remote": "00cd8ffa17d74ef19d60728085ec4cfba29f869a",
+      "upstream": "74522f715d7b10163ef6f6caa09887a90874be83",
+      "old_base": "0b8d66c40dae1ba83b2c66f72adc07bd2aae9654"
+    },
+    "litex": {
+      "old_head": "34a9d07b93e667e95b402c75a21c9b0394dc723b",
+      "expected_remote": "34a9d07b93e667e95b402c75a21c9b0394dc723b",
+      "upstream": "3843e71b0a6932acad2fb3e7a36ca8cb060b7261",
+      "old_base": "80789363b96009ebb610f6e08a822ee1ec7e35c2"
+    },
+    "litex-boards": {
+      "old_head": "14b323db96114d232072be0eaa6a2354dbc262b6",
+      "expected_remote": "14b323db96114d232072be0eaa6a2354dbc262b6",
+      "upstream": "8215d8d9b4b23ed138b7e634bbf87ff2920c4221",
+      "old_base": "880f2b5b832348864f2435ad2da7dd6358d7da61"
+    }
+  }
+}

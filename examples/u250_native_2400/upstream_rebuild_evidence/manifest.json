@@ -1,0 +1,226 @@
+{
+  "overall": "PASS",
+  "scope": "Offline build; hardware explicitly excluded",
+  "path_base": "Paths relative to examples/u250_native_2400",
+  "artifacts": [
+    {
+      "role": "programming_image",
+      "path": "build/gateware/u250_native_2400.bit",
+      "sha256": "6888e38eb64cb2427c181b72b04fbb9376089ffd01326c5fd71a2ec5629fb92c"
+    },
+    {
+      "role": "routed_checkpoint",
+      "path": "build/gateware/u250_native_2400_final.dcp",
+      "sha256": "297e647853edcd0e3295002710f8eb74d7b4710855f4880b33189b015a680c19"
+    },
+    {
+      "role": "rtl",
+      "path": "build/gateware/u250_native_2400.v",
+      "sha256": "5cd7051ea09e990ce9dc0e5d18361729f1171fc13af3ee2fb37e827ed133e286"
+    },
+    {
+      "role": "constraints",
+      "path": "build/gateware/u250_native_2400.xdc",
+      "sha256": "d9627850143d68f8a3e3974d2ed4eadec6836162a728be62e55a7ad072107225"
+    },
+    {
+      "role": "rebuild",
+      "path": "scripts/resume_implementation.tcl",
+      "sha256": "be1892e17caca1acc41bb09f8e42f2c5bdf3b20f09c35b07e2339c8e00cbc9c5"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/build_execution.json",
+      "sha256": "767e083fb656baaf9ec84b539eaf17a3047d51128a9750b4193ae741a5d6cc11"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/build_input_binding.json",
+      "sha256": "91ba2f1a95d5923350c3edc70157ac47ce3786af36df629e2ba6e110f1221a1d"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/design_config.json",
+      "sha256": "7edd58d7be5d17b661d7e0171a3873e98d9d95e18a17530976dbfaf2fd647bff"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/dma_byte_enable.log",
+      "sha256": "bc4f5c263a840eb5b9637170d81adabc0c9e2a299c6553b881f1a333eb5ffe52"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/dma_simulation.json",
+      "sha256": "48a4bc6866935df0c3ce55e639bb19b5a06cdd07b2ab22b638ce515c7cd85b96"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/dma_simulation.log",
+      "sha256": "9088676c66527eac95e57d634549f378489f96fabf4b585de91d6eabb8b53c29"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/implementation_v1.log",
+      "sha256": "7d50b9c6c953796a898aa9e5c35f5b3c1c53f610529ac7d0289957a44f0eeb91"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/rebase_pins.json",
+      "sha256": "65880a67bde9da1cd7170101d6813e2aa3faa203d698ce6b5c8a9aeadc342cf8"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/rebuild_signoff.json",
+      "sha256": "861ab44111eb2daa1b7dd56c3dc3385948d4ff8dd2b4109c080e394e446082a3"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/regressions.json",
+      "sha256": "304e08f55c45dcb56271148522cbfa32ec37cdfdf968cb4f131e5418864facc5"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/regressions.log",
+      "sha256": "8f8dbd9d6cb7c28f73f9b1d8c83e55977b62ce8a09f1299a90505ec5ca0a3729"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/run_dma_sim.py",
+      "sha256": "4251ed49ec02fafff98da4f2bd5787d23ae8e7c607f26f6a62456ec15e8c279c"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/run_regressions.py",
+      "sha256": "d7875aa8c5966949dd4d10f92ebe4405ee4700d5457bf7b4ee7cbd3d7dbe7855"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/run_stream_regressions.py",
+      "sha256": "c67b9b4d2a5d581b4e67ef8ef3458eee227fd874648616c20f36cf569fdef0cf"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/simulate_write_only_compat.py",
+      "sha256": "5b9c47dd2c56481b7ef6214014267bd77d8abb7219a06b0e56dc5c5d40bf1bbf"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/source_catalog.json",
+      "sha256": "7e9e4f18ed5f0c0361237ac5d2d0e2aebf934e7b5ab70bf5d85dd7a59f11b76d"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/streams.log",
+      "sha256": "9c703bf0f1ec3248bdc8c5876f965ad7347729ea52417f6575dc2177a01933de"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/stream_regressions.json",
+      "sha256": "e4d3241e665090a63d31f19734b45942051cddab6718948060cdfdde01faca58"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/synthesis_v1.log",
+      "sha256": "9f80141bda039b5ca9195a40a13d0a96233cc365efc726f8af978f2fc6afeb58"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_bus_skew.rpt",
+      "sha256": "3dafbe6c90d5ad921407211018a6c3ff3246b38e73cd9feeb2e100911f4ab671"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_cdc.rpt",
+      "sha256": "6b3a0c68d9d098f4056b4d2e116deecd91b3618991e3a85613e1e0bc3d8358f9"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_final_drc.rpt",
+      "sha256": "1d2d59c09c35e2516f78c80e538031d2e1e84c73c43c4febba05e0e7ee0d20c1"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_final_timing.rpt",
+      "sha256": "e53e2200d53d68046f7fea3b900e22485742cab16e0532c832aabcf1264a82fb"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_final_utilization.rpt",
+      "sha256": "a5957972404f91d3a46923f07d610b03084bb4ac039961cb35bc6e76880070be"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_methodology.rpt",
+      "sha256": "848e37b89b7243cebf9981a542a43ab37095584b6d7976de53a1069e6a3e2888"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_pulse_width.rpt",
+      "sha256": "2db2f4e462b97aab0f176b48cf322b3982108102ccdef3e4ce37e5b22aaf9f5c"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_route_status.rpt",
+      "sha256": "0e6029b58a650b429940502b98a3440b73adaef2d4d6ce5ca630c31933847850"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_timing_synth.rpt",
+      "sha256": "25d86ab376a093246b73721218a2da898a4d06ece7cf8256a52bed0fe82b3ba4"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/u250_native_2400_utilization_synth.rpt",
+      "sha256": "ddab01153654040c37597e54b26e26bf96ab821e6daee0fd15bb856ce4486f73"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/warnings_rebuild_review.txt",
+      "sha256": "713dc6d9ee73f5335789a32c0dbabb651f95c55aacfe8e9f5271356551eb5559"
+    },
+    {
+      "role": "evidence",
+      "path": "upstream_rebuild_evidence/x4_rebased.log",
+      "sha256": "e2ced23a8c62fe297c519337035af41c9e67fa064338281e3d6a618bd1f668ae"
+    }
+  ],
+  "checks": {
+    "functional_tests": {
+      "status": "pass",
+      "evidence": "upstream_rebuild_evidence/rebuild_signoff.json",
+      "count": 141
+    },
+    "routed_timing": {
+      "status": "pass",
+      "evidence": "upstream_rebuild_evidence/u250_native_2400_final_timing.rpt",
+      "setup_slack_ns": 0.201,
+      "hold_slack_ns": 0.011
+    },
+    "pulse_width": {
+      "status": "pass",
+      "evidence": "upstream_rebuild_evidence/u250_native_2400_pulse_width.rpt"
+    },
+    "bus_skew": {
+      "status": "pass",
+      "evidence": "upstream_rebuild_evidence/u250_native_2400_bus_skew.rpt"
+    },
+    "routing": {
+      "status": "pass",
+      "evidence": "upstream_rebuild_evidence/u250_native_2400_route_status.rpt"
+    },
+    "drc": {
+      "status": "pass",
+      "evidence": "upstream_rebuild_evidence/u250_native_2400_final_drc.rpt",
+      "errors": 0
+    },
+    "source_binding": {
+      "status": "pass",
+      "evidence": "upstream_rebuild_evidence/build_input_binding.json"
+    },
+    "cdc_methodology_review": {
+      "status": "pass",
+      "evidence": "upstream_rebuild_evidence/warnings_rebuild_review.txt",
+      "qualification": "Retained critical CDC diagnostics are not hardware-qualified"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+[
+  {
+    "repo": "litedram",
+    "modules": [
+      "test.test_dma_byte_enable"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.75,
+    "log": "dma_byte_enable.log"
+  },
+  {
+    "repo": "litex",
+    "modules": [
+      "test.interconnect.test_stream",
+      "test.interconnect.test_stream_pipeline"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.5939999999973224,
+    "log": "streams.log"
+  }
+]

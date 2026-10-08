@@ -1,0 +1,83 @@
+Fresh upstream-rebased U250 offline build: retained diagnostics
+=============================================================
+
+Scope: Vivado 2025.2, xcu250-figd2104-2L-e, channel 0, Native DDR4-2400.
+This review records retained diagnostics; it is not a clean CDC result or
+hardware qualification. Original reports and the earlier build remain intact.
+
+Executed gates
+--------------
+Both synthesis and implementation exited 0; Bitgen Completed Successfully.
+Final setup WNS +0.201 ns, hold WHS +0.011 ns, pulse-width WPWS +0.039 ns.
+No failing setup/hold/pulse-width endpoints. Four Gray-pointer bus-skew bounds
+of 6.667 ns pass; worst measured skew 0.493 ns, minimum slack 6.174 ns.
+All 45046 routable nets are fully routed; routing errors 0. DRC errors 0.
+No clockless registers or unconstrained internal endpoints. DDR RESET_n is
+the one output with an explicit false path: asynchronous initialization/reset
+hold times must be checked separately. The BSCANE2 INTERNAL_TCK clock is
+constrained at 30 MHz and grouped asynchronous to the board-derived clocks.
+The 3.333 ns generated reference constraint is rounded; the nominal physical
+configuration remains 300 MHz reference / 1200 MHz CK / 2400 MT/s.
+
+CDC report: 5 critical, 20 warnings, 1 informational
+-------------------------------------------------
+CDC-6 (4): three-bit JTAG FIFO Gray pointers use two-stage ASYNC_REG
+synchronizers. Independent bus-skew constraints pass. Correctness depends
+on the Gray counter and FIFO protocols; timing exclusion alone is insufficient.
+CDC-26 (16): JTAG dual-clock LUTRAM read/write collision diagnostics. The FIFO
+full/empty protocol controls ownership; arbitrary cross-clock RAM access is
+not qualified by this report. Management accesses are separate from native DMA.
+CDC-10 (5 critical): four JTAG reset paths combine logic before asynchronous
+reset synchronizers; one Native PHY en_vtc readiness/control path combines
+logic before its RIU-domain two-stage synchronizer. These are retained
+experimental limitations, including potential reset glitches and VTC changes
+during transitions. Stable management controls, reset release and VTC behavior
+need independent hardware qualification. No waiver or severity downgrade was
+applied to claim a clean CDC report.
+CDC-9 (1 info): asynchronous reset with ASYNC_REG synchronization.
+
+Methodology report: 17 warnings, 3 advisories, no critical warnings
+----------------------------------------------------------------
+LUTAR-1 (1): JTAG reset-combining LUT drives asynchronous preset/clear; this
+is the reset-glitch concern above and remains unresolved.
+SYNTH-6 (16): FIFO BRAM output registers are implemented in fabric rather
+than merged into the RAM blocks. Routed timing passes; this is an optimization
+diagnostic, not a proof of functional memory operation.
+CLKC-58 (3 advisories): Native PLLE4s have no explicit LOC; actual connected
+Native resources and clocks were placed/routed in this device. Placement and
+clock behavior still need physical calibration validation.
+
+DRC report: 4 warnings, no errors or critical warnings
+----------------------------------------------------
+DCIRST-1 (4): inactive DDR1/DDR2 CKE and CS_n use SSTL12_DCI without a
+DCIRESET primitive in those banks. All unused modules are held RESET_n low,
+CKE low and CS_n high. This explains the intended inactive state; it does
+not establish electrical behavior on a physical board. Channel-0 active
+interfaces have no DCIRST-1 diagnostic in the fresh report.
+
+Functional scope and reproducibility
+------------------------------------
+141 selected tests passed: 82 PHY/DFI/init regressions, 3 x4 tests, 4 full-range
+DMA tests, 1 upstream DMA byte-enable test (24 subcases), 51 stream tests.
+DMA tests cover addresses above 4 GiB, the final 64-byte word, all byte masks
+with RMW, independent engines and stalls; they do not exercise 16 GiB of
+physical DRAM. Upstream write-only-memory simulation uses the archived
+simulation-only compatibility shim with pinned Migen; no synthesis sources
+were changed by this shim. LiteEth was added only for upstream KCU105 test
+imports. Its exact commit is recorded in source_catalog.json.
+The archived regression wrappers were executed from the isolated workspace
+named in the logs; their ROOT is their original workspace parent. The portable
+example checks are reproduced with python scripts/run_tests.py. Full upstream
+regressions additionally require the pinned LiteEth checkout and the archived
+write-only simulation shim, with repository paths set as in those wrappers.
+
+Native/RDIMM limitations retained from the original delivery
+---------------------------------------------------------
+Installed SPD, registered command latency, RDIMM RCWs, CL17/CWL12, ODT/drive
+settings and Native BITSLICE reset/RIU/VTC behavior have no hardware validation.
+Native and reference MIG differ in REFCLK_FREQ/PLLCLK attribute interpretation
+and RTT_WR settings; their equivalence is unproven. No autonomous calibration
+or board programming was performed. External CSR initialization/training must
+precede DMA admission. No calibration logs or measured throughput are claimed.
+The 150 MHz x512 native interface has a 9.6 GB/s ceiling versus 19.2 GB/s
+physical x64 DDR4-2400; that is an architectural limit, not measured bandwidth.

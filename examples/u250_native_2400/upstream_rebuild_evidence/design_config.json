@@ -1,0 +1,155 @@
+{
+  "part": "xcu250-figd2104-2L-e",
+  "channel": 0,
+  "data_rate": 2400000000.0,
+  "controller_hz": 150000000.0,
+  "phy_hz": 300000000.0,
+  "ck_hz": 1200000000.0,
+  "bitslice_pll_hz": 2400000000.0,
+  "capacity_bytes": 17179869184,
+  "native_address_width": 28,
+  "native_beat_bytes": 64,
+  "strobes": 16,
+  "with_dm": false,
+  "is_rdimm": true,
+  "cl": 17,
+  "cwl": 12,
+  "cmd_latency": 6,
+  "init_sequence": [
+    [
+      "Release reset",
+      0,
+      0,
+      "DFII_CONTROL_ODT|DFII_CONTROL_RESET_N",
+      50000
+    ],
+    [
+      "Bring CKE high",
+      0,
+      0,
+      "DFII_CONTROL_CKE|DFII_CONTROL_ODT|DFII_CONTROL_RESET_N",
+      10000
+    ],
+    [
+      "Reset RCD",
+      96,
+      7,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      50000
+    ],
+    [
+      "Load RCD F0RC0F",
+      244,
+      7,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      100
+    ],
+    [
+      "Load RCD F0RC03",
+      53,
+      7,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      100
+    ],
+    [
+      "Load RCD F0RC04",
+      69,
+      7,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      100
+    ],
+    [
+      "Load RCD F0RC05",
+      85,
+      7,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      100
+    ],
+    [
+      "Load RCD F0RC0D",
+      212,
+      7,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      100
+    ],
+    [
+      "Load RCD F0RC0A",
+      163,
+      7,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      100
+    ],
+    [
+      "Load RCD F0RC3X",
+      826,
+      7,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      100
+    ],
+    [
+      "Load Mode Register 3",
+      0,
+      3,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      0
+    ],
+    [
+      "Load Mode Register 6",
+      4096,
+      6,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      0
+    ],
+    [
+      "Load Mode Register 5",
+      0,
+      5,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      0
+    ],
+    [
+      "Load Mode Register 4",
+      0,
+      4,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      0
+    ],
+    [
+      "Load Mode Register 2, CWL=12",
+      536,
+      2,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      0
+    ],
+    [
+      "Load Mode Register 1",
+      769,
+      1,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      0
+    ],
+    [
+      "Load Mode Register 0, CL=17, BL=8",
+      9060,
+      0,
+      "DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS",
+      200
+    ],
+    [
+      "ZQ Calibration",
+      1024,
+      0,
+      "DFII_COMMAND_WE|DFII_COMMAND_CS",
+      200
+    ]
+  ],
+  "init_registers": {
+    "1": 769
+  },
+  "banks": [
+    61,
+    62,
+    63
+  ],
+  "hardware_validated": false
+}

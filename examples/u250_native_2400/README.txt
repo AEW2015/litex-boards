@@ -60,12 +60,38 @@ not a newly routed build of every future branch commit. The repository port
 also fixes legacy PHY-settings objects without with_dm, keeping their previous
 DM default while preserving explicit DM=false for this U250 design.
 
+Fresh upstream rebase and rebuild (2026-10-07)
+--------------------------------------------
+The three U250 branches were rebased onto upstream master at:
+  LiteDRAM:     74522f715d7b10163ef6f6caa09887a90874be83
+  LiteX:        3843e71b0a6932acad2fb3e7a36ca8cb060b7261
+  LiteX-Boards: 8215d8d9b4b23ed138b7e634bbf87ff2920c4221
+The DFI rebase combines upstream configurable serializers/deserializers with
+the Native PHY throughput, reset and read-slot options. Exact rebuilt core
+commits are in repositories.lock.json and upstream_rebuild_evidence/.
+
+A fresh Vivado 2025.2 synthesis, placement, routing and bitstream generation
+completed successfully. Routed setup +0.201 ns, hold +0.011 ns, pulse width
++0.039 ns; worst Gray-pointer bus skew 0.493 ns against a 6.667 ns bound.
+Routing and DRC errors: zero. All 141 selected tests passed, including DMA
+address/RMW tests and upstream PHY, DFI and stream regressions. A current
+LiteEth checkout was needed only for upstream test imports; its exact revision
+is recorded in source_catalog.json. Migen remains at the pinned revision.
+
+upstream_rebuild_evidence/ contains fresh reports, executed logs, source and
+artifact hashes, the pre-rebase/upstream pins and warning review. Its manifest
+binds the locally generated .bit and routed .dcp; binaries are ignored by Git.
+The recorded built LiteX-Boards revision precedes this documentation/evidence
+commit; compiled RTL/constraints and build scripts are independently hashed
+and were unchanged throughout the build. The earlier evidence is preserved.
+
 Hardware is explicitly out of scope. This is an experimental candidate, with
 no SPD verification, physical calibration, retention or measured bandwidth.
 Calibration/initialization is not autonomous in the CPU-free image: external
 CSR management must complete training before DMA admission. Five critical
 CDC diagnostics and inactive-channel DCI warnings remain documented in
-offline_build_evidence/warnings_review.txt. RDIMM latency, VTC/reset behavior,
+upstream_rebuild_evidence/warnings_rebuild_review.txt (with earlier results
+in offline_build_evidence/warnings_review.txt). RDIMM latency, VTC/reset behavior,
 Native/MIG reference-frequency attribute differences and ODT require further
 qualification. No hardware success is implied by bitstream generation.
 

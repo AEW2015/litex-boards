@@ -1,0 +1,1159 @@
+#-----------------------------------------------------------
+# Vivado v2025.2 (64-bit)
+# SW Build 6299465 on Fri Nov 14 19:35:11 GMT 2025
+# IP Build 6300035 on Fri Nov 14 10:48:45 MST 2025
+# SharedData Build 6298862 on Thu Nov 13 04:50:51 MST 2025
+# Start of session at: Wed Oct  7 23:19:31 2026
+# Process ID         : 5584
+# Current directory  : C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400
+# Command line       : vivado.exe -mode batch -source C:\Users\lavat\codex\litedram\u250_rebase_20261007\litex-boards\examples\u250_native_2400\scripts\synthesize.tcl -log C:\Users\lavat\codex\litedram\u250_rebase_20261007\litex-boards\examples\u250_native_2400\evidence\synthesis_v1.log -journal C:\Users\lavat\codex\litedram\u250_rebase_20261007\litex-boards\examples\u250_native_2400\evidence\synthesis_v1.jou
+# Log file           : C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/evidence/synthesis_v1.log
+# Journal file       : C:\Users\lavat\codex\litedram\u250_rebase_20261007\litex-boards\examples\u250_native_2400\evidence\synthesis_v1.jou
+# Running On         : DESKTOP-I75K8PP
+# Platform           : Windows Server 2016 or Windows 10
+# Operating System   : 19045
+# Processor Detail   : AMD Ryzen 7 3700X 8-Core Processor             
+# CPU Frequency      : 3593 MHz
+# CPU Physical cores : 8
+# CPU Logical cores  : 16
+# Host memory        : 34304 MB
+# Swap memory        : 64424 MB
+# Total Virtual      : 98729 MB
+# Available Virtual  : 54861 MB
+#-----------------------------------------------------------
+source {C:\Users\lavat\codex\litedram\u250_rebase_20261007\litex-boards\examples\u250_native_2400\scripts\synthesize.tcl}
+# set root [file normalize [file join [file dirname [info script]] ..]]
+# set out [file join $root build gateware]
+# set_param general.maxThreads 4
+# create_project -in_memory -name u250_native_2400 -part xcu250-figd2104-2L-e
+create_project: Time (s): cpu = 00:00:13 ; elapsed = 00:00:06 . Memory (MB): peak = 612.375 ; gain = 228.516
+# set_msg_config -id {Common 17-55} -new_severity {Warning}
+# read_verilog [file join $root build native usnative_core.v]
+# set workspace [file normalize [file join $root .. .. ..]]
+# if {[info exists ::env(U250_REPO_ROOT)]} {set workspace $::env(U250_REPO_ROOT)}
+# set repository [file join $workspace litedram]
+# if {[info exists ::env(U250_LITEDRAM_REPO)]} {set repository $::env(U250_LITEDRAM_REPO)}
+# if {![file exists $repository]} {set repository [file join $workspace u250-litedram]}
+# read_verilog [file join $repository litedram phy usnative riu_falling_launch.v]
+# read_verilog [file join $out u250_native_2400.v]
+# read_xdc [file join $out u250_native_2400.xdc]
+# set_property PROCESSING_ORDER EARLY [get_files *u250_native_2400.xdc]
+# synth_design -directive default -top u250_native_2400 -part xcu250-figd2104-2L-e
+Command: synth_design -directive default -top u250_native_2400 -part xcu250-figd2104-2L-e
+Starting synth_design
+Attempting to get a license for feature 'Synthesis' and/or device 'xcu250'
+INFO: [Common 17-349] Got license for feature 'Synthesis' and/or device 'xcu250'
+INFO: [Device 21-403] Loading part xcu250-figd2104-2L-e
+INFO: [Synth 8-7079] Multithreading enabled for synth_design using a maximum of 4 processes.
+INFO: [Synth 8-7078] Launching helper process for spawning children vivado processes
+INFO: [Synth 8-7075] Helper process launched with PID 14028
+---------------------------------------------------------------------------------
+Starting RTL Elaboration : Time (s): cpu = 00:00:08 ; elapsed = 00:00:09 . Memory (MB): peak = 2262.777 ; gain = 418.668
+---------------------------------------------------------------------------------
+INFO: [Synth 8-6157] synthesizing module 'u250_native_2400' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:23]
+INFO: [Synth 8-3876] $readmem data file 'u250_native_2400_mem.init' is read successfully [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41895]
+INFO: [Synth 8-155] case statement is not full and has no default [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:18434]
+INFO: [Synth 8-155] case statement is not full and has no default [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36380]
+INFO: [Synth 8-155] case statement is not full and has no default [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36403]
+INFO: [Synth 8-155] case statement is not full and has no default [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:37237]
+INFO: [Synth 8-155] case statement is not full and has no default [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:37595]
+INFO: [Synth 8-6157] synthesizing module 'BUFG' [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:2678]
+INFO: [Synth 8-6155] done synthesizing module 'BUFG' (0#1) [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:2678]
+INFO: [Synth 8-6157] synthesizing module 'PLLE4_ADV' [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:134275]
+	Parameter CLKFBOUT_MULT bound to: 4 - type: integer 
+	Parameter CLKFBOUT_PHASE bound to: 9.000000e+01 - type: double 
+	Parameter CLKIN_PERIOD bound to: 3.333333e+00 - type: double 
+	Parameter CLKOUT0_DIVIDE bound to: 1 - type: integer 
+	Parameter CLKOUTPHY_MODE bound to: VCO_2X - type: string 
+	Parameter COMPENSATION bound to: INTERNAL - type: string 
+	Parameter DIVCLK_DIVIDE bound to: 1 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'PLLE4_ADV' (0#1) [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:134275]
+WARNING: [Synth 8-7071] port 'CLKOUT0' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank61' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41808]
+WARNING: [Synth 8-7071] port 'CLKOUT0B' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank61' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41808]
+WARNING: [Synth 8-7071] port 'CLKOUT1' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank61' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41808]
+WARNING: [Synth 8-7071] port 'CLKOUT1B' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank61' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41808]
+WARNING: [Synth 8-7071] port 'DO' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank61' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41808]
+WARNING: [Synth 8-7071] port 'DRDY' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank61' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41808]
+WARNING: [Synth 8-7023] instance 'native_pll_bank61' of module 'PLLE4_ADV' has 19 connections declared, but only 13 given [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41808]
+WARNING: [Synth 8-7071] port 'CLKOUT0' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank62' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41839]
+WARNING: [Synth 8-7071] port 'CLKOUT0B' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank62' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41839]
+WARNING: [Synth 8-7071] port 'CLKOUT1' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank62' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41839]
+WARNING: [Synth 8-7071] port 'CLKOUT1B' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank62' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41839]
+WARNING: [Synth 8-7071] port 'DO' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank62' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41839]
+WARNING: [Synth 8-7071] port 'DRDY' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank62' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41839]
+WARNING: [Synth 8-7023] instance 'native_pll_bank62' of module 'PLLE4_ADV' has 19 connections declared, but only 13 given [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41839]
+WARNING: [Synth 8-7071] port 'CLKOUT0' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank63' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41870]
+WARNING: [Synth 8-7071] port 'CLKOUT0B' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank63' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41870]
+WARNING: [Synth 8-7071] port 'CLKOUT1' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank63' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41870]
+WARNING: [Synth 8-7071] port 'CLKOUT1B' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank63' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41870]
+WARNING: [Synth 8-7071] port 'DO' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank63' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41870]
+WARNING: [Synth 8-7071] port 'DRDY' of module 'PLLE4_ADV' is unconnected for instance 'native_pll_bank63' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41870]
+WARNING: [Synth 8-7023] instance 'native_pll_bank63' of module 'PLLE4_ADV' has 19 connections declared, but only 13 given [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41870]
+INFO: [Synth 8-6157] synthesizing module 'BSCANE2' [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:2479]
+	Parameter JTAG_CHAIN bound to: 1 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'BSCANE2' (0#1) [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:2479]
+WARNING: [Synth 8-7071] port 'DRCK' of module 'BSCANE2' is unconnected for instance 'BSCANE2' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41910]
+WARNING: [Synth 8-7071] port 'RUNTEST' of module 'BSCANE2' is unconnected for instance 'BSCANE2' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41910]
+WARNING: [Synth 8-7023] instance 'BSCANE2' of module 'BSCANE2' has 11 connections declared, but only 9 given [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41910]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:2]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_0' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6303]
+INFO: [Synth 8-6157] synthesizing module 'RXTX_BITSLICE' [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:162374]
+	Parameter ENABLE_PRE_EMPHASIS bound to: FALSE - type: string 
+	Parameter FIFO_SYNC_MODE bound to: FALSE - type: string 
+	Parameter INIT bound to: 1'b1 
+	Parameter IS_RX_CLK_INVERTED bound to: 1'b0 
+	Parameter IS_RX_RST_DLY_INVERTED bound to: 1'b0 
+	Parameter IS_RX_RST_INVERTED bound to: 1'b0 
+	Parameter IS_TX_CLK_INVERTED bound to: 1'b0 
+	Parameter IS_TX_RST_DLY_INVERTED bound to: 1'b0 
+	Parameter IS_TX_RST_INVERTED bound to: 1'b0 
+	Parameter LOOPBACK bound to: FALSE - type: string 
+	Parameter NATIVE_ODELAY_BYPASS bound to: FALSE - type: string 
+	Parameter RX_DATA_TYPE bound to: DATA_AND_CLOCK - type: string 
+	Parameter RX_DATA_WIDTH bound to: 8 - type: integer 
+	Parameter RX_DELAY_FORMAT bound to: TIME - type: string 
+	Parameter RX_DELAY_TYPE bound to: VARIABLE - type: string 
+	Parameter RX_DELAY_VALUE bound to: 0 - type: integer 
+	Parameter RX_REFCLK_FREQUENCY bound to: 2.400000e+03 - type: double 
+	Parameter RX_UPDATE_MODE bound to: ASYNC - type: string 
+	Parameter SIM_DEVICE bound to: ULTRASCALE_PLUS - type: string 
+	Parameter SIM_VERSION bound to: 2.000000e+00 - type: double 
+	Parameter TBYTE_CTL bound to: TBYTE_IN - type: string 
+	Parameter TX_DATA_WIDTH bound to: 8 - type: integer 
+	Parameter TX_DELAY_FORMAT bound to: TIME - type: string 
+	Parameter TX_DELAY_TYPE bound to: VARIABLE - type: string 
+	Parameter TX_DELAY_VALUE bound to: 0 - type: integer 
+	Parameter TX_OUTPUT_PHASE_90 bound to: TRUE - type: string 
+	Parameter TX_REFCLK_FREQUENCY bound to: 2.400000e+03 - type: double 
+	Parameter TX_UPDATE_MODE bound to: ASYNC - type: string 
+INFO: [Synth 8-6155] done synthesizing module 'RXTX_BITSLICE' (0#1) [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:162374]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_0' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6303]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_1' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6407]
+INFO: [Synth 8-6157] synthesizing module 'RXTX_BITSLICE__parameterized0' [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:162374]
+	Parameter ENABLE_PRE_EMPHASIS bound to: FALSE - type: string 
+	Parameter FIFO_SYNC_MODE bound to: FALSE - type: string 
+	Parameter INIT bound to: 1'b1 
+	Parameter IS_RX_CLK_INVERTED bound to: 1'b0 
+	Parameter IS_RX_RST_DLY_INVERTED bound to: 1'b0 
+	Parameter IS_RX_RST_INVERTED bound to: 1'b0 
+	Parameter IS_TX_CLK_INVERTED bound to: 1'b0 
+	Parameter IS_TX_RST_DLY_INVERTED bound to: 1'b0 
+	Parameter IS_TX_RST_INVERTED bound to: 1'b0 
+	Parameter LOOPBACK bound to: FALSE - type: string 
+	Parameter NATIVE_ODELAY_BYPASS bound to: FALSE - type: string 
+	Parameter RX_DATA_TYPE bound to: DATA - type: string 
+	Parameter RX_DATA_WIDTH bound to: 8 - type: integer 
+	Parameter RX_DELAY_FORMAT bound to: TIME - type: string 
+	Parameter RX_DELAY_TYPE bound to: VARIABLE - type: string 
+	Parameter RX_DELAY_VALUE bound to: 0 - type: integer 
+	Parameter RX_REFCLK_FREQUENCY bound to: 2.400000e+03 - type: double 
+	Parameter RX_UPDATE_MODE bound to: ASYNC - type: string 
+	Parameter SIM_DEVICE bound to: ULTRASCALE_PLUS - type: string 
+	Parameter SIM_VERSION bound to: 2.000000e+00 - type: double 
+	Parameter TBYTE_CTL bound to: T - type: string 
+	Parameter TX_DATA_WIDTH bound to: 8 - type: integer 
+	Parameter TX_DELAY_FORMAT bound to: TIME - type: string 
+	Parameter TX_DELAY_TYPE bound to: VARIABLE - type: string 
+	Parameter TX_DELAY_VALUE bound to: 0 - type: integer 
+	Parameter TX_OUTPUT_PHASE_90 bound to: FALSE - type: string 
+	Parameter TX_REFCLK_FREQUENCY bound to: 2.400000e+03 - type: double 
+	Parameter TX_UPDATE_MODE bound to: ASYNC - type: string 
+INFO: [Synth 8-6155] done synthesizing module 'RXTX_BITSLICE__parameterized0' (0#1) [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:162374]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_1' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6407]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_2' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6511]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_2' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6511]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_3' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6615]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_3' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6615]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_4' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6719]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_4' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6719]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_5' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6823]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_5' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6823]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_6' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6927]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_6' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:6927]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_7' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7031]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_7' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7031]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_8' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7135]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_8' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7135]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_9' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7239]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_9' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7239]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_10' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7343]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_10' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7343]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_11' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7447]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_11' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7447]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_12' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7551]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_12' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7551]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_13' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7655]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_13' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7655]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_14' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7759]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_14' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7759]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_15' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7863]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_15' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7863]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_16' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7967]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_16' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:7967]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_17' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8071]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_17' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8071]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_18' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8175]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_18' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8175]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_19' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8279]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_19' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8279]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_20' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8383]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_20' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8383]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_21' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8487]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_21' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8487]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_22' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8591]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_22' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8591]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_23' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8695]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_23' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8695]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_24' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8799]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_24' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8799]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_25' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8903]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_25' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:8903]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_26' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9007]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_26' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9007]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_27' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9111]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_27' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9111]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_28' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9215]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_28' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9215]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_29' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9319]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_29' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9319]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_30' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9423]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_30' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9423]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_31' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9527]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_31' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9527]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_32' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9631]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_32' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9631]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_33' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9735]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_33' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9735]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_34' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9839]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_34' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9839]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_35' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9943]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_35' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:9943]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_36' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10047]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_36' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10047]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_37' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10151]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_37' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10151]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_38' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10255]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_38' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10255]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_39' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10359]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_39' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10359]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_40' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10463]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_40' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10463]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_41' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10567]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_41' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10567]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_42' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10671]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_42' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10671]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_43' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10775]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_43' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10775]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_44' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10879]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_44' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10879]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_45' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10983]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_45' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:10983]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_46' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11087]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_46' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11087]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_47' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11191]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_47' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11191]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_48' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11295]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_48' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11295]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_49' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11399]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_49' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11399]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_50' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11503]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_50' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11503]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_51' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11607]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_51' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11607]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_52' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11711]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_52' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11711]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_53' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11815]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_53' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11815]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_54' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11919]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_54' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:11919]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_55' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12023]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_55' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12023]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_56' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12127]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_56' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12127]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_57' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12231]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_57' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12231]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_58' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12335]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_58' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12335]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_59' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12439]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_59' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12439]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_60' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12543]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_60' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12543]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_61' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12647]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_61' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12647]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_62' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12751]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_62' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12751]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_63' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12855]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_63' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12855]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_64' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12959]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_64' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:12959]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_65' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13063]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_65' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13063]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_66' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13167]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_66' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13167]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_67' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13271]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_67' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13271]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_68' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13375]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_68' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13375]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_69' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13479]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_69' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13479]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_70' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13583]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_70' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13583]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_71' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13687]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_71' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13687]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_72' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13791]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_72' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13791]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_73' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13895]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_73' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13895]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_74' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13999]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_74' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:13999]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_75' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14103]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_75' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14103]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_76' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14207]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_76' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14207]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_77' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14311]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_77' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14311]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_78' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14415]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_78' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14415]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_79' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14519]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_79' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14519]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_80' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14623]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_80' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14623]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_81' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14727]
+INFO: [Synth 8-6157] synthesizing module 'RXTX_BITSLICE__parameterized1' [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:162374]
+	Parameter ENABLE_PRE_EMPHASIS bound to: FALSE - type: string 
+	Parameter FIFO_SYNC_MODE bound to: FALSE - type: string 
+	Parameter INIT bound to: 1'b1 
+	Parameter IS_RX_CLK_INVERTED bound to: 1'b0 
+	Parameter IS_RX_RST_DLY_INVERTED bound to: 1'b0 
+	Parameter IS_RX_RST_INVERTED bound to: 1'b0 
+	Parameter IS_TX_CLK_INVERTED bound to: 1'b0 
+	Parameter IS_TX_RST_DLY_INVERTED bound to: 1'b0 
+	Parameter IS_TX_RST_INVERTED bound to: 1'b0 
+	Parameter LOOPBACK bound to: FALSE - type: string 
+	Parameter NATIVE_ODELAY_BYPASS bound to: FALSE - type: string 
+	Parameter RX_DATA_TYPE bound to: DATA - type: string 
+	Parameter RX_DATA_WIDTH bound to: 8 - type: integer 
+	Parameter RX_DELAY_FORMAT bound to: TIME - type: string 
+	Parameter RX_DELAY_TYPE bound to: VARIABLE - type: string 
+	Parameter RX_DELAY_VALUE bound to: 0 - type: integer 
+	Parameter RX_REFCLK_FREQUENCY bound to: 2.400000e+03 - type: double 
+	Parameter RX_UPDATE_MODE bound to: ASYNC - type: string 
+	Parameter SIM_DEVICE bound to: ULTRASCALE_PLUS - type: string 
+	Parameter SIM_VERSION bound to: 2.000000e+00 - type: double 
+	Parameter TBYTE_CTL bound to: TBYTE_IN - type: string 
+	Parameter TX_DATA_WIDTH bound to: 8 - type: integer 
+	Parameter TX_DELAY_FORMAT bound to: TIME - type: string 
+	Parameter TX_DELAY_TYPE bound to: VARIABLE - type: string 
+	Parameter TX_DELAY_VALUE bound to: 0 - type: integer 
+	Parameter TX_OUTPUT_PHASE_90 bound to: TRUE - type: string 
+	Parameter TX_REFCLK_FREQUENCY bound to: 2.400000e+03 - type: double 
+	Parameter TX_UPDATE_MODE bound to: ASYNC - type: string 
+INFO: [Synth 8-6155] done synthesizing module 'RXTX_BITSLICE__parameterized1' (0#1) [C:/Xilinx/2025.2/Vivado/scripts/rt/data/unisim_comp.v:162374]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_81' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14727]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_82' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14831]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_82' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14831]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_83' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14935]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_83' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:14935]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_84' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15039]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_84' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15039]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_85' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15143]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_85' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15143]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_86' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15247]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_86' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15247]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_87' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15351]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_87' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15351]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_88' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15455]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_88' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15455]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_89' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15559]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_89' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15559]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_90' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15663]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_90' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15663]
+INFO: [Synth 8-6157] synthesizing module 'usnative_core_slice_91' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15767]
+INFO: [Common 17-14] Message 'Synth 8-6157' appears 100 times and further instances of the messages will be disabled. Use the Tcl command set_msg_config to change the current settings.
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_91' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15767]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_92' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15871]
+INFO: [Synth 8-6155] done synthesizing module 'usnative_core_slice_93' (0#1) [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/native/usnative_core.v:15975]
+INFO: [Common 17-14] Message 'Synth 8-6155' appears 100 times and further instances of the messages will be disabled. Use the Tcl command set_msg_config to change the current settings.
+	Parameter CTRL_CLK bound to: EXTERNAL - type: string 
+	Parameter DIV_MODE bound to: DIV4 - type: string 
+	Parameter EN_CLK_TO_EXT_NORTH bound to: DISABLE - type: string 
+	Parameter EN_CLK_TO_EXT_SOUTH bound to: DISABLE - type: string 
+	Parameter EN_DYN_ODLY_MODE bound to: FALSE - type: string 
+	Parameter EN_OTHER_NCLK bound to: FALSE - type: string 
+	Parameter EN_OTHER_PCLK bound to: FALSE - type: string 
+	Parameter IDLY_VT_TRACK bound to: TRUE - type: string 
+	Parameter INV_RXCLK bound to: FALSE - type: string 
+	Parameter ODLY_VT_TRACK bound to: TRUE - type: string 
+	Parameter QDLY_VT_TRACK bound to: TRUE - type: string 
+	Parameter READ_IDLE_COUNT bound to: 6'b011111 
+	Parameter REFCLK_SRC bound to: PLLCLK - type: string 
+	Parameter ROUNDING_FACTOR bound to: 16 - type: integer 
+	Parameter RXGATE_EXTEND bound to: FALSE - type: string 
+	Parameter RX_CLK_PHASE_N bound to: SHIFT_90 - type: string 
+	Parameter RX_CLK_PHASE_P bound to: SHIFT_90 - type: string 
+	Parameter RX_GATING bound to: ENABLE - type: string 
+	Parameter SELF_CALIBRATE bound to: ENABLE - type: string 
+	Parameter SERIAL_MODE bound to: FALSE - type: string 
+	Parameter SIM_DEVICE bound to: ULTRASCALE_PLUS - type: string 
+	Parameter SIM_SPEEDUP bound to: FAST - type: string 
+	Parameter SIM_VERSION bound to: 2.000000e+00 - type: double 
+	Parameter TX_GATING bound to: ENABLE - type: string 
+	Parameter DATA_WIDTH bound to: 8 - type: integer 
+	Parameter DELAY_FORMAT bound to: TIME - type: string 
+	Parameter DELAY_TYPE bound to: FIXED - type: string 
+	Parameter DELAY_VALUE bound to: 0 - type: integer 
+	Parameter INIT bound to: 1'b1 
+	Parameter IS_CLK_INVERTED bound to: 1'b0 
+	Parameter IS_RST_DLY_INVERTED bound to: 1'b0 
+	Parameter IS_RST_INVERTED bound to: 1'b0 
+	Parameter NATIVE_ODELAY_BYPASS bound to: FALSE - type: string 
+	Parameter OUTPUT_PHASE_90 bound to: TRUE - type: string 
+	Parameter REFCLK_FREQUENCY bound to: 2.400000e+03 - type: double 
+	Parameter SIM_DEVICE bound to: ULTRASCALE_PLUS - type: string 
+	Parameter SIM_VERSION bound to: 2.000000e+00 - type: double 
+	Parameter UPDATE_MODE bound to: ASYNC - type: string 
+	Parameter CTRL_CLK bound to: EXTERNAL - type: string 
+	Parameter DIV_MODE bound to: DIV4 - type: string 
+	Parameter EN_CLK_TO_EXT_NORTH bound to: DISABLE - type: string 
+	Parameter EN_CLK_TO_EXT_SOUTH bound to: DISABLE - type: string 
+	Parameter EN_DYN_ODLY_MODE bound to: FALSE - type: string 
+	Parameter EN_OTHER_NCLK bound to: FALSE - type: string 
+	Parameter EN_OTHER_PCLK bound to: FALSE - type: string 
+	Parameter IDLY_VT_TRACK bound to: TRUE - type: string 
+	Parameter INV_RXCLK bound to: FALSE - type: string 
+	Parameter ODLY_VT_TRACK bound to: TRUE - type: string 
+	Parameter QDLY_VT_TRACK bound to: TRUE - type: string 
+	Parameter READ_IDLE_COUNT bound to: 6'b011111 
+	Parameter REFCLK_SRC bound to: PLLCLK - type: string 
+	Parameter ROUNDING_FACTOR bound to: 16 - type: integer 
+	Parameter RXGATE_EXTEND bound to: FALSE - type: string 
+	Parameter RX_CLK_PHASE_N bound to: SHIFT_0 - type: string 
+	Parameter RX_CLK_PHASE_P bound to: SHIFT_0 - type: string 
+	Parameter RX_GATING bound to: DISABLE - type: string 
+	Parameter SELF_CALIBRATE bound to: ENABLE - type: string 
+	Parameter SERIAL_MODE bound to: FALSE - type: string 
+	Parameter SIM_DEVICE bound to: ULTRASCALE_PLUS - type: string 
+	Parameter SIM_SPEEDUP bound to: FAST - type: string 
+	Parameter SIM_VERSION bound to: 2.000000e+00 - type: double 
+	Parameter TX_GATING bound to: DISABLE - type: string 
+	Parameter SIM_DEVICE bound to: ULTRASCALE_PLUS - type: string 
+	Parameter SIM_VERSION bound to: 2.000000e+00 - type: double 
+	Parameter WIDTH bound to: 6'b101101 
+	Parameter BANDWIDTH bound to: OPTIMIZED - type: string 
+	Parameter CLKFBOUT_MULT_F bound to: 5.000000e+00 - type: double 
+	Parameter CLKIN1_PERIOD bound to: 3.333333e+00 - type: double 
+	Parameter CLKOUT0_DIVIDE_F bound to: 1.000000e+01 - type: double 
+	Parameter CLKOUT0_PHASE bound to: 0.000000e+00 - type: double 
+	Parameter CLKOUT1_DIVIDE bound to: 5 - type: integer 
+	Parameter CLKOUT1_PHASE bound to: 0.000000e+00 - type: double 
+	Parameter CLKOUT2_DIVIDE bound to: 10 - type: integer 
+	Parameter CLKOUT2_PHASE bound to: 0.000000e+00 - type: double 
+	Parameter DIVCLK_DIVIDE bound to: 1 - type: integer 
+	Parameter REF_JITTER1 bound to: 1.000000e-02 - type: double 
+WARNING: [Synth 8-7071] port 'CDDCDONE' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKFBOUTB' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKFBSTOPPED' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKINSTOPPED' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKOUT0B' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKOUT1B' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKOUT2B' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKOUT3' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKOUT3B' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKOUT4' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKOUT5' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKOUT6' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'DO' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'DRDY' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'PSDONE' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CDDCREQ' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKIN2' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'CLKINSEL' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'DADDR' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'DCLK' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'DEN' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'DI' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'DWE' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'PSCLK' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'PSEN' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7071] port 'PSINCDEC' of module 'MMCME4_ADV' is unconnected for instance 'MMCME4_ADV' [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+WARNING: [Synth 8-7023] instance 'MMCME4_ADV' of module 'MMCME4_ADV' has 35 connections declared, but only 9 given [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43793]
+	Parameter INIT bound to: 1'b1 
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer33_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32291]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer34_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32292]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer35_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32293]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer36_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32294]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer37_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32295]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer38_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32296]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer39_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32297]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer52_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32310]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer53_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32311]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer54_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32312]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_serializer55_i_d_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:32313]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine0_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:14485]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine0_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:14486]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine1_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:14670]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine1_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:14671]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine2_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:14855]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine2_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:14856]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine3_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15040]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine3_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15041]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine4_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15225]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine4_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15226]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine5_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15410]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine5_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15411]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine6_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15595]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine6_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15596]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine7_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15780]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine7_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15781]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine8_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15965]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine8_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:15966]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine9_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16150]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine9_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16151]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine10_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16335]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine10_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16336]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine11_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16520]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine11_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16521]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine12_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16705]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine12_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16706]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine13_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16890]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine13_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:16891]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine14_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:17075]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine14_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:17076]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine15_pipe_valid_source_first_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:17260]
+WARNING: [Synth 8-6014] Unused sequential element main_sdram_bankmachine15_pipe_valid_source_last_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:17261]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid0_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:35947]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid1_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:35948]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid2_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:35949]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid3_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:35950]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid4_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:35951]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid5_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:35952]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid6_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:35953]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid7_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:35954]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid8_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:35955]
+WARNING: [Synth 8-6014] Unused sequential element builder_new_master_rdata_valid9_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:17958]
+WARNING: [Synth 8-6014] Unused sequential element main_fullrangedma_reader_res_fifo_produce_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36250]
+WARNING: [Synth 8-6014] Unused sequential element main_fullrangedma_reader_res_fifo_consume_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:18146]
+WARNING: [Synth 8-6014] Unused sequential element builder_interface1_re_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:21571]
+WARNING: [Synth 8-6014] Unused sequential element main_reset_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36395]
+WARNING: [Synth 8-6014] Unused sequential element main_scratch_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36399]
+WARNING: [Synth 8-6014] Unused sequential element main_bus_errors_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36400]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_abi_version_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36859]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_abi_config_id_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36860]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_abi_capabilities_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36861]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_rst_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36865]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_en_vtc_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36869]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_bisc_only_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36873]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_debug_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36874]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_snapshot_status_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36875]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_elapsed_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36876]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_first_dly_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36877]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_first_vtc_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36878]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_faults_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36879]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_rx_lane_fault_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36880]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_rx_lane_missing_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36881]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_rx_lane_reads_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36882]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_training_stage_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36886]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_training_error_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36890]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus0_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36891]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus1_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36892]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus2_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36893]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus3_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36894]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus4_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36895]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus5_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36896]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus6_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36897]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus7_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36898]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus8_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36899]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus9_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36900]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus10_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36901]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus11_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36902]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus12_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36903]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus13_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36904]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus14_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36905]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_csrstatus15_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36906]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_ready_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36907]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_dly_rdy_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36908]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_vtc_rdy_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36909]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_fifo_empty_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36910]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_wlevel_en_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36914]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_dly_sel_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36918]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_cdly_value_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36919]
+WARNING: [Synth 8-6014] Unused sequential element main_ddrphy_usnativeddrphy_wdly_dqs_inc_count_wr_stb_reg was removed.  [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:36920]
+INFO: [Common 17-14] Message 'Synth 8-6014' appears 100 times and further instances of the messages will be disabled. Use the Tcl command set_msg_config to change the current settings.
+WARNING: [Synth 8-3936] Found unconnected internal register 'storage_1_dat1_reg' and it is trimmed from '10' to '8' bits. [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41954]
+WARNING: [Synth 8-3936] Found unconnected internal register 'storage_dat1_reg' and it is trimmed from '10' to '8' bits. [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:41937]
+WARNING: [Synth 8-3936] Found unconnected internal register 'main_ddrphy_usnativeddrphy_native_o_dyn_dci_reg' and it is trimmed from '80' to '64' bits. [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:8866]
+WARNING: [Synth 8-3917] design u250_native_2400 has port ddram_reset_gate driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr1_cke driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr1_cs_n driven by constant 1
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr1_reset_n driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr2_cke driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr2_cs_n driven by constant 1
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr2_reset_n driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr3_cke driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr3_cs_n driven by constant 1
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr3_reset_n driven by constant 0
+---------------------------------------------------------------------------------
+Finished RTL Elaboration : Time (s): cpu = 00:00:24 ; elapsed = 00:00:25 . Memory (MB): peak = 2688.918 ; gain = 844.809
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:00:25 ; elapsed = 00:00:26 . Memory (MB): peak = 2688.918 ; gain = 844.809
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 1 : Time (s): cpu = 00:00:25 ; elapsed = 00:00:26 . Memory (MB): peak = 2688.918 ; gain = 844.809
+---------------------------------------------------------------------------------
+Netlist sorting complete. Time (s): cpu = 00:00:02 ; elapsed = 00:00:02 . Memory (MB): peak = 2688.918 ; gain = 0.000
+INFO: [Netlist 29-17] Analyzing 89 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+INFO: [Project 1-570] Preparing netlist for logic optimization
+
+Processing XDC Constraints
+Initializing timing engine
+Parsing XDC File [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.xdc]
+create_clock: Time (s): cpu = 00:00:08 ; elapsed = 00:00:09 . Memory (MB): peak = 3065.680 ; gain = 35.453
+Finished Parsing XDC File [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.xdc]
+INFO: [Project 1-236] Implementation specific constraints were found while reading constraint file [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.xdc]. These constraints will be ignored for synthesis but will be used in implementation. Impacted constraints are listed in the file [.Xil/u250_native_2400_propImpl.xdc].
+Resolution: To avoid this warning, move constraints listed in [.Xil/u250_native_2400_propImpl.xdc] to another XDC file and exclude this new file from synthesis with the used_in_synthesis property (File Properties dialog in GUI) and re-run elaboration/synthesis.
+INFO: [Timing 38-2] Deriving generated clocks
+Completed Processing XDC Constraints
+
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.036 . Memory (MB): peak = 3078.090 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+  A total of 85 instances were transformed.
+  BUFG => BUFGCE: 3 instances
+  IBUFDS => IBUFDS (DIFFINBUF, IBUFCTRL): 1 instance 
+  IOBUFDS => IOBUFDS (DIFFINBUF, IBUFCTRL, INV, OBUFT(x2)): 16 instances
+  IOBUF_DCIEN => IOBUF_DCIEN (IBUFCTRL, INBUF, OBUFT_DCIEN): 64 instances
+  OBUFDS => OBUFDS_DUAL_BUF (INV, OBUF(x2)): 1 instance 
+
+Constraint Validation Runtime : Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.565 . Memory (MB): peak = 3078.090 ; gain = 0.000
+---------------------------------------------------------------------------------
+Finished Constraint Validation : Time (s): cpu = 00:01:30 ; elapsed = 00:01:31 . Memory (MB): peak = 3078.090 ; gain = 1233.980
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Loading Part and Timing Information
+---------------------------------------------------------------------------------
+Loading part: xcu250-figd2104-2L-e
+INFO: [Synth 8-6742] Reading net delay rules and data
+---------------------------------------------------------------------------------
+Finished Loading Part and Timing Information : Time (s): cpu = 00:01:30 ; elapsed = 00:01:31 . Memory (MB): peak = 3078.090 ; gain = 1233.980
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Applying 'set_property' XDC Constraints
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:01:33 ; elapsed = 00:01:34 . Memory (MB): peak = 3078.090 ; gain = 1233.980
+---------------------------------------------------------------------------------
+WARNING: [Synth 8-3936] Found unconnected internal register 'storage_18_dat1_reg' and it is trimmed from '514' to '512' bits. [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43625]
+WARNING: [Synth 8-3936] Found unconnected internal register 'storage_20_dat1_reg' and it is trimmed from '514' to '512' bits. [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.v:43659]
+INFO: [Synth 8-802] inferred FSM for state register 'builder_jtagphy_state_reg' in module 'u250_native_2400'
+INFO: [Synth 8-802] inferred FSM for state register 'builder_refresher_state_reg' in module 'u250_native_2400'
+INFO: [Synth 8-802] inferred FSM for state register 'builder_wishbone2csr_state_reg' in module 'u250_native_2400'
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_1_reg" of size (depth=4 x width=8) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_reg" of size (depth=4 x width=8) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                 iSTATE1 |                               00 |                               00
+*
+                  iSTATE |                               01 |                               01
+                 iSTATE0 |                               10 |                               10
+                 iSTATE2 |                               11 |                               11
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'builder_jtagphy_state_reg' using encoding 'sequential' in module 'u250_native_2400'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                 iSTATE1 |                               00 |                               00
+*
+                  iSTATE |                               01 |                               01
+                 iSTATE0 |                               10 |                               10
+                 iSTATE2 |                               11 |                               11
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'builder_refresher_state_reg' using encoding 'sequential' in module 'u250_native_2400'
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_5_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_12_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_11_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_8_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_9_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_10_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_13_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_7_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_6_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_14_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_17_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_15_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_16_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_4_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_3_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_2_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                  iSTATE |                              001 |                               00
+*
+                 iSTATE0 |                              010 |                               01
+                 iSTATE1 |                              100 |                               10
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'builder_wishbone2csr_state_reg' using encoding 'one-hot' in module 'u250_native_2400'
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 2 : Time (s): cpu = 00:01:51 ; elapsed = 00:01:53 . Memory (MB): peak = 3078.090 ; gain = 1233.980
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start RTL Component Statistics 
+---------------------------------------------------------------------------------
+Detailed RTL Component Info : 
++---Adders : 
+	   2 Input   35 Bit       Adders := 2     
+	   2 Input   32 Bit       Adders := 1     
+	   2 Input   28 Bit       Adders := 3     
+	   2 Input   11 Bit       Adders := 1     
+	   2 Input    9 Bit       Adders := 1     
+	   2 Input    8 Bit       Adders := 7     
+	   2 Input    7 Bit       Adders := 9     
+	   2 Input    6 Bit       Adders := 3     
+	   2 Input    5 Bit       Adders := 2     
+	   2 Input    4 Bit       Adders := 49    
+	   2 Input    3 Bit       Adders := 230   
+	   5 Input    3 Bit       Adders := 1     
+	   2 Input    2 Bit       Adders := 2     
+	   2 Input    1 Bit       Adders := 56    
++---XORs : 
+	   2 Input    512 Bit         XORs := 1     
+	   2 Input     32 Bit         XORs := 96    
+	   2 Input      3 Bit         XORs := 4     
+	   2 Input      1 Bit         XORs := 26    
++---Registers : 
+	              954 Bit    Registers := 2     
+	              512 Bit    Registers := 8     
+	              256 Bit    Registers := 16    
+	              136 Bit    Registers := 1     
+	              128 Bit    Registers := 1     
+	              106 Bit    Registers := 9     
+	               88 Bit    Registers := 1     
+	               64 Bit    Registers := 19    
+	               45 Bit    Registers := 1     
+	               35 Bit    Registers := 1     
+	               34 Bit    Registers := 7     
+	               32 Bit    Registers := 10    
+	               29 Bit    Registers := 1     
+	               28 Bit    Registers := 4     
+	               24 Bit    Registers := 16    
+	               22 Bit    Registers := 5     
+	               17 Bit    Registers := 30    
+	               16 Bit    Registers := 89    
+	               11 Bit    Registers := 1     
+	                9 Bit    Registers := 37    
+	                8 Bit    Registers := 97    
+	                7 Bit    Registers := 9     
+	                6 Bit    Registers := 5     
+	                5 Bit    Registers := 37    
+	                4 Bit    Registers := 116   
+	                3 Bit    Registers := 215   
+	                2 Bit    Registers := 96    
+	                1 Bit    Registers := 478   
++---RAMs : 
+	              64K Bit	(128 X 514 bit)          RAMs := 2     
+	              200 Bit	(8 X 25 bit)          RAMs := 16    
+	               32 Bit	(4 X 8 bit)          RAMs := 2     
++---Muxes : 
+	   2 Input  512 Bit        Muxes := 3     
+	   3 Input  512 Bit        Muxes := 1     
+	   6 Input  512 Bit        Muxes := 1     
+	   2 Input  256 Bit        Muxes := 4     
+	   2 Input  128 Bit        Muxes := 4     
+	   2 Input   64 Bit        Muxes := 17    
+	   6 Input   64 Bit        Muxes := 1     
+	   2 Input   34 Bit        Muxes := 2     
+	   2 Input   32 Bit        Muxes := 80    
+	   4 Input   32 Bit        Muxes := 1     
+	   3 Input   32 Bit        Muxes := 2     
+	   7 Input   32 Bit        Muxes := 2     
+	   6 Input   29 Bit        Muxes := 1     
+	   2 Input   29 Bit        Muxes := 1     
+	   6 Input   28 Bit        Muxes := 2     
+	   2 Input   28 Bit        Muxes := 2     
+	   2 Input   24 Bit        Muxes := 16    
+	   2 Input   17 Bit        Muxes := 29    
+	   3 Input   17 Bit        Muxes := 3     
+	   4 Input   17 Bit        Muxes := 1     
+	   3 Input   14 Bit        Muxes := 1     
+	   2 Input   14 Bit        Muxes := 1     
+	   2 Input   11 Bit        Muxes := 2     
+	   8 Input    9 Bit        Muxes := 2     
+	   6 Input    9 Bit        Muxes := 1     
+	   2 Input    9 Bit        Muxes := 2     
+	   2 Input    8 Bit        Muxes := 74    
+	   5 Input    8 Bit        Muxes := 1     
+	   7 Input    8 Bit        Muxes := 3     
+	   4 Input    8 Bit        Muxes := 2     
+	   2 Input    7 Bit        Muxes := 4     
+	   2 Input    6 Bit        Muxes := 3     
+	   3 Input    5 Bit        Muxes := 1     
+	   2 Input    5 Bit        Muxes := 16    
+	   4 Input    4 Bit        Muxes := 17    
+	   2 Input    4 Bit        Muxes := 76    
+	   3 Input    4 Bit        Muxes := 19    
+	   6 Input    4 Bit        Muxes := 16    
+	   9 Input    4 Bit        Muxes := 16    
+	   4 Input    3 Bit        Muxes := 17    
+	   6 Input    3 Bit        Muxes := 1     
+	   5 Input    3 Bit        Muxes := 2     
+	   2 Input    3 Bit        Muxes := 59    
+	   3 Input    3 Bit        Muxes := 2     
+	   7 Input    3 Bit        Muxes := 1     
+	   6 Input    2 Bit        Muxes := 3     
+	   2 Input    2 Bit        Muxes := 61    
+	   4 Input    2 Bit        Muxes := 3     
+	  12 Input    2 Bit        Muxes := 4     
+	   3 Input    2 Bit        Muxes := 20    
+	   7 Input    2 Bit        Muxes := 2     
+	   2 Input    1 Bit        Muxes := 575   
+	   6 Input    1 Bit        Muxes := 15    
+	   3 Input    1 Bit        Muxes := 23    
+	   4 Input    1 Bit        Muxes := 20    
+	   9 Input    1 Bit        Muxes := 160   
+	   5 Input    1 Bit        Muxes := 1     
+	  12 Input    1 Bit        Muxes := 5     
+	   7 Input    1 Bit        Muxes := 14    
+---------------------------------------------------------------------------------
+Finished RTL Component Statistics 
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Part Resource Summary
+---------------------------------------------------------------------------------
+Part Resources:
+DSPs: 12288 (col length:96)
+BRAMs: 5376 (col length: RAMB18 384 RAMB36 192)
+---------------------------------------------------------------------------------
+Finished Part Resource Summary
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Cross Boundary and Area Optimization
+---------------------------------------------------------------------------------
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_15_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_2_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_5_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_3_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_4_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_16_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_17_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_14_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_1_reg" of size (depth=4 x width=8) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_6_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_7_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_13_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_10_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_9_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_8_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_11_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_12_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_reg" of size (depth=4 x width=8) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+WARNING: [Synth 8-3917] design u250_native_2400 has port ddram_reset_gate driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr1_cke driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr1_cs_n driven by constant 1
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr1_reset_n driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr2_cke driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr2_cs_n driven by constant 1
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr2_reset_n driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr3_cke driven by constant 0
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr3_cs_n driven by constant 1
+WARNING: [Synth 8-3917] design u250_native_2400 has port inactive_ddr3_reset_n driven by constant 0
+RAM ("u250_native_2400/storage_18_reg") is too shallow (depth = 128) to use URAM. Choosing BRAM instead of URAM 
+RAM ("u250_native_2400/storage_20_reg") is too shallow (depth = 128) to use URAM. Choosing BRAM instead of URAM 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_15_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_2_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_5_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_3_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_4_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_16_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_17_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_14_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_1_reg" of size (depth=4 x width=8) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_6_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_7_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_13_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_10_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_9_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_8_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_11_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_12_reg" of size (depth=8 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u250_native_2400/storage_reg" of size (depth=4 x width=8) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+---------------------------------------------------------------------------------
+Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:04:28 ; elapsed = 00:04:34 . Memory (MB): peak = 3109.754 ; gain = 1265.645
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+
+ROM: Preliminary Mapping Report
++-----------------+------------+---------------+----------------+
+|Module Name      | RTL Object | Depth x Width | Implemented As | 
++-----------------+------------+---------------+----------------+
+|u250_native_2400 | mem        | 64x8          | LUT            | 
+|u250_native_2400 | p_0_out    | 64x8          | LUT            | 
++-----------------+------------+---------------+----------------+
+
+
+Block RAM: Preliminary Mapping Report (see note below)
++-----------------+----------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+|Module Name      | RTL Object     | PORT A (Depth x Width) | W | R | PORT B (Depth x Width) | W | R | Ports driving FF | RAMB18 | RAMB36 | Cascade Heights | 
++-----------------+----------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+|u250_native_2400 | storage_18_reg | 128 x 512(READ_FIRST)  | W |   | 128 x 512(WRITE_FIRST) |   | R | Port A and B     | 1      | 7      |                 | 
+|u250_native_2400 | storage_20_reg | 128 x 512(READ_FIRST)  | W |   | 128 x 512(WRITE_FIRST) |   | R | Port A and B     | 1      | 7      |                 | 
++-----------------+----------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+
+Note: The table above is a preliminary report that shows the Block RAMs at the current stage of the synthesis flow. Some Block RAMs may be reimplemented as non Block RAM primitives later in the synthesis flow. Multiple instantiated Block RAMs are reported only once. 
+
+Distributed RAM: Preliminary Mapping Report (see note below)
++-----------------+----------------+-----------+----------------------+---------------+
+|Module Name      | RTL Object     | Inference | Size (Depth x Width) | Primitives    | 
++-----------------+----------------+-----------+----------------------+---------------+
+|u250_native_2400 | storage_15_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_2_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_5_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_3_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_4_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_16_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_17_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_14_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_1_reg  | Implied   | 4 x 8                | RAM32M16 x 1  | 
+|u250_native_2400 | storage_6_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_7_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_13_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_10_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_9_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_8_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_11_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_12_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_reg    | Implied   | 4 x 8                | RAM32M16 x 1  | 
++-----------------+----------------+-----------+----------------------+---------------+
+
+Note: The table above is a preliminary report that shows the Distributed RAMs at the current stage of the synthesis flow. Some Distributed RAMs may be reimplemented as non Distributed RAM primitives later in the synthesis flow. Multiple instantiated RAMs are reported only once.
+---------------------------------------------------------------------------------
+Finished ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Applying XDC Timing Constraints
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Applying XDC Timing Constraints : Time (s): cpu = 00:04:49 ; elapsed = 00:04:56 . Memory (MB): peak = 3261.008 ; gain = 1416.898
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Timing Optimization
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Timing Optimization : Time (s): cpu = 00:07:36 ; elapsed = 00:07:45 . Memory (MB): peak = 3813.914 ; gain = 1969.805
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+
+Block RAM: Final Mapping Report
++-----------------+----------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+|Module Name      | RTL Object     | PORT A (Depth x Width) | W | R | PORT B (Depth x Width) | W | R | Ports driving FF | RAMB18 | RAMB36 | Cascade Heights | 
++-----------------+----------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+|u250_native_2400 | storage_18_reg | 128 x 512(READ_FIRST)  | W |   | 128 x 512(WRITE_FIRST) |   | R | Port A and B     | 1      | 7      |                 | 
+|u250_native_2400 | storage_20_reg | 128 x 512(READ_FIRST)  | W |   | 128 x 512(WRITE_FIRST) |   | R | Port A and B     | 1      | 7      |                 | 
++-----------------+----------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+
+
+Distributed RAM: Final Mapping Report
++-----------------+----------------+-----------+----------------------+---------------+
+|Module Name      | RTL Object     | Inference | Size (Depth x Width) | Primitives    | 
++-----------------+----------------+-----------+----------------------+---------------+
+|u250_native_2400 | storage_2_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_5_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_3_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_4_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_16_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_17_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_14_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_1_reg  | Implied   | 4 x 8                | RAM32M16 x 1  | 
+|u250_native_2400 | storage_6_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_7_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_13_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_10_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_9_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_8_reg  | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_11_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_12_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
+|u250_native_2400 | storage_reg    | Implied   | 4 x 8                | RAM32M16 x 1  | 
+|u250_native_2400 | storage_15_reg | Implied   | 8 x 25               | RAM32M16 x 2  | 
++-----------------+----------------+-----------+----------------------+---------------+
+
+---------------------------------------------------------------------------------
+Finished ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Technology Mapping
+---------------------------------------------------------------------------------
+INFO: [Synth 8-7052] The timing for the instance storage_18_reg_0 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_18_reg_1 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_18_reg_2 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_18_reg_3 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_18_reg_4 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_18_reg_5 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_18_reg_6 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_18_reg_7 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_20_reg_0 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_20_reg_1 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_20_reg_2 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_20_reg_3 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_20_reg_4 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_20_reg_5 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_20_reg_6 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance storage_20_reg_7 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+---------------------------------------------------------------------------------
+Finished Technology Mapping : Time (s): cpu = 00:07:50 ; elapsed = 00:07:59 . Memory (MB): peak = 3822.781 ; gain = 1978.672
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished IO Insertion : Time (s): cpu = 00:08:00 ; elapsed = 00:08:08 . Memory (MB): peak = 3822.781 ; gain = 1978.672
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Instances
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Instances : Time (s): cpu = 00:08:00 ; elapsed = 00:08:08 . Memory (MB): peak = 3822.781 ; gain = 1978.672
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Rebuilding User Hierarchy
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Rebuilding User Hierarchy : Time (s): cpu = 00:08:03 ; elapsed = 00:08:11 . Memory (MB): peak = 3822.781 ; gain = 1978.672
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Ports
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Ports : Time (s): cpu = 00:08:03 ; elapsed = 00:08:12 . Memory (MB): peak = 3822.781 ; gain = 1978.672
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:08:05 ; elapsed = 00:08:13 . Memory (MB): peak = 3822.781 ; gain = 1978.672
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Nets
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Nets : Time (s): cpu = 00:08:05 ; elapsed = 00:08:14 . Memory (MB): peak = 3822.781 ; gain = 1978.672
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Writing Synthesis Report
+---------------------------------------------------------------------------------
+
+Report BlackBoxes: 
++-+--------------+----------+
+| |BlackBox name |Instances |
++-+--------------+----------+
++-+--------------+----------+
+
+Report Cell Usage: 
++------+-----------------+------+
+|      |Cell             |Count |
++------+-----------------+------+
+|1     |BITSLICE_CONTROL |    22|
+|3     |BSCANE2          |     1|
+|4     |BUFG             |     4|
+|5     |CARRY8           |   258|
+|6     |LUT1             |   337|
+|7     |LUT2             |  1992|
+|8     |LUT3             |  2786|
+|9     |LUT4             |  1115|
+|10    |LUT5             |  2380|
+|11    |LUT6             |  5942|
+|12    |MMCME4_ADV       |     1|
+|13    |MUXF7            |   716|
+|14    |MUXF8            |   112|
+|15    |PLLE4_ADV        |     3|
+|16    |RAM32M16         |    34|
+|17    |RAMB18E2         |     2|
+|18    |RAMB36E2         |    14|
+|19    |RIU_OR           |    11|
+|20    |RXTX_BITSLICE    |   106|
+|23    |TX_BITSLICE_TRI  |    22|
+|24    |FDPE             |    16|
+|25    |FDRE             | 18290|
+|26    |FDSE             |   454|
+|27    |IBUFDS           |     1|
+|28    |IOBUFDS          |    16|
+|29    |IOBUF_DCIEN      |    64|
+|30    |OBUF             |    36|
+|31    |OBUFDS           |     1|
++------+-----------------+------+
+---------------------------------------------------------------------------------
+Finished Writing Synthesis Report : Time (s): cpu = 00:08:05 ; elapsed = 00:08:14 . Memory (MB): peak = 3822.781 ; gain = 1978.672
+---------------------------------------------------------------------------------
+Synthesis finished with 0 errors, 0 critical warnings and 12 warnings.
+Synthesis Optimization Runtime : Time (s): cpu = 00:06:47 ; elapsed = 00:07:21 . Memory (MB): peak = 3822.781 ; gain = 1589.500
+Synthesis Optimization Complete : Time (s): cpu = 00:08:06 ; elapsed = 00:08:14 . Memory (MB): peak = 3822.781 ; gain = 1978.672
+INFO: [Project 1-571] Translating synthesized netlist
+Netlist sorting complete. Time (s): cpu = 00:00:02 ; elapsed = 00:00:02 . Memory (MB): peak = 3822.781 ; gain = 0.000
+INFO: [Netlist 29-17] Analyzing 1210 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+WARNING: [Netlist 29-101] Netlist 'u250_native_2400' is not ideal for floorplanning, since the cellview 'u250_native_2400' contains a large number of primitives.  Please consider enabling hierarchy in synthesis if you want to do floorplanning.
+INFO: [Project 1-570] Preparing netlist for logic optimization
+Parsing XDC File [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.xdc]
+create_clock: Time (s): cpu = 00:00:08 ; elapsed = 00:00:08 . Memory (MB): peak = 3863.145 ; gain = 1.168
+Finished Parsing XDC File [C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400.xdc]
+INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
+INFO: [Opt 31-326] The CLKFBOUT to CLKFBIN net for instance MMCME4_ADV with COMPENSATION=INTERNAL is optimized away to aid design routability
+INFO: [Opt 31-326] The CLKFBOUT to CLKFBIN net for instance native_pll_bank61 with COMPENSATION=INTERNAL is optimized away to aid design routability
+INFO: [Opt 31-326] The CLKFBOUT to CLKFBIN net for instance native_pll_bank62 with COMPENSATION=INTERNAL is optimized away to aid design routability
+INFO: [Opt 31-326] The CLKFBOUT to CLKFBIN net for instance native_pll_bank63 with COMPENSATION=INTERNAL is optimized away to aid design routability
+Netlist sorting complete. Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.031 . Memory (MB): peak = 3867.062 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+  A total of 120 instances were transformed.
+  BUFG => BUFGCE: 4 instances
+  IBUFDS => IBUFDS (DIFFINBUF, IBUFCTRL): 1 instance 
+  IOBUFDS => IOBUFDS (DIFFINBUF, IBUFCTRL, INV, OBUFT(x2)): 16 instances
+  IOBUF_DCIEN => IOBUF_DCIEN (IBUFCTRL, INBUF, OBUFT_DCIEN): 64 instances
+  OBUFDS => OBUFDS_DUAL_BUF (INV, OBUF(x2)): 1 instance 
+  RAM32M16 => RAM32M16 (RAMD32(x14), RAMS32(x2)): 34 instances
+
+Synth Design complete | Checksum: 285c881f
+INFO: [Common 17-83] Releasing license: Synthesis
+308 Infos, 177 Warnings, 0 Critical Warnings and 0 Errors encountered.
+synth_design completed successfully
+synth_design: Time (s): cpu = 00:09:11 ; elapsed = 00:10:08 . Memory (MB): peak = 3867.062 ; gain = 3254.688
+# report_timing_summary -file [file join $out u250_native_2400_timing_synth.rpt]
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+INFO: [Timing 38-2] Deriving generated clocks
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -2L, Temperature grade: E, Delay Type: min_max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 4 CPUs
+report_timing_summary: Time (s): cpu = 00:00:56 ; elapsed = 00:00:41 . Memory (MB): peak = 4330.129 ; gain = 463.066
+# report_utilization -file [file join $out u250_native_2400_utilization_synth.rpt]
+# write_checkpoint -force [file join $out u250_native_2400_synth.dcp]
+INFO: [Timing 38-480] Writing timing data to binary archive.
+Write ShapeDB Complete: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.062 . Memory (MB): peak = 4330.129 ; gain = 0.000
+Wrote PlaceDB: Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.203 . Memory (MB): peak = 4330.129 ; gain = 0.000
+Wrote PulsedLatchDB: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 4330.129 ; gain = 0.000
+Writing XDEF routing.
+Writing XDEF routing logical nets.
+Writing XDEF routing special nets.
+Wrote RouteStorage: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.042 . Memory (MB): peak = 4330.129 ; gain = 0.000
+Wrote Netlist Cache: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.012 . Memory (MB): peak = 4330.129 ; gain = 0.000
+Wrote Device Cache: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.027 . Memory (MB): peak = 4330.129 ; gain = 0.000
+Write Physdb Complete: Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.300 . Memory (MB): peak = 4330.129 ; gain = 0.000
+INFO: [Common 17-1381] The checkpoint 'C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400_synth.dcp' has been generated.
+# exit
+INFO: [Common 17-206] Exiting Vivado at Wed Oct  7 23:30:38 2026...

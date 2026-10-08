@@ -1,0 +1,14 @@
+[
+  {
+    "phase": "synthesis",
+    "exit_code": 0,
+    "elapsed_seconds": 670.2810000000027,
+    "log": "litex-boards\\examples\\u250_native_2400\\evidence\\synthesis_v1.log"
+  },
+  {
+    "phase": "implementation",
+    "exit_code": 0,
+    "elapsed_seconds": 1228.375,
+    "log": "litex-boards\\examples\\u250_native_2400\\evidence\\implementation_v1.log"
+  }
+]

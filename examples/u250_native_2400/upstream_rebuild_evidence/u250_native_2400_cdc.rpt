@@ -1,0 +1,69 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version      : Vivado v.2025.2 (win64) Build 6299465 Fri Nov 14 19:35:11 GMT 2025
+| Date              : Wed Oct  7 23:48:28 2026
+| Host              : DESKTOP-I75K8PP running 64-bit major release  (build 9200)
+| Command           : report_cdc -details -file C:/Users/lavat/codex/litedram/u250_rebase_20261007/litex-boards/examples/u250_native_2400/build/gateware/u250_native_2400_cdc.rpt
+| Design            : u250_native_2400
+| Device            : xcu250-figd2104
+| Speed File        : -2L  PRODUCTION 1.28 03-30-2022
+| Design State      : Physopt postRoute
+| Temperature Grade : E
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+CDC Report
+
+ID      Severity  Count  Description
+------  --------  -----  -------------------------------------------------------
+CDC-6   Warning       4  Multi-bit synchronized with ASYNC_REG property
+CDC-9   Info          1  Asynchronous reset synchronized with ASYNC_REG property
+CDC-10  Critical      5  Combinational logic detected before a synchronizer
+CDC-26  Warning      16  LUTRAM read/write potential collision
+
+Source Clock: main_clkout0
+Destination Clock: jtag_tck
+CDC Type: No Common Primary Clock
+
+Row  ID      Severity  Description                                              Depth  Exception            Source (From)                                           Destination (To)
+---  ------  --------  -------------------------------------------------------  -----  -------------------  ------------------------------------------------------  --------------------------------------------
+  1  CDC-10  Critical  Combinational logic detected before a synchronizer           2  Asynch Clock Groups  FDPE_3/C                                                FDPE_12/PRE
+  2  CDC-10  Critical  Combinational logic detected before a synchronizer           2  Asynch Clock Groups  FDPE_3/C                                                FDPE_14/PRE
+  3  CDC-9   Info      Asynchronous reset synchronized with ASYNC_REG property      2  Asynch Clock Groups  FDPE_3/C                                                FDPE_8/PRE
+  4  CDC-6   Warning   Multi-bit synchronized with ASYNC_REG property               2  Asynch Clock Groups  main_jtagbone_phy_tx_cdc_cdc_graycounter0_q_reg[2:0]/C  builder_xilinxmultiregimpl0_regs0_reg[2:0]/D
+  5  CDC-6   Warning   Multi-bit synchronized with ASYNC_REG property               2  Asynch Clock Groups  main_jtagbone_phy_rx_cdc_cdc_graycounter1_q_reg[2:0]/C  builder_xilinxmultiregimpl3_regs0_reg[2:0]/D
+  6  CDC-26  Warning   LUTRAM read/write potential collision                        0  Asynch Clock Groups  storage_reg_0_3_0_7/RAMA/CLK                            storage_dat1_reg[0]/D
+  7  CDC-26  Warning   LUTRAM read/write potential collision                        0  Asynch Clock Groups  storage_reg_0_3_0_7/RAMA_D1/CLK                         storage_dat1_reg[1]/D
+  8  CDC-26  Warning   LUTRAM read/write potential collision                        0  Asynch Clock Groups  storage_reg_0_3_0_7/RAMB/CLK                            storage_dat1_reg[2]/D
+  9  CDC-26  Warning   LUTRAM read/write potential collision                        0  Asynch Clock Groups  storage_reg_0_3_0_7/RAMB_D1/CLK                         storage_dat1_reg[3]/D
+ 10  CDC-26  Warning   LUTRAM read/write potential collision                        0  Asynch Clock Groups  storage_reg_0_3_0_7/RAMC/CLK                            storage_dat1_reg[4]/D
+ 11  CDC-26  Warning   LUTRAM read/write potential collision                        0  Asynch Clock Groups  storage_reg_0_3_0_7/RAMC_D1/CLK                         storage_dat1_reg[5]/D
+ 12  CDC-26  Warning   LUTRAM read/write potential collision                        0  Asynch Clock Groups  storage_reg_0_3_0_7/RAMD/CLK                            storage_dat1_reg[6]/D
+ 13  CDC-26  Warning   LUTRAM read/write potential collision                        0  Asynch Clock Groups  storage_reg_0_3_0_7/RAMD_D1/CLK                         storage_dat1_reg[7]/D
+
+Source Clock: jtag_tck
+Destination Clock: main_clkout0
+CDC Type: No Common Primary Clock
+
+Row  ID      Severity  Description                                         Depth  Exception            Source (From)                                           Destination (To)
+---  ------  --------  --------------------------------------------------  -----  -------------------  ------------------------------------------------------  --------------------------------------------
+  1  CDC-10  Critical  Combinational logic detected before a synchronizer      2  Asynch Clock Groups  FDPE_9/C                                                FDPE_10/PRE
+  2  CDC-10  Critical  Combinational logic detected before a synchronizer      2  Asynch Clock Groups  FDPE_9/C                                                FDPE_16/PRE
+  3  CDC-6   Warning   Multi-bit synchronized with ASYNC_REG property          2  Asynch Clock Groups  main_jtagbone_phy_tx_cdc_cdc_graycounter1_q_reg[2:0]/C  builder_xilinxmultiregimpl1_regs0_reg[2:0]/D
+  4  CDC-6   Warning   Multi-bit synchronized with ASYNC_REG property          2  Asynch Clock Groups  main_jtagbone_phy_rx_cdc_cdc_graycounter0_q_reg[2:0]/C  builder_xilinxmultiregimpl2_regs0_reg[2:0]/D
+  5  CDC-26  Warning   LUTRAM read/write potential collision                   0  Asynch Clock Groups  storage_1_reg_0_3_0_7/RAMA/CLK                          storage_1_dat1_reg[0]/D
+  6  CDC-26  Warning   LUTRAM read/write potential collision                   0  Asynch Clock Groups  storage_1_reg_0_3_0_7/RAMA_D1/CLK                       storage_1_dat1_reg[1]/D
+  7  CDC-26  Warning   LUTRAM read/write potential collision                   0  Asynch Clock Groups  storage_1_reg_0_3_0_7/RAMB/CLK                          storage_1_dat1_reg[2]/D
+  8  CDC-26  Warning   LUTRAM read/write potential collision                   0  Asynch Clock Groups  storage_1_reg_0_3_0_7/RAMB_D1/CLK                       storage_1_dat1_reg[3]/D
+  9  CDC-26  Warning   LUTRAM read/write potential collision                   0  Asynch Clock Groups  storage_1_reg_0_3_0_7/RAMC/CLK                          storage_1_dat1_reg[4]/D
+ 10  CDC-26  Warning   LUTRAM read/write potential collision                   0  Asynch Clock Groups  storage_1_reg_0_3_0_7/RAMC_D1/CLK                       storage_1_dat1_reg[5]/D
+ 11  CDC-26  Warning   LUTRAM read/write potential collision                   0  Asynch Clock Groups  storage_1_reg_0_3_0_7/RAMD/CLK                          storage_1_dat1_reg[6]/D
+ 12  CDC-26  Warning   LUTRAM read/write potential collision                   0  Asynch Clock Groups  storage_1_reg_0_3_0_7/RAMD_D1/CLK                       storage_1_dat1_reg[7]/D
+
+Source Clock: main_clkout0
+Destination Clock: main_clkout2
+CDC Type: User Ignored
+
+Row  ID      Severity  Description                                         Depth  Exception   Source (From)                                    Destination (To)
+---  ------  --------  --------------------------------------------------  -----  ----------  -----------------------------------------------  ----------------------------------------
+  1  CDC-10  Critical  Combinational logic detected before a synchronizer      2  False Path  main_ddrphy_usnativeddrphy_en_vtc_storage_reg/C  builder_xilinxmultiregimpl30_regs0_reg/D
+
