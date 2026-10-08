@@ -1,0 +1,65 @@
+Offline signoff warning review
+=============================
+
+This review explains retained diagnostics; it is not hardware CDC or PHY
+qualification. No severity overrides or waivers were applied to the reports.
+
+CDC-6 (4): the two management AsyncFIFO instances each synchronize their
+3-bit Gray write/read pointers through two ASYNC_REG stages. Four independent
+bus-skew constraints bound those crossings at 6.667 ns. In the routed report
+their worst actual skew is 0.402 ns. The multi-bit warning is retained because
+the tool cannot infer the complete Gray-pointer/FIFO protocol.
+
+CDC-26 (16): dual-clock JTAG FIFO LUTRAM read/write collision warnings. FIFO
+full/empty logic and synchronized pointers govern ownership. These are not
+DDR data-path clock crossings. Reset and extreme JTAG-clock behavior still
+need physical management-interface validation.
+
+CDC-10 (5): four asynchronous reset crossings in JTAG FIFO reset coordination,
+and one enable-VTC control crossing into RIU. The reset crossings use two-stage
+asynchronous assertion/synchronous release chains, but combinational reset
+combining can glitch and the warning is retained. The VTC enable is combined
+with readiness before synchronization. Software must hold training controls
+stable, stop DMA during training/VTC changes, and wait for status before
+admission. These five critical CDC diagnostics are unresolved qualifications;
+the deliverable does not claim a clean CDC report.
+
+LUTAR-1 (1): combinational logic feeding the asynchronous JTAG FIFO reset
+chains; the same reset coordination issue described above.
+
+SYNTH-6 (16): DMA FIFO block RAM outputs are registered in fabric rather than
+merged into primitive output registers. Routed setup/hold constraints pass;
+this is a performance/layout recommendation.
+
+CLKC-58 (3): PLLs have no explicit user LOC. Channel floorplanning and dedicated
+native-clock connections determine their implemented locations. The design is
+fully routed and native-clock pulse-width checks pass. The final checkpoint
+preserves the actual placements.
+
+DCIRST-1 (4): inactive channel 1/2 CKE and CS pins retain the official SSTL12_DCI
+standard without a DCIRESET primitive. Their DDR RESET_n is permanently low,
+CKE low, CS high, and there is no clock/DQ interface. No active channel-0 pin is
+listed. This warning remains an inactive-channel electrical limitation; those
+channels must not be enabled with this image.
+
+The original TIMING-2 and missing-clock/TDO coverage warnings are corrected
+using the documented UltraScale+ BSCANE2 INTERNAL_TCK clock source. The old
+reports are preserved in signoff_v2/. DDR RESET_n is an asynchronous control
+with initialization hold-time requirements, explicitly excluded from CK-edge
+output timing. This does not verify the initialization waveform on a DIMM.
+XDCC-4 (1) records the intentional replacement of the original jtag_tck clock
+in the saved routed checkpoint. A fresh rebuild creates only the corrected
+clock definition and does not need this replacement.
+
+Minor logs also retain 1 ps timing-constraint rounding and flattened-netlist
+floorplanning advice. The native-clock report shows 2400.240 MHz because
+Vivado rounds the 300 MHz input period to 3.333 ns; the configured oscillator
+rate is 300 MHz and physical DDR data rate is 2400 MT/s.
+
+Further experimental PHY limitations, including RDIMM command latency, ODT,
+Native/MIG reference-frequency attributes and absent parity handling, are
+recorded in README.txt. Calibration is not autonomous in this CPU-free image;
+an external management program must initialize/train it before DMA admission.
+
+Reference for INTERNAL_TCK:
+https://www.amd.com/content/dam/xilinx/support/documents/user_guides/ug570-ultrascale-configuration.pdf

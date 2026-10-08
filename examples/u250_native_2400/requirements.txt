@@ -1,0 +1,6 @@
+packaging==26.3
+pyserial==3.5
+requests==2.34.2
+PyYAML==6.0.3
+colorama==0.4.6
+setuptools==65.5.0

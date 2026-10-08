@@ -1,0 +1,9 @@
+{
+  "regeneration": "comment-only changes; restored canonical synthesized source",
+  "compiled_files": {
+    "build/gateware/u250_native_2400.v": "817299943a521363ce76ec2d926b8ee9c70c7c2aaba460bc9cdf56526b27f129",
+    "build/native/usnative_core.v": "f239f6e4a9a8d737c64b796a5a50ab9c4c002e60407027f223a710e754d7eeda",
+    "sources/litedram/litedram/phy/usnative/riu_falling_launch.v": "9234f29a81b2dc80ae233d12d47e9b1d1f1d0d3a6bc886d84e923767c4c01051",
+    "build/gateware/u250_native_2400.xdc": "d9627850143d68f8a3e3974d2ed4eadec6836162a728be62e55a7ad072107225"
+  }
+}

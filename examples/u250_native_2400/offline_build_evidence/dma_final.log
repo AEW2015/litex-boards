@@ -1,0 +1,9 @@
+test_all_patterns_high_addresses_and_last_word (__main__.DMATest.test_all_patterns_high_addresses_and_last_word) ... ok
+test_invalid_ranges_and_alias_protection (__main__.DMATest.test_invalid_ranges_and_alias_protection) ... ok
+test_rmw_all_byte_masks (__main__.DMATest.test_rmw_all_byte_masks) ... ok
+test_simultaneous_independent_reader_writer (__main__.DMATest.test_simultaneous_independent_reader_writer) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 415.279s
+
+OK

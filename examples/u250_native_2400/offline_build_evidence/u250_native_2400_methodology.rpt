@@ -1,0 +1,146 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+----------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2025.2 (win64) Build 6299465 Fri Nov 14 19:35:11 GMT 2025
+| Date         : Wed Oct  7 21:53:16 2026
+| Host         : DESKTOP-I75K8PP running 64-bit major release  (build 9200)
+| Command      : report_methodology -file C:/Users/lavat/codex/litedram/u250_native_2400/evidence/signoff_v3/u250_native_2400_methodology.rpt
+| Design       : u250_native_2400
+| Device       : xcu250-figd2104-2L-e
+| Speed File   : -2L
+| Design State : Fully Routed
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+Report Methodology
+
+Table of Contents
+-----------------
+1. REPORT SUMMARY
+2. REPORT DETAILS
+
+1. REPORT SUMMARY
+-----------------
+            Netlist: netlist
+          Floorplan: checkpoint_u250_native_2400_final
+      Design limits: <entire design considered>
+             Max checks: <unlimited>
+             Checks found: 21
++---------+----------+------------------------------------------------------+--------+
+| Rule    | Severity | Description                                          | Checks |
++---------+----------+------------------------------------------------------+--------+
+| LUTAR-1 | Warning  | LUT drives async reset alert                         | 1      |
+| SYNTH-6 | Warning  | Timing of a RAM block might be sub-optimal           | 16     |
+| XDCC-4  | Warning  | User Clock constraint overwritten with the same name | 1      |
+| CLKC-58 | Advisory | PLLE4 with global clock driver has no LOC            | 3      |
++---------+----------+------------------------------------------------------+--------+
+
+2. REPORT DETAILS
+-----------------
+LUTAR-1#1 Warning
+LUT drives async reset alert  
+LUT cell FDPE_17_i_1, with 2 or more inputs, drives asynchronous preset/clear pin(s) FDPE_10/PRE, FDPE_11/PRE, FDPE_12/PRE, FDPE_13/PRE, FDPE_14/PRE,
+FDPE_15/PRE, FDPE_16/PRE, FDPE_17/PRE. The LUT may glitch and trigger an unexpected reset, even if it is a properly timed path.
+Related violations: <none>
+
+SYNTH-6#1 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_18_reg_0, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#2 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_18_reg_1, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#3 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_18_reg_2, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#4 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_18_reg_3, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#5 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_18_reg_4, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#6 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_18_reg_5, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#7 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_18_reg_6, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#8 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_18_reg_7, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#9 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_20_reg_0, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#10 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_20_reg_1, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#11 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_20_reg_2, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#12 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_20_reg_3, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#13 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_20_reg_4, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#14 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_20_reg_5, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#15 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_20_reg_6, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+SYNTH-6#16 Warning
+Timing of a RAM block might be sub-optimal  
+The timing for the instance storage_20_reg_7, implemented as a RAM block, might be sub-optimal as no output register was merged into the block.
+Related violations: <none>
+
+XDCC-4#1 Warning
+User Clock constraint overwritten with the same name  
+A new clock constraint create_clock overrides a previous user clock constraint with the same name.
+New: create_clock -period 33.333 -name jtag_tck [get_pins -of_objects [get_cells -hierarchical -filter {REF_NAME == BSCANE2}] -filter {REF_PIN_NAME == INTERNAL_TCK}] (Source: Not Available)
+Previous: create_clock -period 33.333 -name jtag_tck [get_pins -of_objects [get_cells -hierarchical -filter {REF_NAME == BSCANE2}] -filter {REF_PIN_NAME == TCK}] (Source: Not Available)
+Related violations: <none>
+
+CLKC-58#1 Advisory
+PLLE4 with global clock driver has no LOC  
+The PLLE4_ADV cell native_pll_bank61 CLKIN pin is driven by global Clock buffer BUFG_1 and does not have a LOC constraint. It is recommended to LOC the PLL and use the CLOCK_DEDICATED_ROUTE constraint on the net driven by the global Clock buffer.
+Related violations: <none>
+
+CLKC-58#2 Advisory
+PLLE4 with global clock driver has no LOC  
+The PLLE4_ADV cell native_pll_bank62 CLKIN pin is driven by global Clock buffer BUFG_1 and does not have a LOC constraint. It is recommended to LOC the PLL and use the CLOCK_DEDICATED_ROUTE constraint on the net driven by the global Clock buffer.
+Related violations: <none>
+
+CLKC-58#3 Advisory
+PLLE4 with global clock driver has no LOC  
+The PLLE4_ADV cell native_pll_bank63 CLKIN pin is driven by global Clock buffer BUFG_1 and does not have a LOC constraint. It is recommended to LOC the PLL and use the CLOCK_DEDICATED_ROUTE constraint on the net driven by the global Clock buffer.
+Related violations: <none>
+
+

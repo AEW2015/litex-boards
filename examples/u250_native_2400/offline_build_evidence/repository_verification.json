@@ -1,0 +1,21 @@
+{
+  "build/gateware/u250_native_2400.v": {
+    "normalized_sha256": "24773df154fc8310d4e1dc42aa9ff84aa8e73ecfc1fd887b23d3ea03a6b2ca63",
+    "matches_original_compiled_logic": true
+  },
+  "build/native/usnative_core.v": {
+    "normalized_sha256": "63ea8e9ffc931bb5d50ea32aaff44be65985dc0ce3da804b79d4659c5a05161c",
+    "matches_original_compiled_logic": true
+  },
+  "xdc_matches_original_compiled_constraints": true,
+  "x4_tests": {
+    "exit_code": 0,
+    "tests": 3
+  },
+  "dma_source_matches_original_tested_engine": true,
+  "lite_dram_regressions": {
+    "tests": 63,
+    "result": "pass",
+    "log": "regression_tests.log"
+  }
+}

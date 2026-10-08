@@ -1,0 +1,125 @@
+{
+  "overall": "PASS",
+  "scope": "Offline bitstream; no hardware qualification",
+  "artifacts": [
+    {
+      "role": "programming_image",
+      "path": "build/gateware/u250_native_2400.bit",
+      "sha256": "ccc88e9b773dc1db16c4f9f95336af9a90a93af08dfcd0ae2fe5c61660d03075"
+    },
+    {
+      "role": "routed_checkpoint",
+      "path": "build/gateware/u250_native_2400_final.dcp",
+      "sha256": "ba255caae655acb215e0f8f5045d0c1ff09ca289d1870a84acfed6844711b4d3"
+    },
+    {
+      "role": "rtl",
+      "path": "build/gateware/u250_native_2400.v",
+      "sha256": "817299943a521363ce76ec2d926b8ee9c70c7c2aaba460bc9cdf56526b27f129"
+    },
+    {
+      "role": "constraints",
+      "path": "build/gateware/u250_native_2400.xdc",
+      "sha256": "d9627850143d68f8a3e3974d2ed4eadec6836162a728be62e55a7ad072107225"
+    },
+    {
+      "role": "rebuild",
+      "path": "scripts/resume_implementation.tcl",
+      "sha256": "35168f7b94cabb1b026f1c8e356493d3fa6e54c25d7e4811d6bd8eedbe402656"
+    },
+    {
+      "role": "evidence",
+      "path": "evidence/final_source_catalog.json",
+      "sha256": "d37f94a831ef5f7426a06ffd1cfff10297691143c858a0ec34b8ac0c25171552"
+    },
+    {
+      "role": "evidence",
+      "path": "evidence/signoff_checks.json",
+      "sha256": "809a90c9ba836fa1652a1a5a9d98c8db3c3e5d6e07585f79f48e7e9ce78d2c5b"
+    },
+    {
+      "role": "evidence",
+      "path": "evidence/source_changes.patch",
+      "sha256": "3a0ce973667f35b9c56771df28e4faca90ca0b7e8e0395b4f89baca2dc82cf7e"
+    },
+    {
+      "role": "evidence",
+      "path": "evidence/warnings_review.txt",
+      "sha256": "159e2886772d05c8488807a32c30632a6cce7200ff44504c755ad1669c3f3c6a"
+    },
+    {
+      "role": "evidence",
+      "path": "build/gateware/u250_native_2400_final_timing.rpt",
+      "sha256": "0a8be3cd06d80b58b7059414565ef971434c8d8074e14d04e7d8888f661db2c6"
+    },
+    {
+      "role": "evidence",
+      "path": "README.txt",
+      "sha256": "d2eb8b50646532d07c424eddb6874f2860d5b2d03410bf5781907fdb6ae6aeca"
+    },
+    {
+      "role": "evidence",
+      "path": "build/csr.csv",
+      "sha256": "fc24bc908ed4e511786ff75fa46e20ea760442be65452e48c9bc5dd646effb3b"
+    },
+    {
+      "role": "evidence",
+      "path": "build/csr.json",
+      "sha256": "0a5577e5d4fd26b96c7912293cace68cc1c7e59f5dcc5e7beb0f4302dd856b70"
+    }
+  ],
+  "checks": {
+    "offline_tests": {
+      "status": "pass",
+      "evidence": "evidence/test_exit_codes.json",
+      "tests": 7
+    },
+    "compiled_source_binding": {
+      "status": "pass",
+      "evidence": "evidence/rtl_binding.json"
+    },
+    "routed_setup_hold": {
+      "status": "pass",
+      "evidence": "build/gateware/u250_native_2400_final_timing.rpt",
+      "setup_slack_ns": 0.064,
+      "hold_slack_ns": 0.01
+    },
+    "pulse_width": {
+      "status": "pass",
+      "evidence": "build/gateware/u250_native_2400_pulse_width.rpt",
+      "slack_ns": 0.039
+    },
+    "bus_skew": {
+      "status": "pass",
+      "evidence": "build/gateware/u250_native_2400_bus_skew.rpt",
+      "worst_skew_ns": 0.402
+    },
+    "routing": {
+      "status": "pass",
+      "evidence": "build/gateware/u250_native_2400_route_status.rpt",
+      "routing_errors": 0
+    },
+    "clock_coverage": {
+      "status": "pass",
+      "evidence": "build/gateware/u250_native_2400_final_timing.rpt",
+      "no_clock": 0,
+      "unconstrained_internal_endpoints": 0,
+      "exception": "Asynchronous DDR module RESET_n; initialization hold times required"
+    },
+    "drc": {
+      "status": "pass",
+      "evidence": "build/gateware/u250_native_2400_final_drc.rpt",
+      "errors": 0,
+      "retained_warnings": "Four inactive-channel DCIRST-1 warnings"
+    },
+    "cdc_methodology_review": {
+      "status": "pass",
+      "evidence": "evidence/warnings_review.txt",
+      "qualification": "Five critical CDC diagnostics remain unresolved; CDC is not clean"
+    },
+    "bitstream_generation": {
+      "status": "pass",
+      "evidence": "evidence/implementation_v4.log"
+    }
+  }
+}

@@ -1,0 +1,2 @@
+# Preserve original report/log hashes and tool-emitted spacing.
+offline_build_evidence/** -text -whitespace

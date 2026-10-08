@@ -1,0 +1,11 @@
+/build/
+/query_cache/
+/evidence/
+/references/
+/mig_reference/
+*.log
+!offline_build_evidence/*.log
+*.jou
+*.str
+*.dmp
+__pycache__/

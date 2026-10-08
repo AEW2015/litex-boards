@@ -16,8 +16,8 @@ from litex.build.xilinx import XilinxUSPPlatform, VivadoProgrammer
 _io = [
     # Clk / Rst
     ("clk300", 0,
-        Subsignal("n", Pins("AY38"), IOStandard("DIFF_SSTL12")),
-        Subsignal("p", Pins("AY37"), IOStandard("DIFF_SSTL12")),
+        Subsignal("n", Pins("AY38"), IOStandard("DIFF_POD12_DCI")),
+        Subsignal("p", Pins("AY37"), IOStandard("DIFF_POD12_DCI")),
     ),
     ("clk300", 1,
         Subsignal("n", Pins("AW19"), IOStandard("DIFF_SSTL12")),
@@ -91,13 +91,13 @@ _io = [
         Subsignal("dqs_n", Pins(
             "BB30 BC26 BD29 BE26 BB36 BD31 AW33 BA33",
             "AM32 AP31 AL29 AT30 AU30 AY28 BE36 BE32"),
-            IOStandard("DIFF_POD12"),
+            IOStandard("DIFF_POD12_DCI"),
             Misc("PRE_EMPHASIS=RDRV_240"),
             Misc("EQUALIZATION=EQ_LEVEL2")),
         Subsignal("dqs_p", Pins(
             "BA30 BB26 BD28 BD26 BB35 BC31 AV33 BA32",
             "AM31 AP30 AL28 AR30 AU29 AY27 BE35 BE31"),
-            IOStandard("DIFF_POD12"),
+            IOStandard("DIFF_POD12_DCI"),
             Misc("PRE_EMPHASIS=RDRV_240"),
             Misc("EQUALIZATION=EQ_LEVEL2")),
         Subsignal("odt",     Pins("AP34"), IOStandard("SSTL12_DCI")),

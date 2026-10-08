@@ -1,0 +1,8 @@
+test_all_nibbles_own_four_correct_dq_and_one_control (__main__.X4Test.test_all_nibbles_own_four_correct_dq_and_one_control) ... ok
+test_geometry_profile_and_rdimm_mode_registers (__main__.X4Test.test_geometry_profile_and_rdimm_mode_registers) ... ok
+test_independent_fifo_accounting_for_each_nibble (__main__.X4Test.test_independent_fifo_accounting_for_each_nibble) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.057s
+
+OK

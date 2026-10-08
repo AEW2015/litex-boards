@@ -1,0 +1,17 @@
+{
+  "branch": "u250/native-ddr4-2400",
+  "repositories": {
+    "litedram": {
+      "url": "https://github.com/AEW2015/litedram.git",
+      "revision": "00cd8ffa17d74ef19d60728085ec4cfba29f869a"
+    },
+    "litex": {
+      "url": "https://github.com/AEW2015/litex.git",
+      "revision": "34a9d07b93e667e95b402c75a21c9b0394dc723b"
+    },
+    "migen": {
+      "url": "https://github.com/m-labs/migen.git",
+      "revision": "e19524c963a8342952840983047557707fbe0b6a"
+    }
+  }
+}

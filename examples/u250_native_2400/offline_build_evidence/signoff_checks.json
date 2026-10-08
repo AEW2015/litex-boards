@@ -1,0 +1,54 @@
+{
+  "offline_tests": {
+    "status": "pass",
+    "evidence": "evidence/test_exit_codes.json",
+    "tests": 7
+  },
+  "compiled_source_binding": {
+    "status": "pass",
+    "evidence": "evidence/rtl_binding.json"
+  },
+  "routed_setup_hold": {
+    "status": "pass",
+    "evidence": "build/gateware/u250_native_2400_final_timing.rpt",
+    "setup_slack_ns": 0.064,
+    "hold_slack_ns": 0.01
+  },
+  "pulse_width": {
+    "status": "pass",
+    "evidence": "build/gateware/u250_native_2400_pulse_width.rpt",
+    "slack_ns": 0.039
+  },
+  "bus_skew": {
+    "status": "pass",
+    "evidence": "build/gateware/u250_native_2400_bus_skew.rpt",
+    "worst_skew_ns": 0.402
+  },
+  "routing": {
+    "status": "pass",
+    "evidence": "build/gateware/u250_native_2400_route_status.rpt",
+    "routing_errors": 0
+  },
+  "clock_coverage": {
+    "status": "pass",
+    "evidence": "build/gateware/u250_native_2400_final_timing.rpt",
+    "no_clock": 0,
+    "unconstrained_internal_endpoints": 0,
+    "exception": "Asynchronous DDR module RESET_n; initialization hold times required"
+  },
+  "drc": {
+    "status": "pass",
+    "evidence": "build/gateware/u250_native_2400_final_drc.rpt",
+    "errors": 0,
+    "retained_warnings": "Four inactive-channel DCIRST-1 warnings"
+  },
+  "cdc_methodology_review": {
+    "status": "pass",
+    "evidence": "evidence/warnings_review.txt",
+    "qualification": "Five critical CDC diagnostics remain unresolved; CDC is not clean"
+  },
+  "bitstream_generation": {
+    "status": "pass",
+    "evidence": "evidence/implementation_v4.log"
+  }
+}
