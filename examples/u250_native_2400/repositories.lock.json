@@ -3,11 +3,11 @@
   "repositories": {
     "litedram": {
       "url": "https://github.com/AEW2015/litedram.git",
-      "revision": "00cd8ffa17d74ef19d60728085ec4cfba29f869a"
+      "revision": "00fb5a538bde28b2b274920230659dfa7f3e81f5"
     },
     "litex": {
       "url": "https://github.com/AEW2015/litex.git",
-      "revision": "34a9d07b93e667e95b402c75a21c9b0394dc723b"
+      "revision": "6030b784bbb21a310e97cb82c89084a519679737"
     },
     "migen": {
       "url": "https://github.com/m-labs/migen.git",
