@@ -178,6 +178,8 @@ class BaseSoC(SoCCore):
                 # Four RV32 windows select eight groups of four native ports.
                 # AXILiteDecoder holds each route through its response, including
                 # when a selector write arrives while a request is outstanding.
+                # Change banks only after all four windows have completed
+                # their transactions; request buffers do not capture the bank.
                 self.hbm_window = LiteXModule()
                 self.hbm_window.bank = CSRStorage(3, name="bank")
                 for channel in range(4):
@@ -205,8 +207,15 @@ class BaseSoC(SoCCore):
                     self.submodules += axi.AXILiteConverter(converted, wide)
                     self.submodules += axi.AXILiteOffset(wide, native, offset=0)
                     routed = axi.AXILiteInterface(data_width=256, address_width=33)
+                    # Register commands and data before the native-port fanout,
+                    # including ready, to bound the path back into the CPU bus.
                     for name in ("aw", "w", "ar"):
-                        self.comb += getattr(native, name).connect(getattr(routed, name))
+                        request = getattr(native, name)
+                        buffer = stream.Buffer(request.description,
+                            pipe_valid=True, pipe_ready=True)
+                        self.submodules += buffer
+                        self.comb += request.connect(buffer.sink)
+                        self.comb += buffer.source.connect(getattr(routed, name))
                     # Cut the native-port response mux from the CPU path.
                     # Buffer payload/valid and ready so backpressure cannot
                     # reconnect the long return path combinatorially.
