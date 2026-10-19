@@ -223,6 +223,17 @@ static void transactions(void) {
  * Each round writes all channels before checking any channel, so aliases
  * cannot pass by reading data immediately after writing the same location.
  */
+static uint32_t stress_pattern(uint32_t channel, uint32_t offset, uint32_t word, uint32_t round) {
+    uint32_t value = pattern(channel, offset, word);
+    switch (round & 3u) {
+    case 1: return 1u << (word & 31u);
+    case 2: return ~(1u << (word & 31u));
+    case 3:
+        value ^= value << 13; value ^= value >> 17; value ^= value << 5;
+        return value;
+    default: return value;
+    }
+}
 static uint32_t stress_stop(void) {
     if (mb->command != 3) return 0;
     mb->command = 0;
@@ -249,7 +260,7 @@ static void stress(void) {
                     if (stress_stop()) return;
                     refresh_temperatures();
                 }
-                write_word(base + offset + 4*word, pattern(channel, offset, word));
+                write_word(base + offset + 4*word, stress_pattern(channel, offset, word, round));
             }
             mb->written_channels |= 1u << channel;
         }
@@ -260,7 +271,7 @@ static void stress(void) {
                     if (stress_stop()) return;
                     refresh_temperatures();
                 }
-                read_word(base + offset + 4*word, pattern(channel, offset, word));
+                read_word(base + offset + 4*word, stress_pattern(channel, offset, word, round));
             }
             mb->checked_channels |= 1u << channel;
         }
