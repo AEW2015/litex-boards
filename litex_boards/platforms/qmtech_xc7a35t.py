@@ -147,18 +147,17 @@ class Platform(Xilinx7SeriesPlatform):
 
     def __init__(self, toolchain="vivado", with_daughterboard=False, with_core_resources=True):
         device = "xc7a35tftg256-1"
-        io = _io
-        connectors = _connectors
+        io = list(_io)
+        connectors = list(_connectors)
 
-        if with_daughterboard:
-            from litex_boards.platforms.qmtech_daughterboard import QMTechDaughterboard
-            daughterboard = QMTechDaughterboard(IOStandard("LVCMOS33"))
-            io += daughterboard.io
-            connectors += daughterboard.connectors
-        elif with_core_resources:
+        if not with_daughterboard and with_core_resources:
             io += self.core_resources
 
         Xilinx7SeriesPlatform.__init__(self, device, io, connectors, toolchain=toolchain)
+
+        if with_daughterboard:
+            from litex_boards.extensions.qmtech import QMTechDaughterboard
+            self.add_extension(QMTechDaughterboard())
 
         self.toolchain.bitstream_commands = \
             ["set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]"]

@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
+from migen.genlib.cdc import MultiReg
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.gen import *
@@ -77,7 +78,21 @@ class _CRG(LiteXModule):
         por_done  = Signal()
         self.comb += self.cd_por.clk.eq(clk50)
         self.comb += por_done.eq(por_count == 0)
-        self.sync.por += If(~por_done, por_count.eq(por_count - 1))
+        # SoC reset request (rst: sys pulse, toggle to por): restart the power-on reset, the PLLs are
+        # held in reset as after power-up (a sys pulse is too short for the GW5A PLLs).
+        rst_toggle = Signal(reset_less=True)
+        rst_por    = Signal()
+        rst_por_d  = Signal()
+        self.sync += If(self.rst, rst_toggle.eq(~rst_toggle))
+        self.specials += MultiReg(rst_toggle, rst_por, "por")
+        self.sync.por += [
+            rst_por_d.eq(rst_por),
+            If(rst_por != rst_por_d,
+                por_count.eq(2**16-1),
+            ).Elif(~por_done,
+                por_count.eq(por_count - 1),
+            ),
+        ]
 
         # PLL
         self.pll = pll = GW5APLL(devicename=platform.devicename, device=platform.device)
@@ -174,11 +189,15 @@ class BaseSoC(SoCCore):
         with_rgb_led        = False,
         with_fan_pwm        = True,
         with_buttons        = True,
+        dock                = "standard",
         **kwargs):
         assert ddr3_rate in ("1:2", "1:4")
         ddr3_nphases = int(ddr3_rate[-1])
 
-        platform = sipeed_tang_mega_138k_pro.Platform(toolchain="gowin")
+        platform = sipeed_tang_mega_138k_pro.Platform(dock=dock, toolchain="gowin")
+        if dock is None:
+            with_buttons = False # Buttons/Fan are on the dock.
+            with_fan_pwm = False
 
         # Memory configuration ---------------------------------------------------------------------
         integrated_main_ram_size = kwargs.get("integrated_main_ram_size", 0)
@@ -296,6 +315,13 @@ class BaseSoC(SoCCore):
                 sfp_pads = platform.request("sfp", eth_sfp)
                 self.comb += sfp_pads.tx_disable.eq(0)
                 self.ethphy = GW5_1000BASEX(platform, lane=eth_sfp)
+            elif eth_phy == "10gbaser":
+                if with_pcie:
+                    raise ValueError("10GBASE-R and PCIe require a combined SerDes configuration.")
+                from liteeth.phy import GW5_10G_BASER
+                sfp_pads = platform.request("sfp", eth_sfp)
+                self.comb += sfp_pads.tx_disable.eq(0)
+                self.ethphy = GW5_10G_BASER(platform, lane=eth_sfp)
             else:
                 raise ValueError(f"Unsupported Ethernet PHY: {eth_phy}")
             if with_etherbone:
@@ -332,6 +358,7 @@ def main():
     parser.add_target_argument("--flash",               action="store_true",      help="Flash bitstream.")
     parser.add_target_argument("--prog-kit",            default="openfpgaloader", help="Programmer select from Gowin/openFPGALoader.")
     parser.add_target_argument("--sys-clk-freq",        default=50e6, type=float, help="System clock frequency.")
+    parser.add_target_argument("--dock",                default="standard",       choices=[*sipeed_tang_mega_138k_pro.docks, "none"], help="Dock (standard or none for SoM only).")
     parser.add_target_argument("--with-sdram",          action="store_true",      help="Use the optional SDRAM module instead of DDR3.")
     parser.add_target_argument("--sdram-model",         default="sipeed",
         choices=[
@@ -347,8 +374,8 @@ def main():
     ethopts = parser.target_group.add_mutually_exclusive_group()
     ethopts.add_argument("--with-ethernet",  action="store_true", help="Enable Ethernet support.")
     ethopts.add_argument("--with-etherbone", action="store_true", help="Enable Etherbone support.")
-    parser.add_target_argument("--eth-phy", default="rgmii", choices=["rgmii", "1000basex"],
-        help="Ethernet PHY: RGMII or 1000BASE-X on SFP (100 MHz reference clock).")
+    parser.add_target_argument("--eth-phy", default="rgmii", choices=["rgmii", "1000basex", "10gbaser"],
+        help="Ethernet PHY: RGMII, 1000BASE-X on SFP (100 MHz REFCLK1) or 10GBASE-R on SFP (125 MHz REFCLK0).")
     parser.add_target_argument("--eth-sfp", default=0, type=int, choices=[0, 1], help="Ethernet SFP.")
     parser.add_target_argument("--eth-dynamic-ip", action="store_true",     help="Enable dynamic Ethernet IP assignment.")
     parser.add_target_argument("--remote-ip",      default="192.168.1.100", help="Remote IP address of TFTP server.")
@@ -356,12 +383,15 @@ def main():
     parser.add_target_argument("--with-pcie",      action="store_true",     help="Enable PCIe support.")
     parser.add_target_argument("--with-rgb-led",   action="store_true",     help="Enable WS2812 RGB Led.")
     parser.add_target_argument("--without-fan",    action="store_true",     help="Disable Fan PWM.")
+    parser.add_target_argument("--without-leds",   action="store_true",     help="Disable LED Chaser.")
+    parser.add_target_argument("--without-buttons", action="store_true",    help="Disable Buttons.")
     args = parser.parse_args()
 
     assert not (args.with_etherbone and args.eth_dynamic_ip)
 
     soc = BaseSoC(
         sys_clk_freq        = args.sys_clk_freq,
+        dock                = None if args.dock == "none" else args.dock,
         with_video_terminal = args.with_video_terminal,
         with_hdmi_out_terminal  = args.with_hdmi_out_terminal,
         with_hdmi_out_colorbars = args.with_hdmi_out_colorbars,
@@ -372,6 +402,8 @@ def main():
         with_pcie           = args.with_pcie,
         with_rgb_led        = args.with_rgb_led,
         with_fan_pwm        = not args.without_fan,
+        with_led_chaser     = not args.without_leds,
+        with_buttons        = not args.without_buttons,
         with_ethernet       = args.with_ethernet,
         with_etherbone      = args.with_etherbone,
         eth_phy             = args.eth_phy,

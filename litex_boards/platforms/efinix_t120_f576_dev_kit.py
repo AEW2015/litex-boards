@@ -155,29 +155,6 @@ _connectors = [
     ],
 ]
 
-# PMODS --------------------------------------------------------------------------------------------
-
-def raw_pmod_io(pmod):
-    return [(pmod, 0, Pins(" ".join([f"{pmod}:{i:d}" for i in range(8)])), IOStandard("3.3_V_LVTTL_/_LVCMOS"))]
-
-def usb_pmod_io(pmod):
-    return [
-        # USB-UART PMOD: https://store.digilentinc.com/pmod-usbuart-usb-to-uart-interface/
-        ("usb_uart", 0,
-            Subsignal("tx", Pins(f"{pmod}:1")),
-            Subsignal("rx", Pins(f"{pmod}:2")),
-            IOStandard("3.3_V_LVTTL_/_LVCMOS")
-        ),
-    ]
-
-def i2c_pmod_io(pmod):
-    return [
-        ("i2c", 0,
-            Subsignal("sda", Pins(f"{pmod}:0")),
-            Subsignal("scl", Pins(f"{pmod}:1")),
-            IOStandard("3.3_V_LVTTL_/_LVCMOS"),
-        ),
-    ]
 
 # DDR Configuration --------------------------------------------------------------------------------
 
@@ -241,3 +218,18 @@ class Platform(EfinixPlatform):
         self.add_period_constraint(
             self.lookup_request(self.default_clk_name, loose=True),
             self.default_clk_period)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodGPIO, PmodI2C, PmodUSBUART
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "raw_pmod_io" : ('platform.add_extension(PmodGPIO(pmod))',
+        lambda pmod: PmodGPIO(pmod).get_io(EfinixPlatform)),
+    "usb_pmod_io" : ('platform.add_extension(PmodUSBUART(pmod))',
+        lambda pmod: PmodUSBUART(pmod).get_io(EfinixPlatform)),
+    "i2c_pmod_io" : ('platform.add_extension(PmodI2C(pmod))',
+        lambda pmod: PmodI2C(pmod).get_io(EfinixPlatform)),
+})

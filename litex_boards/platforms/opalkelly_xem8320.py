@@ -328,46 +328,6 @@ _connectors = [
     ("pmod4", "AD14 AD13 W16  AD15 AB14 AA14 Y16  AA15"),
 ]
 
-def dvi_pmod_io(pmoda,pmodb):
-    return [
-        ("dvi", 0,
-            Subsignal("clk",   Pins(f"{pmodb}:1")),
-            Subsignal("de",    Pins(f"{pmodb}:6")),
-            Subsignal("hsync", Pins(f"{pmodb}:3")),
-            Subsignal("vsync", Pins(f"{pmodb}:7")),
-            Subsignal("b",     Pins(f"{pmoda}:5 {pmoda}:1 {pmoda}:4 {pmoda}:0")),
-            Subsignal("g",     Pins(f"{pmoda}:7 {pmoda}:3 {pmoda}:6 {pmoda}:2")),
-            Subsignal("r",     Pins(f"{pmodb}:2 {pmodb}:5 {pmodb}:4 {pmodb}:0")),
-            IOStandard("LVCMOS33"),
-        )
-    ]
-
-_dvi_pmod_io = dvi_pmod_io("pmod2","pmod1") # SDCARD PMOD on JD.
-
-def sdcard_pmod_io(pmod):
-    return [
-        # SDCard PMOD:
-        # - https://store.digilentinc.com/pmod-microsd-microsd-card-slot/
-        # - https://github.com/antmicro/arty-expansion-board
-        ("spisdcard", 0,
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("mosi", Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("cs_n", Pins(f"{pmod}:0"), Misc("PULLUP True")),
-            Subsignal("miso", Pins(f"{pmod}:2"), Misc("PULLUP True")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-        ("sdcard", 0,
-            Subsignal("data", Pins(f"{pmod}:2 {pmod}:4 {pmod}:5 {pmod}:0"), Misc("PULLUP True")),
-            Subsignal("cmd",  Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("cd",   Pins(f"{pmod}:6")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-]
-
-_sdcard_pmod_io = sdcard_pmod_io("pmod3") # SDCARD PMOD on JD.
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -386,3 +346,20 @@ class Platform(XilinxUSPPlatform):
         self.add_period_constraint(self.lookup_request("sys_clk100", loose=True), 1e9/100e6)
         self.add_period_constraint(self.lookup_request("ddr_clk100", loose=True), 1e9/100e6)
         self.add_platform_command("set_property INTERNAL_VREF 0.84 [get_iobanks 64]")
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodDVI, PmodSDCard
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "dvi_pmod_io"     : ('platform.add_extension(PmodDVI(a=pmoda, b=pmodb))',
+        lambda pmoda, pmodb: PmodDVI(a=pmoda, b=pmodb).get_io(XilinxUSPPlatform)),
+    "_dvi_pmod_io"    : ('platform.add_extension(PmodDVI(a="pmod2", b="pmod1"))',
+        PmodDVI(a="pmod2", b="pmod1").get_io(XilinxUSPPlatform)),
+    "sdcard_pmod_io"  : ('platform.add_extension(PmodSDCard(pmod))',
+        lambda pmod: PmodSDCard(pmod).get_io(XilinxUSPPlatform)),
+    "_sdcard_pmod_io" : ('platform.add_extension(PmodSDCard("pmod3"))',
+        PmodSDCard("pmod3").get_io(XilinxUSPPlatform)),
+})

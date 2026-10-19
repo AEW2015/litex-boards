@@ -11,6 +11,7 @@
 import os
 
 from migen import *
+from migen.genlib.cdc import MultiReg
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.gen import *
@@ -77,7 +78,21 @@ class _CRG(LiteXModule):
         por_done  = Signal()
         self.comb += self.cd_por.clk.eq(clk50)
         self.comb += por_done.eq(por_count == 0)
-        self.sync.por += If(~por_done, por_count.eq(por_count - 1))
+        # SoC reset request (rst: sys pulse, toggle to por): restart the power-on reset, the PLLs are
+        # held in reset as after power-up (a sys pulse is too short for the GW5A PLLs).
+        rst_toggle = Signal(reset_less=True)
+        rst_por    = Signal()
+        rst_por_d  = Signal()
+        self.sync += If(self.rst, rst_toggle.eq(~rst_toggle))
+        self.specials += MultiReg(rst_toggle, rst_por, "por")
+        self.sync.por += [
+            rst_por_d.eq(rst_por),
+            If(rst_por != rst_por_d,
+                por_count.eq(2**16-1),
+            ).Elif(~por_done,
+                por_count.eq(por_count - 1),
+            ),
+        ]
 
         # PLL
         if without_pll:
@@ -308,7 +323,8 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=sipeed_tang_console.Platform, description="LiteX SoC on Tang Console.")
     parser.add_target_argument("--flash",           action="store_true",      help="Flash bitstream.")
     parser.add_target_argument("--prog-kit",        default="openfpgaloader", help="Programmer select from Gowin/openFPGALoader.")
@@ -333,6 +349,7 @@ def main():
     parser.add_target_argument("--with-video-terminal", action="store_true", help="Enable Video Terminal (HDMI).")
     parser.add_target_argument("--with-lcd-terminal",   action="store_true", help="Enable Video Terminal (LCD).")
     parser.add_target_argument("--with-lcd-colorbars",  action="store_true", help="Enable Video Colorbars (LCD).")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -354,6 +371,7 @@ def main():
         toolchain           = args.toolchain,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
 
     builder = Builder(soc, **parser.builder_argdict)
     if args.build or args.with_pcie:

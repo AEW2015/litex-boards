@@ -20,6 +20,7 @@ from litex.soc.integration.builder import *
 
 from litex.soc.cores.clock.efinix import *
 from litex.soc.cores.bitbang import I2CMaster
+from litex.soc.cores.gpio import GPIOIn
 from litex.soc.cores.pwm import PWM
 from litex.soc.cores.ram.efinix_ddr import EfinixDDR, add_efinix_ddr
 
@@ -103,6 +104,7 @@ class BaseSoC(SoCCore):
             ptp_p2p          = False,
             ptp_debug        = False,
             with_ohci        = False,
+            with_buttons     = False,
             **kwargs):
         platform = efinix_ti375_c529_dev_kit.Platform()
 
@@ -126,33 +128,24 @@ class BaseSoC(SoCCore):
             default_period = 0xfff,
         )
 
+        # Buttons ---------------------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request_all("user_btn_n")[1:]))
+
         # USB OHCI ---------------------------------------------------------------------------------
         if with_ohci:
-            _usb_pmod_ios = [
-               ("usb_pmod1", 0,
-                   Subsignal("dp", Pins("pmod1:0", "pmod1:1", "pmod1:2", "pmod1:3")),
-                   Subsignal("dm", Pins("pmod1:4", "pmod1:5", "pmod1:6", "pmod1:7")),
-                   IOStandard("3.3_V_LVCMOS"), Misc("DRIVE_STRENGTH=8"),
-               )
-            ]
-            platform.add_extension(_usb_pmod_ios)
+            from litex_boards.extensions.pmod import PmodUSBHostQuad
+            platform.add_extension(PmodUSBHostQuad("pmod1", name="usb_pmod1", iostandard="3.3_V_LVCMOS", misc=Misc("DRIVE_STRENGTH=8")))
             self.submodules.usb_ohci = USBOHCI(platform, platform.request("usb_pmod1"), usb_clk_freq=int(60e6))
             self.bus.add_slave("usb_ohci_ctrl", self.usb_ohci.wb_ctrl, region=SoCRegion(origin=self.mem_map["usb_ohci"], size=0x100000, cached=False))
-            self.dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
+            dma_bus = getattr(self, "dma_bus", self.bus)
+            dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
             self.comb += self.cpu.interrupt[16].eq(self.usb_ohci.interrupt)
 
         # JTAG -------------------------------------------------------------------------------------
         if hasattr(self.cpu, "jtag_tms"):
-            _jtag_io = [
-                ("jtag", 0,
-                    Subsignal("tck", Pins("pmod0:0")),
-                    Subsignal("tdi", Pins("pmod0:1")),
-                    Subsignal("tdo", Pins("pmod0:2")),
-                    Subsignal("tms", Pins("pmod0:3")),
-                    IOStandard("3.3_V_LVCMOS"),
-                )
-            ]
-            self.platform.add_extension(_jtag_io)
+            from litex_boards.extensions.pmod import PmodJTAG
+            self.platform.add_extension(PmodJTAG("pmod0", iostandard="3.3_V_LVCMOS"))
             jtag_pads = platform.request("jtag")
             self.cpu.add_jtag(jtag_pads)
             platform.add_false_path_constraints(self.crg.cd_sys.clk, jtag_pads.tck)
@@ -447,7 +440,8 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=efinix_ti375_c529_dev_kit.Platform, description="LiteX SoC on Efinix Ti375 C529 Dev Kit.")
     parser.add_target_argument("--flash",            action="store_true",                             help="Flash bitstream.")
     parser.add_target_argument("--sys-clk-freq",     default=100e6, type=float,                       help="System clock frequency.")
@@ -456,6 +450,7 @@ def main():
     parser.add_target_argument("--spi-flash-number", default=0, type=int, choices=[0, 1],             help="SPI Flash number.")
     parser.add_target_argument("--spi-flash-rate",   default="1:2", type=str, choices=["1:1", "1:2"], help="SPI Flash rate.")
     parser.add_target_argument("--with-ohci",        action="store_true",                             help="Enable USB OHCI.")
+    parser.add_target_argument("--with-buttons",     action="store_true",                             help="Enable Buttons.")
     parser.add_target_argument("--with-emmc",        action="store_true",                             help="Enable SDCard support (use eMMC).")
     sdopts = parser.target_group.add_mutually_exclusive_group()
     sdopts.add_argument("--with-spi-sdcard", action="store_true", help="Enable SPI-mode SDCard support.")
@@ -469,6 +464,7 @@ def main():
     parser.add_target_argument("--ptp-p2p",        action="store_true",                                          help="Enable PTP P2P mode.")
     parser.add_target_argument("--ptp-debug",      action="store_true",                                          help="Enable PTP debug monitor CSRs.")
     parser.add_target_argument("--remote-ip",      default="192.168.1.100",                                      help="Remote IP address of TFTP server.")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     eth_phy = args.eth_phy if args.eth_phy is not None else "rgmii"
@@ -480,6 +476,7 @@ def main():
         spi_flash_number = args.spi_flash_number,
         spi_flash_rate   = args.spi_flash_rate,
         with_ohci        = args.with_ohci,
+        with_buttons     = args.with_buttons,
         with_ethernet    = args.with_ethernet,
         with_etherbone   = args.with_etherbone,
         with_ptp         = args.with_ptp,
@@ -490,6 +487,7 @@ def main():
         ptp_debug        = args.ptp_debug,
         remote_ip        = args.remote_ip,
         **parser.soc_argdict)
+    add_pmods(soc, args.pmod)
     if args.with_spi_sdcard:
         soc.add_spi_sdcard()
     if args.with_sdcard:

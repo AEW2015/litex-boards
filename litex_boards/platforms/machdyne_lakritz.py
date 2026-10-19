@@ -7,6 +7,7 @@
 
 from litex.build.generic_platform import *
 from litex.build.lattice import LatticeECP5Platform
+from litex_boards.extensions.pmod import PmodUART
 from litex.build.openfpgaloader import OpenFPGALoader
 
 # IOs ----------------------------------------------------------------------------------------------
@@ -104,11 +105,7 @@ _io_v0 = [
     ),
 
     # UART PMOD
-    ("serial", 0,
-        Subsignal("tx", Pins("PMODA:1")),
-        Subsignal("rx", Pins("PMODA:2")),
-        IOStandard("LVCMOS33")
-    ),
+    *PmodUART("PMODA").get_io(LatticeECP5Platform),
 
 ]
 
@@ -129,8 +126,8 @@ class Platform(LatticeECP5Platform):
         assert device in ["12F", "25F", "45F", "85F"]
         self.revision = revision
 
-        io = _io_vx
-        connectors = _connectors_vx
+        io = list(_io_vx)
+        connectors = list(_connectors_vx)
 
         if revision == "v0": io += _io_v0
 

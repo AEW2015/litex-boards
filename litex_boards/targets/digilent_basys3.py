@@ -12,11 +12,14 @@ from litex.gen import *
 
 from litex_boards.platforms import digilent_basys3
 
+from litex_boards.extensions.pmod import PmodSDCard
+
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.video import VideoVGAPHY
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -38,7 +41,8 @@ class _CRG(LiteXModule):
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class BaseSoC(SoCCore):
-    def __init__(self, sys_clk_freq=75e6, with_led_chaser=True, with_video_terminal=False, **kwargs):
+    def __init__(self, sys_clk_freq=75e6, with_led_chaser=True, with_video_terminal=False,
+        with_buttons=False, with_switches=False, **kwargs):
         platform = digilent_basys3.Platform()
 
         # CRG --------------------------------------------------------------------------------------
@@ -59,26 +63,53 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons / Switches -----------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(
+                platform.request("user_btnu"),
+                platform.request("user_btnd"),
+                platform.request("user_btnl"),
+                platform.request("user_btnr"),
+            ))
+        if with_switches:
+            self.switches = GPIOIn(Cat(platform.request_all("user_sw")))
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
+    from litex_boards.compat          import warn_deprecated_arg
     parser = LiteXArgumentParser(platform=digilent_basys3.Platform, description="LiteX SoC on Basys3.")
     parser.add_target_argument("--sys-clk-freq",        default=75e6, type=float, help="System clock frequency.")
     sdopts = parser.target_group.add_mutually_exclusive_group()
     sdopts.add_argument("--with-spi-sdcard", action="store_true", help="Enable SPI-mode SDCard support.")
     sdopts.add_argument("--with-sdcard",     action="store_true", help="Enable SDCard support.")
-    parser.add_target_argument("--sdcard-adapter",      help="SDCard PMOD adapter (digilent or numato).")
+    parser.add_target_argument("--sdcard-adapter",      help="SDCard PMOD adapter (digilent or numato). Deprecated, use --pmod pmoda=numato_sdcard.")
     viopts = parser.target_group.add_mutually_exclusive_group()
     viopts.add_argument("--with-video-terminal", action="store_true",        help="Enable Video Terminal (VGA).")
+    parser.add_target_argument("--with-buttons",  action="store_true", help="Enable Buttons.")
+    parser.add_target_argument("--with-switches", action="store_true", help="Enable Switches.")
+    add_pmod_args(parser)
     args = parser.parse_args()
+
+    # Deprecated arguments (still functional).
+    if args.sdcard_adapter is not None:
+        warn_deprecated_arg("--sdcard-adapter", "--pmod pmoda=numato_sdcard for the Numato adapter (Digilent one is the default)")
 
     soc = BaseSoC(
         sys_clk_freq        = args.sys_clk_freq,
         with_video_terminal = args.with_video_terminal,
+        with_buttons        = args.with_buttons,
+        with_switches       = args.with_switches,
         **parser.soc_argdict
     )
-    soc.platform.add_extension(digilent_basys3._sdcard_pmod_io)
+    if args.sdcard_adapter == "numato":
+        from litex_boards.extensions.pmod import PmodNumatoSDCard
+        soc.platform.add_extension(PmodNumatoSDCard("pmoda"))
+    else:
+        soc.platform.add_extension(PmodSDCard("pmoda"))
+    add_pmods(soc, args.pmod)
     if args.with_spi_sdcard:
         soc.add_spi_sdcard()
     if args.with_sdcard:

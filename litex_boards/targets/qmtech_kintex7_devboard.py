@@ -18,6 +18,7 @@ from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.video import VideoVGAPHY
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 from litedram.modules import MT41J128M16
 from litedram.phy import s7ddrphy
@@ -66,12 +67,12 @@ class BaseSoC(SoCCore):
                  with_ethernet   = False, with_etherbone=False, eth_ip="192.168.1.50", eth_dynamic_ip=False,
                  local_ip        = "", remote_ip="",
                  with_led_chaser = True, with_video_terminal=False, with_video_framebuffer=False, with_video_colorbars=False,
-                 with_spi_flash=False, **kwargs):
+                 with_spi_flash=False, with_switches=False, **kwargs):
         platform = qmtech_kintex7_devboard.Platform(toolchain=toolchain)
 
         # SoCCore ----------------------------------------------------------------------------------
-        if (kwargs["uart_name"] == "serial"):
-            if kwargs.get("uart_name", "serial") == "serial": kwargs["uart_name"] = "JP5_serial"
+        if kwargs["uart_name"] == "serial":
+            kwargs["uart_name"] = "JP5_serial"
 
         SoCCore.__init__(self, platform, sys_clk_freq,
             ident = "LiteX SoC on QMTech Kintex 7 Development board",
@@ -129,8 +130,9 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
-        if kwargs["uart_name"] == "serial":
-            if kwargs.get("uart_name", "serial") == "serial": kwargs["uart_name"] = "jtag_serial"
+        # Switches ---------------------------------------------------------------------------------
+        if with_switches:
+            self.switches = GPIOIn(Cat(platform.request("sw3")))
 
 # Build --------------------------------------------------------------------------------------------
 
@@ -151,6 +153,7 @@ def main():
     sdopts.add_argument("--with-spi-sdcard", action="store_true", help="Enable SPI-mode SDCard support.")
     sdopts.add_argument("--with-sdcard",     action="store_true", help="Enable SDCard support.")
     parser.add_target_argument("--with-spi-flash",      action="store_true",        help="Enable memory-mapped SPI flash.")
+    parser.add_target_argument("--with-switches",       action="store_true",        help="Enable Switches.")
     viopts = parser.target_group.add_mutually_exclusive_group()
     viopts.add_argument("--with-video-terminal",    action="store_true", help="Enable Video Terminal (VGA).")
     viopts.add_argument("--with-video-framebuffer", action="store_true", help="Enable Video Framebuffer (VGA).")
@@ -167,6 +170,7 @@ def main():
         local_ip               = args.local_ip,
         remote_ip              = args.remote_ip,
         with_spi_flash         = args.with_spi_flash,
+        with_switches         = args.with_switches,
         with_video_terminal    = args.with_video_terminal,
         with_video_framebuffer = args.with_video_framebuffer,
         with_video_colorbars   = args.with_video_colorbars,

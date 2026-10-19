@@ -137,20 +137,17 @@ class Platform(AlteraPlatform):
 
     def __init__(self, toolchain="quartus", with_daughterboard=False, with_core_resources=True):
         device = "10CL006YU256C8G"
-        io = _io
-        connectors = _connectors
+        io = list(_io)
+        connectors = list(_connectors)
 
-        if with_daughterboard:
-            from litex_boards.platforms.qmtech_daughterboard import QMTechDaughterboard
-            daughterboard = QMTechDaughterboard(IOStandard("3.3-V LVTTL"))
-            io += daughterboard.io
-            connectors += daughterboard.connectors
-        elif with_core_resources:
+        if not with_daughterboard and with_core_resources:
             io += self.core_resources
 
         AlteraPlatform.__init__(self, device, io, connectors, toolchain=toolchain)
 
         if with_daughterboard:
+            from litex_boards.extensions.qmtech import QMTechDaughterboard
+            self.add_extension(QMTechDaughterboard())
             # an ethernet pin takes K22, so make it available
             self.add_platform_command("set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION \"USE AS REGULAR IO\"")
 

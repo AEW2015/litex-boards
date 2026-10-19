@@ -145,8 +145,8 @@ class Platform(Xilinx7SeriesPlatform):
         assert kgates in [100, 200], "kgates can only be 100 or 200, representing a XC7A100T or XC7A200T"
         self.kgates = kgates
         device = f"xc7a{kgates}tfbg484-1"
-        io = _io
-        connectors = _connectors
+        io = list(_io)
+        connectors = list(_connectors)
 
         core_leds_name = "onboard_led" if with_daughterboard else "user_led"
         io += [
@@ -154,13 +154,12 @@ class Platform(Xilinx7SeriesPlatform):
             (core_leds_name, 1, Pins("E3"),  IOStandard("LVCMOS33")),
         ]
 
-        if with_daughterboard:
-            from litex_boards.platforms.qmtech_daughterboard import QMTechDaughterboard
-            daughterboard = QMTechDaughterboard(IOStandard("LVCMOS33"))
-            io += daughterboard.io
-            connectors += daughterboard.connectors
 
         Xilinx7SeriesPlatform.__init__(self, device, io, connectors, toolchain=toolchain)
+
+        if with_daughterboard:
+            from litex_boards.extensions.qmtech import QMTechDaughterboard
+            self.add_extension(QMTechDaughterboard())
 
         self.toolchain.bitstream_commands = \
             ["set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]",

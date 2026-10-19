@@ -230,30 +230,6 @@ _connectors = [
     ("pmodxdac", "A13 A15 B16 B18 A14 A16 B17 A18"),
 ]
 
-# PMODS --------------------------------------------------------------------------------------------
-
-def sdcard_pmod_io(pmod):
-    return [
-        # SDCard PMOD:
-        # - https://store.digilentinc.com/pmod-microsd-microsd-card-slot/
-        ("spisdcard", 0,
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("mosi", Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("cs_n", Pins(f"{pmod}:0"), Misc("PULLUP True")),
-            Subsignal("miso", Pins(f"{pmod}:2"), Misc("PULLUP True")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-        ("sdcard", 0,
-            Subsignal("data", Pins(f"{pmod}:2 {pmod}:4 {pmod}:5 {pmod}:0"), Misc("PULLUP True")),
-            Subsignal("cmd",  Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("cd",   Pins(f"{pmod}:6")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-]
-_sdcard_pmod_io = sdcard_pmod_io("pmodd") # SDCARD PMOD on JD.
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -272,3 +248,16 @@ class Platform(Xilinx7SeriesPlatform):
         Xilinx7SeriesPlatform.do_finalize(self, fragment)
         self.add_period_constraint(self.lookup_request("clk100",             loose=True), 1e9/100e6)
         self.add_period_constraint(self.lookup_request("eth_clocks:ref_clk", loose=True), 1e9/50e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodSDCard
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "sdcard_pmod_io"  : ('platform.add_extension(PmodSDCard(pmod))',
+        lambda pmod: PmodSDCard(pmod).get_io(Xilinx7SeriesPlatform)),
+    "_sdcard_pmod_io" : ('platform.add_extension(PmodSDCard("pmodd"))',
+        PmodSDCard("pmodd").get_io(Xilinx7SeriesPlatform)),
+})

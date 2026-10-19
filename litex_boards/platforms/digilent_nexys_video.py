@@ -334,21 +334,6 @@ _connectors = [
     )
 ]
 
-# PMODS --------------------------------------------------------------------------------------------
-
-def raw_pmod_io(pmod):
-    return [(pmod, 0, Pins(" ".join([f"{pmod}:{i:d}" for i in range(8)])), IOStandard("LVCMOS33"))]
-
-def usb_pmod_io(pmod):
-    return [
-        # USB-UART PMOD: https://store.digilentinc.com/pmod-usbuart-usb-to-uart-interface/
-        ("usb_uart", 0,
-            Subsignal("tx", Pins(f"{pmod}:1")),
-            Subsignal("rx", Pins(f"{pmod}:2")),
-            IOStandard("LVCMOS33")
-        ),
-    ]
-_usb_uart_pmod_io = usb_pmod_io("pmodb") # USB-UART PMOD on JB.
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -370,12 +355,20 @@ class Platform(Xilinx7SeriesPlatform):
 
     def do_finalize(self, fragment):
         Xilinx7SeriesPlatform.do_finalize(self, fragment)
-        try:
-            self.add_period_constraint(self.lookup_request("eth_clocks").rx, 1e9/125e6)
-        except ConstraintError:
-            pass
-
-    def do_finalize(self, fragment):
-        Xilinx7SeriesPlatform.do_finalize(self, fragment)
         self.add_period_constraint(self.lookup_request("clk100",        loose=True), 1e9/100e6)
         self.add_period_constraint(self.lookup_request("eth_clocks:rx", loose=True), 1e9/125e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodGPIO, PmodUSBUART
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "raw_pmod_io"       : ('platform.add_extension(PmodGPIO(pmod))',
+        lambda pmod: PmodGPIO(pmod).get_io(Xilinx7SeriesPlatform)),
+    "usb_pmod_io"       : ('platform.add_extension(PmodUSBUART(pmod))',
+        lambda pmod: PmodUSBUART(pmod).get_io(Xilinx7SeriesPlatform)),
+    "_usb_uart_pmod_io" : ('platform.add_extension(PmodUSBUART("pmodb"))',
+        PmodUSBUART("pmodb").get_io(Xilinx7SeriesPlatform)),
+})

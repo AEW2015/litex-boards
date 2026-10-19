@@ -24,6 +24,8 @@ from litex.gen import *
 
 from litex_boards.platforms import icebreaker
 
+from litex_boards.extensions.pmod import Pmod1BitSquaredBreakOff, PmodDVI
+
 from litex.soc.cores.ram import Up5kSPRAM
 from litex.soc.cores.clock import iCE40PLL
 from litex.soc.integration.soc import *
@@ -31,6 +33,7 @@ from litex.soc.integration.soc import SoCRegion
 from litex.soc.integration.builder import *
 from litex.soc.cores.video import VideoDVIPHY
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -67,9 +70,10 @@ class BaseSoC(SoCCore):
     def __init__(self, bios_flash_offset, sys_clk_freq=24e6,
         with_led_chaser     = True,
         with_video_terminal = False,
+        with_buttons        = False,
         **kwargs):
         platform = icebreaker.Platform()
-        platform.add_extension(icebreaker.break_off_pmod)
+        platform.add_extension(Pmod1BitSquaredBreakOff("PMOD2"))
 
         # CRG --------------------------------------------------------------------------------------
         self.crg = _CRG(platform, sys_clk_freq)
@@ -110,7 +114,7 @@ class BaseSoC(SoCCore):
 
         # Video ------------------------------------------------------------------------------------
         if with_video_terminal:
-            platform.add_extension(icebreaker.dvi_pmod)
+            platform.add_extension(PmodDVI(a="PMOD1A", b="PMOD1B"))
             self.videophy = VideoDVIPHY(platform.request("dvi"), clock_domain="sys")
             self.add_video_terminal(phy=self.videophy, timings="640x480@75Hz", clock_domain="sys")
 
@@ -119,6 +123,10 @@ class BaseSoC(SoCCore):
             self.leds = LedChaser(
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
+
+        # Buttons ---------------------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request_all("user_btn")))
 
 # Flash --------------------------------------------------------------------------------------------
 
@@ -140,20 +148,25 @@ def flash(builder, bios_flash_offset):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=icebreaker.Platform, description="LiteX SoC on iCEBreaker.")
     parser.add_target_argument("--flash",               action="store_true",      help="Flash bitstream and BIOS.")
     parser.add_target_argument("--sys-clk-freq",        default=24e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--bios-flash-offset",   default="0x40000",        help="BIOS offset in SPI Flash.")
     parser.add_target_argument("--with-video-terminal", action="store_true",      help="Enable Video Terminal (with DVI PMOD).")
+    parser.add_target_argument("--with-buttons",        action="store_true",      help="Enable break-off buttons.")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
         bios_flash_offset   = int(args.bios_flash_offset, 0),
         sys_clk_freq        = args.sys_clk_freq,
         with_video_terminal = args.with_video_terminal,
+        with_buttons        = args.with_buttons,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
     builder = Builder(soc, **parser.builder_argdict)
     if args.build:
         builder.build(**parser.toolchain_argdict)

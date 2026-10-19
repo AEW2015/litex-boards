@@ -13,6 +13,8 @@ from litex.gen import *
 
 from litex_boards.platforms import opalkelly_xem8320
 
+from litex_boards.extensions.pmod import PmodDVI, PmodSDCard
+
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
@@ -106,7 +108,7 @@ class BaseSoC(SoCCore):
 
         # Video ------------------------------------------------------------------------------------
         if with_video_framebuffer:
-            platform.add_extension(opalkelly_xem8320._dvi_pmod_io)
+            platform.add_extension(PmodDVI(a="pmod2", b="pmod1"))
             self.videophy = VideoDVIPHY(platform.request("dvi"), clock_domain="hdmi")
             self.add_video_framebuffer(phy=self.videophy, timings="640x480@75Hz", clock_domain="hdmi")
 
@@ -119,7 +121,8 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=opalkelly_xem8320.Platform, description="LiteX SoC on XEM8320.")
     parser.add_target_argument("--sys-clk-freq",        default=125e6, type=float, help="System clock frequency.")
     #ethopts = parser.target_group.add_mutually_exclusive_group()
@@ -130,6 +133,7 @@ def main():
     viopts = parser.target_group.add_mutually_exclusive_group()
     viopts.add_argument("--with-video-terminal",    action="store_true", help="Enable Video Terminal (HDMI).")
     viopts.add_argument("--with-video-framebuffer", action="store_true", help="Enable Video Framebuffer (HDMI).")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     #assert not (args.with_etherbone and args.eth_dynamic_ip)
@@ -144,8 +148,9 @@ def main():
         with_video_framebuffer = args.with_video_framebuffer,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
 
-    soc.platform.add_extension(opalkelly_xem8320._sdcard_pmod_io)
+    soc.platform.add_extension(PmodSDCard("pmod3"))
     soc.add_spi_sdcard()
 
     builder = Builder(soc, **parser.builder_argdict)

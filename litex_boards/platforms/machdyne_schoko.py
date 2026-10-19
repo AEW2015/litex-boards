@@ -7,6 +7,7 @@
 
 from litex.build.generic_platform import *
 from litex.build.lattice import LatticeECP5Platform
+from litex_boards.extensions.pmod import PmodUART, PmodUSBHostDual
 from litex.build.openfpgaloader import OpenFPGALoader
 
 # IOs ----------------------------------------------------------------------------------------------
@@ -76,20 +77,11 @@ _io_vx = [
     ),
 
     # USB HOST
-    ("usb_host", 0,
-        Subsignal("dp", Pins("PMODB:0 PMODB:2")),
-        Subsignal("dm", Pins("PMODB:1 PMODB:3")),
-        #Subsignal("dp", Pins("F2 PMODB:0")),
-        #Subsignal("dm", Pins("E1 PMODB:1")),
-        IOStandard("LVCMOS33")
-    ),
+    # Alternative: dp = F2 PMODB:0, dm = E1 PMODB:1.
+    *PmodUSBHostDual("PMODB", bundled=True).get_io(LatticeECP5Platform),
 
     # UART PMOD
-    ("serial", 0,
-        Subsignal("tx", Pins("PMODA:1")),
-        Subsignal("rx", Pins("PMODA:2")),
-        IOStandard("LVCMOS33")
-    ),
+    *PmodUART("PMODA").get_io(LatticeECP5Platform),
 
     # SPI
     ("spiflash", 0,
@@ -134,8 +126,8 @@ class Platform(LatticeECP5Platform):
         assert device in ["12F", "25F", "45F", "85F"]
         self.revision = revision
 
-        io = _io_vx
-        connectors = _connectors_vx
+        io = list(_io_vx)
+        connectors = list(_connectors_vx)
 
         if revision == "v1": io += _io_v1
 

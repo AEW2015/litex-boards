@@ -17,12 +17,14 @@ from litex_boards.platforms import lattice_crosslink_nx_evn
 from litex.soc.cores.ram import NXLRAM
 from litex.soc.cores.clock import NXPLL
 from litex.build.generic_platform import *
+from litex_boards.extensions.pmod import PmodUART
 
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc import *
 from litex.soc.integration.soc import SoCRegion
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -66,6 +68,7 @@ class BaseSoC(SoCCore):
     def __init__(self, sys_clk_freq=75e6, device="LIFCL-40-9BG400C", toolchain="radiant",
         with_led_chaser = True,
         with_spi_flash  = False,
+        with_buttons    = False,
         **kwargs):
         platform = lattice_crosslink_nx_evn.Platform(device=device, toolchain=toolchain)
 
@@ -76,7 +79,8 @@ class BaseSoC(SoCCore):
         # Disable Integrated SRAM since we want to instantiate LRAM specifically for it
         kwargs["integrated_sram_size"] = 0
         # Make serial_pmods available
-        platform.add_extension(lattice_crosslink_nx_evn.serial_pmods)
+        for n in range(3): # Serial Pmods (rx on pin 1, tx on pin 2).
+            platform.add_extension(PmodUART(f"PMOD{n}", tx=1, rx=0, name=f"serial_pmod{n}"))
         SoCCore.__init__(self, platform, sys_clk_freq, ident="LiteX SoC on Crosslink-NX Evaluation Board", **kwargs)
 
         # 128KB LRAM (used as SRAM) ---------------------------------------------------------------
@@ -92,6 +96,10 @@ class BaseSoC(SoCCore):
                 pads         = Cat(*[platform.request("user_led", i) for i in range(14)]),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons ---------------------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request_all("user_btn")))
+
         # SPI Flash --------------------------------------------------------------------------------
         if with_spi_flash:
             from litespi.modules import MX25L12833F
@@ -101,7 +109,8 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=lattice_crosslink_nx_evn.Platform, description="LiteX SoC on Crosslink-NX Eval Board.")
     parser.add_target_argument("--device",         default="LIFCL-40-9BG400C", help="FPGA device (LIFCL-40-9BG400C, LIFCL-40-8BG400CES, or LIFCL-40-8BG400CES2).")
     parser.add_target_argument("--sys-clk-freq",   default=75e6, type=float,   help="System clock frequency.")
@@ -110,6 +119,8 @@ def main():
     parser.add_target_argument("--address", default=0x0, type=lambda x: int(x, 0), help="Flash address to program bitstream at.")
     parser.add_target_argument("--prog-target",    default="direct",           help="Programming Target (direct or flash).")
     parser.add_target_argument("--with-spi-flash", action="store_true",        help="Enable memory-mapped SPI flash.")
+    parser.add_target_argument("--with-buttons",   action="store_true",        help="Enable Buttons.")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -117,8 +128,10 @@ def main():
         device         = args.device,
         toolchain      = args.toolchain,
         with_spi_flash = args.with_spi_flash,
+        with_buttons   = args.with_buttons,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
     builder = Builder(soc, **parser.builder_argdict)
     if args.build:
         builder.build(**parser.toolchain_argdict)

@@ -11,6 +11,9 @@ from litex.build.gowin.platform import GowinPlatform
 from litex.build.gowin.programmer import GowinProgrammer
 from litex.build.openfpgaloader import OpenFPGALoader
 
+from litex_boards.extensions.sdram_modules import MiSTerSDRAM, SipeedSDRAM
+from litex_boards.extensions.sipeed        import TangPrimer25KDock
+
 
 # IOs ----------------------------------------------------------------------------------------------
 
@@ -71,112 +74,19 @@ _connectors = [
     ],
 ]
 
-# Dock IOs -----------------------------------------------------------------------------------------
-
-_dock_io = [
-    # Serial.
-    ("serial", 0,
-        Subsignal("rx", Pins("J1:19")),
-        Subsignal("tx", Pins("J1:21")),
-        IOStandard("LVCMOS33")
-    ),
-
-    # Leds.
-    ("led", 0, Pins("J1:17"), IOStandard("LVCMOS33")), # Pin READY.
-    ("led", 1, Pins("J1:25"), IOStandard("LVCMOS33")), # Pin DONE.
-
-    # Buttons.
-    ("btn_n", 0, Pins("J1:37"), IOStandard("LVCMOS33")),
-    ("btn_n", 1, Pins("J1:39"), IOStandard("LVCMOS33")),
-
-    # USB.
-    ("usb", 0,
-        Subsignal("d_p", Pins("J1:30")),
-        Subsignal("d_n", Pins("J1:32")),
-        IOStandard("LVCMOS33"),
-    ),
-]
-
-_dock_connectors = [
-    # Pmod
-    ("j4", "G11 D11 B11 C11 G10 D10 B10 C10"),
-    ("j5", "A11 E11 K11  L5 A10 E10 L11  K5"),
-    ("j6", " F5  G7  H8  H5  G5  G8  H7  J5"),
-
-    ("j3", {
-         1:  "K2",  2:  "K1",
-         3:  "L1",  4:  "L2",
-         5:  "K4",  6:  "J4",
-         7:  "G1",  8:  "G2",
-         9:  "L3", 10:  "L4",
-        11: "---", 12: "---",
-        13:  "C2", 14:  "B2",
-        15:  "F1", 16:  "F2",
-        17:  "A1", 18:  "E1",
-        19:  "D1", 20:  "E3",
-        21:  "J2", 22:  "J1",
-        23:  "H4", 24:  "G4",
-        25:  "H2", 26:  "H1",
-        27:  "J7", 28:  "K7",
-        29:  "L8", 30:  "L7",
-        31: "K10", 32: "L10",
-        33:  "K9", 34:  "L9",
-        35:  "K8", 36:  "J8",
-        37:  "F6", 38:  "F7",
-        39: "J10", 40: "J11",
-    }),
-]
-
 # SDRAMs -------------------------------------------------------------------------------------------
 
 def misterSDRAM(conn="j3"):
-    return [
-        ("sdram_clock", 0, Pins(f"{conn}:20"),
-            IOStandard("LVCMOS33"),
-            Misc("PULL_MODE=NONE DRIVE=16"),
-        ),
-        ("sdram", 0,
-            Subsignal("a",   Pins(
-                f"{conn}:37 {conn}:38 {conn}:39 {conn}:40 {conn}:28 {conn}:25 {conn}:26 {conn}:23",
-                f"{conn}:24 {conn}:21 {conn}:36 {conn}:22 {conn}:19")
-            ),
-            Subsignal("dq",  Pins(
-                f"{conn}:1  {conn}:2  {conn}:3  {conn}:4  {conn}:5  {conn}:6  {conn}:7  {conn}:8",
-                f"{conn}:18 {conn}:17 {conn}:16 {conn}:15 {conn}:14 {conn}:13 {conn}:10 {conn}:9")
-            ),
-            Subsignal("ba",    Pins(f"{conn}:34 {conn}:35")),
-            Subsignal("cas_n", Pins(f"{conn}:31")),
-            Subsignal("cs_n",  Pins(f"{conn}:33")),
-            Subsignal("ras_n", Pins(f"{conn}:32")),
-            Subsignal("we_n",  Pins(f"{conn}:27")),
-            IOStandard("LVCMOS33"),
-        ),
-    ]
+    return MiSTerSDRAM(conn).get_io(GowinPlatform)
 
 def sipeedSDRAM(conn="j3"):
-    return [
-        ("sdram_clock", 0, Pins(f"{conn}:20"),
-            IOStandard("LVCMOS33"),
-            Misc("PULL_MODE=NONE DRIVE=16"),
-        ),
-        ("sdram", 0,
-            Subsignal("a",   Pins(
-                f"{conn}:37 {conn}:38 {conn}:39 {conn}:40 {conn}:28 {conn}:25 {conn}:26 {conn}:23",
-                f"{conn}:24 {conn}:21 {conn}:36 {conn}:22 {conn}:19")
-            ),
-            Subsignal("dq",  Pins(
-                f"{conn}:1  {conn}:2  {conn}:3  {conn}:4  {conn}:5  {conn}:6  {conn}:7  {conn}:8",
-                f"{conn}:18 {conn}:17 {conn}:16 {conn}:15 {conn}:14 {conn}:13 {conn}:10 {conn}:9"),
-            ),
-            Subsignal("ba",    Pins(f"{conn}:34 {conn}:35")),
-            Subsignal("cas_n", Pins(f"{conn}:31")),
-            Subsignal("cs_n",  Pins(f"{conn}:33")),
-            Subsignal("ras_n", Pins(f"{conn}:32")),
-            Subsignal("we_n",  Pins(f"{conn}:27")),
-            Subsignal("dm",    Pins(f"{conn}:29 {conn}:30")),
-            IOStandard("LVCMOS33"),
-        ),
-    ]
+    return SipeedSDRAM(conn).get_io(GowinPlatform)
+
+# Docks --------------------------------------------------------------------------------------------
+
+docks = {
+    "standard" : TangPrimer25KDock(),
+}
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -184,11 +94,13 @@ class Platform(GowinPlatform):
     default_clk_name   = "clk50"
     default_clk_period = 1e9/50e6
 
-    def __init__(self, toolchain="gowin"):
+    def __init__(self, dock="standard", toolchain="gowin"):
 
         GowinPlatform.__init__(self, "GW5A-LV25MG121NC1/I0", _io, _connectors, toolchain=toolchain, devicename="GW5A-25A")
-        self.add_extension(_dock_io)
-        self.add_connector(_dock_connectors)
+        if dock is not None:
+            if dock not in docks:
+                raise ValueError(f"Unsupported dock {dock}, supported: {', '.join(docks)} or None (SoM only).")
+            self.add_extension(docks[dock])
 
         self.toolchain.options["use_mspi_as_gpio"]  = 1 # spi flash
         self.toolchain.options["use_i2c_as_gpio"]   = 1 # SDRAM / J3

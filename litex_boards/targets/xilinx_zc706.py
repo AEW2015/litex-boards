@@ -40,6 +40,7 @@ from litex.soc.cores.clock import *
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 from litedram.modules import MT8JTF12864
 from litedram.phy import s7ddrphy
@@ -88,6 +89,8 @@ class BaseSoC(SoCCore):
         eth_dynamic_ip  = False,
         with_led_chaser = True,
         with_pcie       = False,
+        with_buttons    = False,
+        with_switches   = False,
         **kwargs):
         platform = xilinx_zc706.Platform()
 
@@ -144,10 +147,21 @@ class BaseSoC(SoCCore):
                 sys_clk_freq = sys_clk_freq
             )
 
+        # Buttons / Switches -----------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(
+                platform.request("user_btn_c"),
+                platform.request("user_btn_l"),
+                platform.request("user_btn_r"),
+            ))
+        if with_switches:
+            self.switches = GPIOIn(Cat(platform.request_all("user_dip_btn")))
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=xilinx_zc706.Platform, description="LiteX SoC on ZC706.")
     parser.add_target_argument("--sys-clk-freq",   default=125e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--programmer",     default="vivado",          help="Programmer select from Vivado/openFPGALoader.")
@@ -158,6 +172,9 @@ def main():
     parser.add_target_argument("--eth-dynamic-ip", action="store_true",       help="Enable dynamic Ethernet IP assignment.")
     parser.add_target_argument("--with-pcie",      action="store_true",       help="Enable PCIe support.")
     parser.add_target_argument("--driver",         action="store_true",       help="Generate PCIe driver.")
+    parser.add_target_argument("--with-buttons",   action="store_true",       help="Enable Buttons.")
+    parser.add_target_argument("--with-switches",  action="store_true",       help="Enable Switches.")
+    add_pmod_args(parser)
     args = parser.parse_args()
     if args.with_etherbone and args.eth_dynamic_ip:
         parser.error("--eth-dynamic-ip cannot be used with Etherbone.")
@@ -170,8 +187,11 @@ def main():
         remote_ip      = args.remote_ip,
         eth_dynamic_ip = args.eth_dynamic_ip,
         with_pcie      = args.with_pcie,
+        with_buttons   = args.with_buttons,
+        with_switches  = args.with_switches,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
     builder = Builder(soc, **parser.builder_argdict)
     if args.build or args.driver:
         if not args.build:

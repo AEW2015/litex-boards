@@ -11,6 +11,7 @@ from migen import *
 from litex.gen import *
 
 from litex_boards.platforms import digilent_nexys_video
+from litex_boards.extensions.fmc import FMCRAID
 
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc import SoCRegion
@@ -18,6 +19,7 @@ from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.video import VideoS7HDMIPHY
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 from litedram.modules import MT41K256M16
 from litedram.phy import s7ddrphy
@@ -81,6 +83,8 @@ class BaseSoC(SoCCore):
         vadj                   = "1.2V",
         with_video_terminal    = False,
         with_video_framebuffer = False,
+        with_buttons           = False,
+        with_switches          = False,
         **kwargs):
         platform = digilent_nexys_video.Platform(toolchain=toolchain)
 
@@ -114,22 +118,10 @@ class BaseSoC(SoCCore):
 
         # SATA -------------------------------------------------------------------------------------
         if with_sata:
-            from litex.build.generic_platform import Subsignal, Pins
             from litesata.phy import LiteSATAPHY
 
-            # IOs
-            _sata_io = [
-                # AB09-FMCRAID / https://www.dgway.com/AB09-FMCRAID_E.html
-                ("fmc2sata", 0,
-                    Subsignal("clk_p", Pins("LPC:GBTCLK0_M2C_P")),
-                    Subsignal("clk_n", Pins("LPC:GBTCLK0_M2C_N")),
-                    Subsignal("tx_p",  Pins("LPC:DP0_C2M_P")),
-                    Subsignal("tx_n",  Pins("LPC:DP0_C2M_N")),
-                    Subsignal("rx_p",  Pins("LPC:DP0_M2C_P")),
-                    Subsignal("rx_n",  Pins("LPC:DP0_M2C_N"))
-                ),
-            ]
-            platform.add_extension(_sata_io)
+            # IOs (AB09-FMCRAID on LPC).
+            platform.add_extension(FMCRAID("LPC"))
 
             # RefClk, generate 150MHz from PLL.
             self.cd_sata_refclk = ClockDomain()
@@ -158,7 +150,7 @@ class BaseSoC(SoCCore):
 
         # USB-OHCI ---------------------------------------------------------------------------------
         if with_usb:
-            from litex.build.generic_platform import Subsignal, Pins, IOStandard
+            from litex.build.generic_platform import Subsignal, Pins
             from litex.soc.cores.usb_ohci import USBOHCI
 
             # Use the Video PLL if available
@@ -166,19 +158,16 @@ class BaseSoC(SoCCore):
             self.crg.pll.create_clkout(self.crg.cd_usb, 48e6, margin=0)
 
             # Machdyne PMOD (https://github.com/machdyne/usb_host_dual_socket_pmod) on JB
-            _usb_pmodb_dual_ios = [
-                ("usb_pmodb_dual", 0,
-                    Subsignal("dp", Pins("pmodb:0 pmodb:2")),
-                    Subsignal("dm", Pins("pmodb:1 pmodb:3")),
-                    IOStandard("LVCMOS33"),
-                ),
-            ]
-            self.platform.add_extension(_usb_pmodb_dual_ios)
+
+            from litex_boards.extensions.pmod import PmodUSBHostDual
+
+            self.platform.add_extension(PmodUSBHostDual("pmodb", bundled=True, name="usb_pmodb_dual"))
 
             self.submodules.usb_ohci = USBOHCI(self.platform, self.platform.request("usb_pmodb_dual"), usb_clk_freq=int(48e6))
             self.mem_map["usb_ohci"] = 0x90000000
             self.bus.add_slave("usb_ohci_ctrl", self.usb_ohci.wb_ctrl, region=SoCRegion(origin=self.mem_map["usb_ohci"], size=0x1000, cached=False)) # FIXME: Mapping.
-            self.dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
+            dma_bus = getattr(self, "dma_bus", self.bus)
+            dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
 
             self.comb += self.cpu.interrupt[16].eq(self.usb_ohci.interrupt)
 
@@ -188,6 +177,12 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons / Switches -----------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request_all("user_btn")))
+        if with_switches:
+            self.switches = GPIOIn(Cat(platform.request_all("user_sw")))
+
         # VADJ -------------------------------------------------------------------------------------
         vadj_map = {"1.2V": 0b00, "1.8V": 0b01, "2.5V": 0b10, "3.3V": 0b11}
         platform.request_all("vadj").eq(vadj_map[vadj])
@@ -195,7 +190,8 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=digilent_nexys_video.Platform, description="LiteX SoC on Nexys Video.")
     parser.add_target_argument("--sys-clk-freq",   default=100e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--with-usb",       action="store_true",       help="Enable USB Host.")
@@ -212,6 +208,9 @@ def main():
     viopts = parser.target_group.add_mutually_exclusive_group()
     viopts.add_argument("--with-video-terminal",    action="store_true", help="Enable Video Terminal (HDMI).")
     viopts.add_argument("--with-video-framebuffer", action="store_true", help="Enable Video Framebuffer (HDMI).")
+    parser.add_target_argument("--with-buttons",  action="store_true", help="Enable Buttons.")
+    parser.add_target_argument("--with-switches", action="store_true", help="Enable Switches.")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -227,8 +226,11 @@ def main():
         vadj                   = args.vadj,
         with_video_terminal    = args.with_video_terminal,
         with_video_framebuffer = args.with_video_framebuffer,
+        with_buttons           = args.with_buttons,
+        with_switches          = args.with_switches,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
     if args.with_spi_sdcard:
         soc.add_spi_sdcard()
     if args.with_sdcard:

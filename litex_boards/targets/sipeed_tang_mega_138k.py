@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
+from migen.genlib.cdc import MultiReg
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.gen import *
@@ -81,13 +82,27 @@ class _CRG(LiteXModule):
         por_done  = Signal()
         self.comb += self.cd_por.clk.eq(clk50)
         self.comb += por_done.eq(por_count == 0)
-        self.sync.por += If(~por_done, por_count.eq(por_count - 1))
+        # SoC reset request (rst: sys pulse, toggle to por): restart the power-on reset, the PLLs are
+        # held in reset as after power-up (a sys pulse is too short for the GW5A PLLs).
+        rst_toggle = Signal(reset_less=True)
+        rst_por    = Signal()
+        rst_por_d  = Signal()
+        self.sync += If(self.rst, rst_toggle.eq(~rst_toggle))
+        self.specials += MultiReg(rst_toggle, rst_por, "por")
+        self.sync.por += [
+            rst_por_d.eq(rst_por),
+            If(rst_por != rst_por_d,
+                por_count.eq(2**16-1),
+            ).Elif(~por_done,
+                por_count.eq(por_count - 1),
+            ),
+        ]
 
         # PLL
         self.pll = pll = GW5APLL(devicename=platform.devicename, device=platform.device)
         # GW5AST-138 PLL limits (Gowin UG306, section 2.3).
         pll.vco_freq_range = (650e6, 1300e6)
-        self.comb += pll.reset.eq(~por_done | self.rst)
+        self.comb += pll.reset.eq(~por_done)
         pll.register_clkin(clk50, 50e6)
         if with_ddr3:
             # Keep the system and DDR clocks phase-aligned across the PHY stop/reset sequence.
@@ -194,11 +209,14 @@ class BaseSoC(SoCCore):
         with_ch569_gpio        = False,
         with_spi_sdcard        = False,
         with_sdcard            = False,
+        dock                   = "neo",
         **kwargs):
         assert ddr3_rate in ("1:2", "1:4")
         ddr3_nphases = int(ddr3_rate[-1])
 
-        platform = sipeed_tang_mega_138k.Platform(toolchain="gowin")
+        platform = sipeed_tang_mega_138k.Platform(dock=dock, toolchain="gowin")
+        if dock is None:
+            with_buttons = False # Buttons are on the dock.
 
         # Memory configuration ---------------------------------------------------------------------
         integrated_main_ram_size = kwargs.get("integrated_main_ram_size", 0)
@@ -342,11 +360,13 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=sipeed_tang_mega_138k.Platform, description="LiteX SoC on Tang Mega 138K.")
     parser.add_target_argument("--flash",          action="store_true",      help="Flash bitstream.")
     parser.add_target_argument("--prog-kit",       default="openfpgaloader", help="Programmer select from Gowin/openFPGALoader.")
     parser.add_target_argument("--sys-clk-freq",   default=50e6, type=float, help="System clock frequency.")
+    parser.add_target_argument("--dock",           default="neo",            choices=[*sipeed_tang_mega_138k.docks, "none"], help="Dock (neo or none for SoM only).")
 
     # Memory.
     parser.add_target_argument("--without-ddr3",   action="store_true", help="Disable DDR3 SDRAM.")
@@ -384,12 +404,14 @@ def main():
     parser.add_target_argument("--with-buttons",        action="store_true",        help="Enable Buttons.")
     parser.add_target_argument("--with-ch569-gpio",     action="store_true",        help="Enable CH569 parallel-bus GPIO.")
 
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     assert not (args.with_etherbone and args.eth_dynamic_ip)
 
     soc = BaseSoC(
         sys_clk_freq           = args.sys_clk_freq,
+        dock                   = None if args.dock == "none" else args.dock,
         with_video_colorbars   = args.with_video_colorbars,
         with_video_terminal    = args.with_video_terminal,
         with_video_framebuffer = args.with_video_framebuffer,
@@ -411,6 +433,7 @@ def main():
         eth_dynamic_ip         = args.eth_dynamic_ip,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
 
     builder = Builder(soc, **parser.builder_argdict)
     if args.build or args.with_pcie:

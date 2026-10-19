@@ -96,89 +96,6 @@ _connectors = [
     ("pmod1", "F9  F8  E8  D8  E10 D10 G12 F12"),
 ]
 
-# PMODS --------------------------------------------------------------------------------------------
-
-def raw_pmod_io(pmod):
-    return [(pmod, 0, Pins(" ".join([f"{pmod}:{i:d}" for i in range(8)])), IOStandard("LVCMOS33"))]
-
-def usb_pmod_io(pmod):
-    return [
-        # USB-UART PMOD: https://store.digilentinc.com/pmod-usbuart-usb-to-uart-interface/
-        ("usb_uart", 0,
-            Subsignal("tx", Pins(f"{pmod}:1")),
-            Subsignal("rx", Pins(f"{pmod}:2")),
-            IOStandard("LVCMOS18")
-        ),
-    ]
-_usb_uart_pmod_io = usb_pmod_io("pmod0") # USB-UART PMOD on JB.
-
-
-def i2s_pmod_io(pmod):
-    return [
-        # I2S PMOD: https://store.digilentinc.com/pmod-i2s2-stereo-audio-input-and-output/
-        ("i2s_rx_mclk", 0, Pins(f"{pmod}:4"), IOStandard("LVCMOS33")),
-        ("i2s_rx", 0,
-            Subsignal("clk", Pins(f"{pmod}:6")),
-            Subsignal("sync", Pins(f"{pmod}:5")),
-            Subsignal("rx", Pins(f"{pmod}:7")),
-            IOStandard("LVCMOS18"),
-        ),
-        ("i2s_tx_mclk", 0, Pins(f"{pmod}:0"), IOStandard("LVCMOS33")),
-        ("i2s_tx", 0,
-            Subsignal("clk",Pins(f"{pmod}:2")),
-            Subsignal("sync", Pins(f"{pmod}:1")),
-            Subsignal("tx", Pins(f"{pmod}:3")),
-            IOStandard("LVCMOS18"),
-        ),
-    ]
-_i2s_pmod_io = i2s_pmod_io("pmod0") # I2S PMOD on JA.
-
-def sdcard_pmod_io(pmod):
-    return [
-        # SDCard PMOD:
-        # - https://store.digilentinc.com/pmod-microsd-microsd-card-slot/
-        # - https://github.com/antmicro/arty-expansion-board
-        ("spisdcard", 0,
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("mosi", Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("cs_n", Pins(f"{pmod}:0"), Misc("PULLUP True")),
-            Subsignal("miso", Pins(f"{pmod}:2"), Misc("PULLUP True")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS18"),
-        ),
-        ("sdcard", 0,
-            Subsignal("data", Pins(f"{pmod}:2 {pmod}:4 {pmod}:5 {pmod}:0"), Misc("PULLUP True")),
-            Subsignal("cmd",  Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("cd",   Pins(f"{pmod}:6")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS18"),
-        ),
-]
-_sdcard_pmod_io = sdcard_pmod_io("pmod0") # SDCARD PMOD on JD.
-
-def numato_sdcard_pmod_io(pmod):
-    return [
-        # SDCard PMOD:
-        # https://numato.com/product/micro-sd-expansion-module/
-        # This adaptor does not have the card detect (CD) pin connected
-        ("spisdcard", 0,
-            Subsignal("clk",  Pins(f"{pmod}:5")),
-            Subsignal("mosi", Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("cs_n", Pins(f"{pmod}:4"), Misc("PULLUP True")),
-            Subsignal("miso", Pins(f"{pmod}:2"), Misc("PULLUP True")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS18"),
-        ),
-        ("sdcard", 0,
-            Subsignal("data", Pins(f"{pmod}:2 {pmod}:6 {pmod}:0 {pmod}:4"), Misc("PULLUP True")),
-            Subsignal("cmd",  Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("clk",  Pins(f"{pmod}:5")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS18"),
-        ),
-]
-_numato_sdcard_pmod_io = numato_sdcard_pmod_io("pmod0") # SDCARD PMOD on JD.
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -197,3 +114,30 @@ class Platform(XilinxUSPlatform):
         self.add_period_constraint(self.lookup_request("clk250", loose=True), 1e9/250e6)
         self.add_platform_command("set_property INTERNAL_VREF 0.84 [get_iobanks 44]")
         self.add_platform_command("set_property INTERNAL_VREF 0.84 [get_iobanks 45]")
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodGPIO, PmodI2S2, PmodNumatoSDCard, PmodSDCard, PmodUSBUART
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "raw_pmod_io"            : ('platform.add_extension(PmodGPIO(pmod))',
+        lambda pmod: PmodGPIO(pmod).get_io(XilinxUSPlatform)),
+    "usb_pmod_io"            : ('platform.add_extension(PmodUSBUART(pmod, iostandard="LVCMOS18"))',
+        lambda pmod: PmodUSBUART(pmod, iostandard="LVCMOS18").get_io(XilinxUSPlatform)),
+    "_usb_uart_pmod_io"      : ('platform.add_extension(PmodUSBUART("pmod0", iostandard="LVCMOS18"))',
+        PmodUSBUART("pmod0", iostandard="LVCMOS18").get_io(XilinxUSPlatform)),
+    "i2s_pmod_io"            : ('platform.add_extension(PmodI2S2(pmod, iostandard="LVCMOS18"))',
+        lambda pmod: PmodI2S2(pmod, iostandard="LVCMOS18").get_io(XilinxUSPlatform)),
+    "_i2s_pmod_io"           : ('platform.add_extension(PmodI2S2("pmod0", iostandard="LVCMOS18"))',
+        PmodI2S2("pmod0", iostandard="LVCMOS18").get_io(XilinxUSPlatform)),
+    "sdcard_pmod_io"         : ('platform.add_extension(PmodSDCard(pmod, iostandard="LVCMOS18"))',
+        lambda pmod: PmodSDCard(pmod, iostandard="LVCMOS18").get_io(XilinxUSPlatform)),
+    "_sdcard_pmod_io"        : ('platform.add_extension(PmodSDCard("pmod0", iostandard="LVCMOS18"))',
+        PmodSDCard("pmod0", iostandard="LVCMOS18").get_io(XilinxUSPlatform)),
+    "numato_sdcard_pmod_io"  : ('platform.add_extension(PmodNumatoSDCard(pmod, iostandard="LVCMOS18"))',
+        lambda pmod: PmodNumatoSDCard(pmod, iostandard="LVCMOS18").get_io(XilinxUSPlatform)),
+    "_numato_sdcard_pmod_io" : ('platform.add_extension(PmodNumatoSDCard("pmod0", iostandard="LVCMOS18"))',
+        PmodNumatoSDCard("pmod0", iostandard="LVCMOS18").get_io(XilinxUSPlatform)),
+})

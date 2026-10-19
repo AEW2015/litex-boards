@@ -17,6 +17,7 @@ from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.video import VideoVGAPHY
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 from litedram.modules import MT41J128M16
 from litedram.phy import s7ddrphy
@@ -65,12 +66,12 @@ class BaseSoC(SoCCore):
                  with_ethernet   = False, with_etherbone=False, eth_ip="192.168.1.50", eth_dynamic_ip=False,
                  local_ip        = "", remote_ip="",
                  with_led_chaser = True, with_video_terminal=False, with_video_framebuffer=False, with_video_colorbars=False,
-                 with_spi_flash=False, **kwargs):
+                 with_spi_flash=False, with_buttons=False, **kwargs):
         platform = qmtech_xc7k325t.Platform(toolchain=toolchain, with_daughterboard=with_daughterboard)
 
         # SoCCore ----------------------------------------------------------------------------------
         if (kwargs["uart_name"] == "serial") and (not with_daughterboard):
-            if kwargs.get("uart_name", "serial") == "serial": kwargs["uart_name"] = "gpio_serial"
+            kwargs["uart_name"] = "gpio_serial"
 
         SoCCore.__init__(self, platform, sys_clk_freq,
             ident = "LiteX SoC on QMTech XC7K325T" + (" + Daughterboard" if with_daughterboard else ""),
@@ -128,15 +129,16 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons ----------------------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request("user_btn_n", 1)))
+
         if (with_daughterboard):
-            from litex_boards.platforms.qmtech_daughterboard import SevenSeg
+            from litex_boards.extensions.qmtech import SevenSeg
             self.submodules.sevenseg = SevenSeg(
                     segs         = platform.request_all("seven_seg"),
                     sels         = platform.request_all("seven_seg_ctl"),
                     sys_clk_freq = sys_clk_freq)
-
-        if not with_daughterboard and kwargs["uart_name"] == "serial":
-            if kwargs.get("uart_name", "serial") == "serial": kwargs["uart_name"] = "jtag_serial"
 
 # Build --------------------------------------------------------------------------------------------
 
@@ -145,6 +147,7 @@ def main():
     parser = LiteXArgumentParser(platform=qmtech_xc7k325t.Platform, description="LiteX SoC on QMTech XC7K325T")
     parser.add_target_argument("--sys-clk-freq",       default=100e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--with-daughterboard", action="store_true",       help="Board plugged into the QMTech daughterboard.")
+    parser.add_target_argument("--with-buttons",       action="store_true",       help="Enable Buttons.")
     ethopts = parser.target_group.add_mutually_exclusive_group()
     ethopts.add_argument("--with-ethernet",  action="store_true", help="Enable Ethernet support.")
     ethopts.add_argument("--with-etherbone", action="store_true", help="Enable Etherbone support.")
@@ -178,6 +181,7 @@ def main():
         with_video_terminal    = args.with_video_terminal,
         with_video_framebuffer = args.with_video_framebuffer,
         with_video_colorbars   = args.with_video_colorbars,
+        with_buttons           = args.with_buttons,
         **parser.soc_argdict
     )
 

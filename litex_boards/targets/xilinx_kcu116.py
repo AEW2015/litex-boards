@@ -18,6 +18,7 @@ from litex.soc.cores.clock import *
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 from litedram.modules import EDY4016A
 from litedram.phy import usddrphy
@@ -69,6 +70,8 @@ class BaseSoC(SoCCore):
         with_pcie       = False,
         pcie_lanes      = 4,
         with_sata       = False,
+        with_buttons    = False,
+        with_switches   = False,
         **kwargs):
         platform = xilinx_kcu116.Platform()
 
@@ -153,10 +156,23 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons / Switches -----------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(
+                platform.request("user_btn_c"),
+                platform.request("user_btn_e"),
+                platform.request("user_btn_n"),
+                platform.request("user_btn_s"),
+                platform.request("user_btn_w"),
+            ))
+        if with_switches:
+            self.switches = GPIOIn(Cat(platform.request_all("user_dip_sw")))
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=xilinx_kcu116.Platform, description="LiteX SoC on KCU116.")
     parser.add_target_argument("--sys-clk-freq",        default=125e6, type=float, help="System clock frequency.")
     ethopts = parser.target_group.add_mutually_exclusive_group()
@@ -169,6 +185,9 @@ def main():
     parser.add_target_argument("--pcie-lanes",     default=4, type=int,     choices=[4, 8], help="PCIe lane count.")
     parser.add_target_argument("--driver",         action="store_true",     help="Generate PCIe driver.")
     parser.add_target_argument("--with-sata",      action="store_true",     help="Enable SATA support (over SFP2SATA).")
+    parser.add_target_argument("--with-buttons",   action="store_true",     help="Enable Buttons.")
+    parser.add_target_argument("--with-switches",  action="store_true",     help="Enable Switches.")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -181,8 +200,11 @@ def main():
         with_pcie      = args.with_pcie,
         pcie_lanes     = args.pcie_lanes,
         with_sata      = args.with_sata,
+        with_buttons   = args.with_buttons,
+        with_switches  = args.with_switches,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
     builder = Builder(soc, **parser.builder_argdict)
     if args.build or args.driver:
         if not args.build:

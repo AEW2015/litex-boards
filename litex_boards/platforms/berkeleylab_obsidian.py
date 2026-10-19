@@ -202,18 +202,6 @@ _connectors = [
 ]
 
 
-def raw_pmod_io(pmod="pmoda", iostd="LVCMOS33"):
-    """use with platform.add_extension() to expose a PMOD as GPIO pins"""
-    return [
-        (
-            pmod,
-            0,
-            Pins(" ".join([f"{pmod}:{i:d}" for i in range(8)])),
-            IOStandard(iostd),
-        )
-    ]
-
-
 # Platform -----------------------------------------------------------------------------------------
 
 
@@ -245,3 +233,14 @@ class Platform(Xilinx7SeriesPlatform):
         Xilinx7SeriesPlatform.do_finalize(self, fragment)
         self.add_period_constraint(self.lookup_request("clk20", loose=True), 1e9 / 20e6)
         self.add_period_constraint(self.lookup_request("clk125", loose=True), 1e9 / 125e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodGPIO
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "raw_pmod_io" : ('platform.add_extension(PmodGPIO(pmod, iostandard=...))',
+        lambda pmod="pmoda", iostd="LVCMOS33": PmodGPIO(pmod, iostandard=iostd).get_io(Xilinx7SeriesPlatform)),
+})

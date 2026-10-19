@@ -472,17 +472,6 @@ _connectors = [
     }),
 ]
 
-# PMODS --------------------------------------------------------------------------------------------
-
-def can_pmod_io(pmod, n):
-    return [
-        # SN65HVD230 based transceiver on PMOD, https://www.waveshare.com/sn65hvd230-can-board.htm.
-        ("can", n,
-            Subsignal("tx", Pins(f"{pmod}:2")),
-            Subsignal("rx", Pins(f"{pmod}:3")),
-            IOStandard("LVCMOS33"),
-        ),
-    ]
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -501,3 +490,14 @@ class Platform(Xilinx7SeriesPlatform):
         Xilinx7SeriesPlatform.do_finalize(self, fragment)
         self.add_period_constraint(self.lookup_request("clk200",        loose=True), 1e9/200e6)
         self.add_period_constraint(self.lookup_request("eth_clocks:rx", loose=True), 1e9/125e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodCAN
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "can_pmod_io" : ('platform.add_extension(PmodCAN(pmod, number=n))',
+        lambda pmod, n: PmodCAN(pmod, number=n).get_io(Xilinx7SeriesPlatform)),
+})

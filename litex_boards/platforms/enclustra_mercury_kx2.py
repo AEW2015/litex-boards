@@ -9,6 +9,8 @@ from litex.build.generic_platform import *
 from litex.build.xilinx import Xilinx7SeriesPlatform
 from litex.build.openocd import OpenOCD
 
+from litex_boards.compat import warn_deprecated
+
 # IOs ----------------------------------------------------------------------------------------------
 
 _io = [
@@ -131,12 +133,16 @@ _connectors = [
         103 : "A24",    104 : "F22",
         105 : "B20",    106 : "E23",
         107 : "A20",
+        111 : "L23",                    # I2C SCL (Bank 14).
+        113 : "C24",                    # I2C SDA (Bank 14).
+        115 : "AC18",                   # I2C INT# (Bank 32, VCC_DDR3).
     }),
     ("B", {
-        1   : "D6" ,
-        3   : "D5" ,     4: "H6",
-        5   : "F6" ,     6: "H5",
-        7   : "F5" ,
+        # MGT reference clocks (MGTREFCLK0/1_116 on 3/5 and 7/9, MGTREFCLK0/1_115 on 4/6 and 10/12).
+        3   : "D6" ,     4: "H6",
+        5   : "D5" ,     6: "H5",
+        7   : "F6" ,
+        9   : "F5" ,
                         10: "K6",
                         12: "K5",
         13  : "P2" ,
@@ -218,6 +224,9 @@ _connectors = [
         165 : "A15",   166: "A19",
     }),
     ("C", {
+        # C:3/C:5 are single-ended IOs (Bank 13). Other C pins below 69 are not connected on KX2.
+        3:    "N16",
+        5:    "U16",
         69:   "J8",     
         71:   "J14",     72 :   "K15",
                          74 :   "M16",
@@ -297,8 +306,9 @@ class Platform(Xilinx7SeriesPlatform):
         self.add_platform_command("set_property BITSTREAM.CONFIG.UNUSEDPIN PULLNONE [current_design]")
 
     def add_baseboard(self, bb):
-        self.add_connector(bb.connectors)
-        self.add_extension(bb.io)
+        # Deprecated, equivalent to add_extension(bb).
+        warn_deprecated("Platform.add_baseboard(bb)", "platform.add_extension(bb)")
+        self.add_extension(bb)
 
     def create_programmer(self):
         return OpenOCD("openocd_xc7_ft232.cfg", "bscan_spi_xc7k160t.bit")

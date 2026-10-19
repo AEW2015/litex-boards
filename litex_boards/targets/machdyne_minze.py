@@ -128,7 +128,8 @@ class BaseSoC(SoCCore):
         if with_usb_host:
             self.usb_ohci = USBOHCI(platform, platform.request("usb_host"), usb_clk_freq=int(48e6))
             self.bus.add_slave("usb_ohci_ctrl", self.usb_ohci.wb_ctrl, region=SoCRegion(origin=self.mem_map["usb_ohci"], size=0x100000, cached=False))
-            self.dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
+            dma_bus = getattr(self, "dma_bus", self.bus)
+            dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
             self.comb += self.cpu.interrupt[16].eq(self.usb_ohci.interrupt)
 
         # VGA Framebuffer -------------------------------------------------------------------------------------
@@ -152,7 +153,8 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=machdyne_minze.Platform, description="LiteX SoC on Minze")
     parser.add_target_argument("--sys-clk-freq",    default=48e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--revision",        default="v0",             help="Board Revision (v0).")
@@ -164,6 +166,7 @@ def main():
     parser.add_target_argument("--boot-from-flash", action="store_true",      help="Boot from flash MMOD.")
     parser.add_target_argument("--sdram-device",    default="W9825G6KH6",     help="SDRAM device (W9825G6KH6 or IS42S16320).")
 
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -174,6 +177,7 @@ def main():
         sdram_device  = args.sdram_device,
         with_usb_host = args.with_usb_host,
         **parser.soc_argdict)
+    add_pmods(soc, args.pmod)
 
     if args.with_sdcard:
         soc.add_sdcard()

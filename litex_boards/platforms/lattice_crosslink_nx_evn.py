@@ -261,23 +261,6 @@ _connectors = [
     ("PMOD2", "J2  J1 K2 K1 K3 K4 D17 E18"),
 ]
 
-# Test and Demo ------------------------------------------------------------------------------------
-
-serial_pmods = [
-    ("serial_pmod0", 0,
-        Subsignal("rx", Pins("PMOD0:0"), IOStandard("LVCMOS33")),
-        Subsignal("tx", Pins("PMOD0:1"), IOStandard("LVCMOS33")),
-    ),
-    ("serial_pmod1", 0,
-        Subsignal("rx", Pins("PMOD1:0"), IOStandard("LVCMOS33")),
-        Subsignal("tx", Pins("PMOD1:1"), IOStandard("LVCMOS33")),
-    ),
-    ("serial_pmod2", 0,
-        Subsignal("rx", Pins("PMOD2:0"), IOStandard("LVCMOS33")),
-        Subsignal("tx", Pins("PMOD2:1"), IOStandard("LVCMOS33")),
-    ),
-]
-
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -479,3 +462,18 @@ class Platform(LatticeNexusPlatform):
             xcf_template = xcf_template_flash
 
         return LatticeProgrammer(xcf_template)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodUART
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "serial_pmods" : ('platform.add_extension(PmodUART("PMODn", tx=1, rx=0, name="serial_pmodn")) for n in 0-2',
+        [
+            *PmodUART("PMOD0", tx=1, rx=0, name="serial_pmod0").get_io(LatticeNexusPlatform),
+            *PmodUART("PMOD1", tx=1, rx=0, name="serial_pmod1").get_io(LatticeNexusPlatform),
+            *PmodUART("PMOD2", tx=1, rx=0, name="serial_pmod2").get_io(LatticeNexusPlatform),
+        ]),
+})

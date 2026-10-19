@@ -18,6 +18,8 @@ from litex.gen import *
 
 from litex_boards.platforms import digilent_arty
 
+from litex_boards.extensions.pmod import PmodCAN, PmodGPIO, PmodNumatoSDCard, PmodSDCard
+
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc import SoCRegion
 from litex.soc.integration.soc import *
@@ -83,6 +85,7 @@ class BaseSoC(SoCCore):
         with_led_chaser = True,
         with_spi_flash  = False,
         with_buttons    = False,
+        with_switches   = False,
         with_pmod_gpio  = False,
         with_can        = False,
         **kwargs):
@@ -143,30 +146,21 @@ class BaseSoC(SoCCore):
         # USB-OHCI ---------------------------------------------------------------------------------
         if with_usb:
             from litex.soc.cores.usb_ohci import USBOHCI
-            from litex.build.generic_platform import Subsignal, Pins, IOStandard
 
             self.crg.cd_usb = ClockDomain()
             self.crg.pll.create_clkout(self.crg.cd_usb, 48e6, margin=0)
 
             # Machdyne PMOD (https://github.com/machdyne/usb_host_dual_socket_pmod)
-            _usb_pmod_ios = [
-                ("usb_pmoda", 0, # USB1 (top socket)
-                    Subsignal("dp", Pins("pmoda:2")),
-                    Subsignal("dm", Pins("pmoda:3")),
-                    IOStandard("LVCMOS33"),
-                ),
-                ("usb_pmoda", 1, # USB2 (bottom socket)
-                    Subsignal("dp", Pins("pmoda:0")),
-                    Subsignal("dm", Pins("pmoda:1")),
-                    IOStandard("LVCMOS33"),
-                )
-            ]
-            self.platform.add_extension(_usb_pmod_ios)
+
+            from litex_boards.extensions.pmod import PmodUSBHostDual
+
+            self.platform.add_extension(PmodUSBHostDual("pmoda", name="usb_pmoda"))
 
             self.submodules.usb_ohci = USBOHCI(self.platform, self.platform.request("usb_pmoda", 0), usb_clk_freq=int(48e6))
             self.mem_map["usb_ohci"] = 0xc0000000
             self.bus.add_slave("usb_ohci_ctrl", self.usb_ohci.wb_ctrl, region=SoCRegion(origin=self.mem_map["usb_ohci"], size=0x100000, cached=False)) # FIXME: Mapping.
-            self.dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
+            dma_bus = getattr(self, "dma_bus", self.bus)
+            dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
 
             self.comb += self.cpu.interrupt[16].eq(self.usb_ohci.interrupt)
 
@@ -177,16 +171,18 @@ class BaseSoC(SoCCore):
                 sys_clk_freq = sys_clk_freq,
             )
 
-        # Buttons ----------------------------------------------------------------------------------
+        # Buttons / Switches -----------------------------------------------------------------------
         if with_buttons:
             self.buttons = GPIOIn(
                 pads     = platform.request_all("user_btn"),
                 with_irq = self.irq.enabled
             )
+        if with_switches:
+            self.switches = GPIOIn(Cat(platform.request_all("user_sw")))
 
         # GPIOs ------------------------------------------------------------------------------------
         if with_pmod_gpio:
-            platform.add_extension(digilent_arty.raw_pmod_io("pmoda"))
+            platform.add_extension(PmodGPIO("pmoda"))
             self.gpio = GPIOTristate(
                 pads     = platform.request("pmoda"),
                 with_irq = self.irq.enabled
@@ -195,7 +191,7 @@ class BaseSoC(SoCCore):
         # CAN --------------------------------------------------------------------------------------
         if with_can:
             from litex.soc.cores.can.ctu_can_fd import CTUCANFD
-            self.platform.add_extension(digilent_arty.can_pmod_io("pmodc", 0))
+            self.platform.add_extension(PmodCAN("pmodc"))
             self.can0 = CTUCANFD(platform, platform.request("can", 0))
             self.bus.add_slave("can0", self.can0.bus, SoCRegion(origin=0xb0010000, size=0x10000, mode="rw", cached=False))
             self.irq.add("can0")
@@ -203,7 +199,9 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
+    from litex_boards.compat          import warn_deprecated_arg
     parser = LiteXArgumentParser(platform=digilent_arty.Platform, description="LiteX SoC on Arty A7.")
     parser.add_target_argument("--flash",          action="store_true",       help="Flash bitstream.")
     parser.add_target_argument("--variant",        default="a7-35",           help="Board variant (a7-35 or a7-100).")
@@ -221,12 +219,23 @@ def main():
     sdopts.add_argument("--with-spi-sdcard", action="store_true", help="Enable SPI-mode SDCard support.")
     sdopts.add_argument("--with-sdcard",     action="store_true", help="Enable SDCard support.")
 
-    parser.add_target_argument("--sdcard-adapter",                      help="SDCard PMOD adapter (digilent or numato).")
+    parser.add_target_argument("--sdcard-adapter",                      help="SDCard PMOD adapter (digilent or numato). Deprecated, use --pmod pmodd=numato_sdcard.")
 
     parser.add_target_argument("--with-spi-flash", action="store_true", help="Enable memory-mapped SPI flash.")
-    parser.add_target_argument("--with-pmod-gpio", action="store_true", help="Enable GPIOs through PMOD.") # FIXME: Temporary test.
-    parser.add_target_argument("--with-can",       action="store_true", help="Enable CAN support (Through CTU-CAN-FD Core and SN65HVD230 'PMOD'.")
+    parser.add_target_argument("--with-buttons",   action="store_true", help="Enable Buttons.")
+    parser.add_target_argument("--with-switches",  action="store_true", help="Enable Switches.")
+    parser.add_target_argument("--with-pmod-gpio", action="store_true", help="Enable GPIOs through PMOD. Deprecated, use --pmod pmoda=gpio.")
+    parser.add_target_argument("--with-can",       action="store_true", help="Enable CAN support (Through CTU-CAN-FD Core and SN65HVD230 'PMOD'. Deprecated, use --pmod pmodc=can.")
+    add_pmod_args(parser)
     args = parser.parse_args()
+
+    # Deprecated arguments (still functional).
+    if args.with_pmod_gpio:
+        warn_deprecated_arg("--with-pmod-gpio", "--pmod pmoda=gpio (GPIOs CSRs: pmoda_gpio instead of gpio)")
+    if args.sdcard_adapter is not None:
+        warn_deprecated_arg("--sdcard-adapter", "--pmod pmodd=numato_sdcard for the Numato adapter (Digilent one is the default)")
+    if args.with_can:
+        warn_deprecated_arg("--with-can", "--pmod pmodc=can (CTU-CAN-FD core: pmodc_can instead of can0, bus region allocated automatically instead of 0xb0010000)")
 
     if args.with_etherbone and (args.eth_dynamic_ip or args.eth_dhcp):
         parser.error("--with-etherbone requires a static IP; remove --eth-dynamic-ip and --eth-dhcp.")
@@ -245,15 +254,18 @@ def main():
         eth_dhcp       = args.eth_dhcp,
         with_usb       = args.with_usb,
         with_spi_flash = args.with_spi_flash,
+        with_buttons   = args.with_buttons,
+        with_switches  = args.with_switches,
         with_pmod_gpio = args.with_pmod_gpio,
         with_can       = args.with_can,
         **parser.soc_argdict
     )
 
     if args.sdcard_adapter == "numato":
-        soc.platform.add_extension(digilent_arty._numato_sdcard_pmod_io)
+        soc.platform.add_extension(PmodNumatoSDCard("pmodd"))
     else:
-        soc.platform.add_extension(digilent_arty._sdcard_pmod_io)
+        soc.platform.add_extension(PmodSDCard("pmodd"))
+    add_pmods(soc, args.pmod)
     if args.with_spi_sdcard:
         soc.add_spi_sdcard()
     if args.with_sdcard:

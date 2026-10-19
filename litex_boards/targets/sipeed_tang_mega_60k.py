@@ -7,6 +7,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
+from migen.genlib.cdc import MultiReg
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.gen import *
@@ -28,6 +29,7 @@ from litedram.phy import GENSDRPHY, HalfRateGENSDRPHY
 from litedram.phy import GW5DDRPHY
 
 from litex_boards.platforms import sipeed_tang_mega_60k
+from litex_boards.extensions.sdram_modules import MiSTerSDRAM, SipeedSDRAM
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -70,7 +72,21 @@ class _CRG(LiteXModule):
         por_done  = Signal()
         self.comb += self.cd_por.clk.eq(clk50)
         self.comb += por_done.eq(por_count == 0)
-        self.sync.por += If(~por_done, por_count.eq(por_count - 1))
+        # SoC reset request (rst: sys pulse, toggle to por): restart the power-on reset, the PLLs are
+        # held in reset as after power-up (a sys pulse is too short for the GW5A PLLs).
+        rst_toggle = Signal(reset_less=True)
+        rst_por    = Signal()
+        rst_por_d  = Signal()
+        self.sync += If(self.rst, rst_toggle.eq(~rst_toggle))
+        self.specials += MultiReg(rst_toggle, rst_por, "por")
+        self.sync.por += [
+            rst_por_d.eq(rst_por),
+            If(rst_por != rst_por_d,
+                por_count.eq(2**16-1),
+            ).Elif(~por_done,
+                por_count.eq(por_count - 1),
+            ),
+        ]
 
         # PLL.
         self.pll = pll = GW5APLL(devicename=platform.devicename, device=platform.device)
@@ -90,7 +106,7 @@ class _CRG(LiteXModule):
             else:
                 pll.create_clkout(self.cd_sys_ps, sys_clk_freq, phase=90)
                 sdram_clk = ClockSignal("sys_ps")
-            self.specials += DDROutput(1, 0, platform.request("sdram").clk, sdram_clk)
+            self.specials += DDROutput(1, 0, platform.request("sdram_clock"), sdram_clk)
 
         # DDR3 clock.
         if with_ddr3:
@@ -151,6 +167,14 @@ class BaseSoC(SoCCore):
 
         with_ddr3 = with_ddr3 and not (with_sdram or kwargs.get("integrated_main_ram_size", 0))
         with_sdram = with_sdram and not kwargs.get("integrated_main_ram_size", 0)
+
+        if with_sdram:
+            # SDRAM module plugged on the dock's SDRAM connector.
+            platform.add_extension({
+                "sipeed": SipeedSDRAM("sdram0_connector"),
+                "mister": MiSTerSDRAM("sdram0_connector")}[sdram_model],
+                prepend = True,
+            )
 
         # CRG --------------------------------------------------------------------------------------
         self.crg = _CRG(platform, sys_clk_freq,

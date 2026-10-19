@@ -17,6 +17,7 @@ from litex.soc.cores.clock import *
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 from litex.soc.cores.bitbang import I2CMaster
 
 from litedram.modules import MT8KTF51264
@@ -58,6 +59,7 @@ class BaseSoC(SoCCore):
         eth_dynamic_ip  = False,
         with_led_chaser = True,
         with_i2c        = False,
+        with_buttons    = False,
         **kwargs):
         platform = digilent_netfpga_sume.Platform()
 
@@ -103,6 +105,10 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons ----------------------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request_all("user_btn")))
+
         # I2C Bus ----------------------------------------------------------------------------------
         if with_i2c:
             self.i2c = I2CMaster(platform.request("i2c"))
@@ -110,10 +116,12 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=digilent_netfpga_sume.Platform, description="LiteX SoC on NetFPGA-Sume.")
     parser.add_target_argument("--sys-clk-freq", default=125e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--with-i2c",     action="store_true",       help="Enable I2C support.")
+    parser.add_target_argument("--with-buttons", action="store_true",       help="Enable Buttons.")
     ethopts = parser.target_group.add_mutually_exclusive_group()
     ethopts.add_argument("--with-ethernet",  action="store_true", help="Enable Ethernet support.")
     ethopts.add_argument("--with-etherbone", action="store_true", help="Enable Etherbone support.")
@@ -124,6 +132,7 @@ def main():
     sdopts.add_argument("--with-spi-sdcard", action="store_true", help="Enable SPI-mode SDCard support.")
     sdopts.add_argument("--with-sdcard",     action="store_true", help="Enable SDCard support.")
 
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -134,8 +143,10 @@ def main():
         remote_ip      = args.remote_ip,
         with_etherbone = args.with_etherbone,
         with_i2c       = args.with_i2c,
+        with_buttons   = args.with_buttons,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
 
     if args.with_spi_sdcard:
         soc.add_spi_sdcard()

@@ -113,9 +113,24 @@ _io_v7_0 = [ # Documented by @smunaut
 
 # From https://github.com/wuxx/Colorlight-FPGA-Projects/blob/master/schematic/i5_v6.0-extboard.pdf and
 # https://github.com/wuxx/Colorlight-FPGA-Projects/blob/master/doc/i5_extboard_v1.2_pinout.png
+# The i5 and i9 modules route the same balls to the same SODIMM pins (except SODIMM pin 41: U16 on
+# i5, L2 on i9, shared with the user LED), so the extension board Pmods are the same.
 _connectors_v7_0 = [
+    # P2
+    ("pmodc", "P17 R18 C18 U16 M17 R17 T18 K18"), # pmodc:3 shared with user_led_n, pmodc:7 with cpu_reset_n.
+    ("pmodd", "J20 L18 M18 N17 G20 K20 L20 N18"),
+    # P3
     ("pmode", "C17 B18 B20 F20 A18 A19 B19 D20"),
     ("pmodf", "D1  C1  C2  E3  E2  D2  B1  A3"),
+    # P4
+    ("pmodg", "H4 G3 F1 F2 H3 F3 E4 E1"),
+    ("pmodh", "- E19 B3 K5 - B2 K4 A2"),
+    # P5
+    ("pmodi", "D18 G5 F5 E5 D17 D16 E6 F4"),
+    ("pmodj", "J17 H17 H16 G16 H18 G18 F18 E18"), # pmodj:0/4 shared with serial.
+    # P6
+    ("pmodk", "R3 M4 L5 J16 N4 L4 P16 J18"),
+    ("pmodl", "R1 U1 W1 M1 T1 Y2 V1 N2"),
 ]
 
 # ColorLight i9 V 7.2 hardware
@@ -138,49 +153,11 @@ _io_v7_2 += [
     ("serialx", 0, Subsignal("tx", Pins("E5")), Subsignal("rx", Pins("F4")), IOStandard("LVCMOS33"))
 ]
 
-_connectors_v7_2 = copy.deepcopy(_connectors_v7_0)
-
-# Append the rest of the pmod interfaces
-
-_connectors_v7_2 += [
-    # P2
-    ("pmodc", "P17 R18 C18 L2 M17 R17 T18 K18"),
-    ("pmodd", "J20 L18 M18 N17 G20 K20 L20 N18"),
-    # P4
-    ("pmodg", "H4 G3 F1 F2 H3 F3 E4 E1"),
-    ("pmodh", "- E19 B3 K5 - B2 K4 A2"),
-    # P5
-    ("pmodi", "D18 G5 F5 E5 D17 D16 E6 F4"),
-    ("pmodj", "J17 H17 H16 G16 H18 G18 F18 E18"),
-    # P6
-    ("pmodk", "R3 M4 L5 J16 N4 L4 P16 J18"),
-    ("pmodl", "R1 U1 W1 M1 T1 Y2 V1 N2"),
+# SODIMM pin 41 (pmodc:3) is L2 on i9 (instead of U16 on i5).
+_connectors_v7_2 = [
+    ("pmodc", "P17 R18 C18 L2 M17 R17 T18 K18") if name == "pmodc" else (name, pins)
+    for name, pins in _connectors_v7_0
 ]
-
-# PMODS --------------------------------------------------------------------------------------------
-
-def sdcard_pmod_io(pmod):
-    return [
-        # SDCard PMOD:
-        # - https://store.digilentinc.com/pmod-microsd-microsd-card-slot/
-        ("spisdcard", 0,
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("mosi", Pins(f"{pmod}:1"), Misc("PULLMODE=UP")),
-            Subsignal("cs_n", Pins(f"{pmod}:0"), Misc("PULLMODE=UP")),
-            Subsignal("miso", Pins(f"{pmod}:2"), Misc("PULLMODE=UP")),
-            Misc("SLEWRATE=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-        ("sdcard", 0,
-            Subsignal("data", Pins(f"{pmod}:2 {pmod}:4 {pmod}:5 {pmod}:0"), Misc("PULLMODE=UP")),
-            Subsignal("cmd",  Pins(f"{pmod}:1"), Misc("PULLMODE=UP")),
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("cd",   Pins(f"{pmod}:6")),
-            #Misc("SLEWRATE=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-]
-_sdcard_pmod_io = sdcard_pmod_io("pmode") # SDCARD PMOD on P3.
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -188,16 +165,22 @@ class Platform(LatticeECP5Platform):
     default_clk_name   = "clk25"
     default_clk_period = 1e9/25e6
 
-    def __init__(self, board="i5", revision="7.0", toolchain="trellis"):
+    # Supported revisions per board (first one is the default).
+    revisions = {"i5": ["7.0"], "i9": ["7.2"]}
+
+    def __init__(self, board="i5", revision=None, toolchain="trellis"):
+        if board not in self.revisions:
+            raise ValueError(f"Unsupported board {board}, supported: {', '.join(self.revisions)}.")
+        if revision is None:
+            revision = self.revisions[board][0]
+        if revision not in self.revisions[board]:
+            raise ValueError(f"Unsupported revision {revision} for {board}, supported: {', '.join(self.revisions[board])}.")
+        self.revision = revision
         if board == "i5":
-            assert revision in ["7.0"]
-            self.revision = revision
             device     = {"7.0": "LFE5U-25F-6BG381C"}[revision]
             io         = {"7.0": _io_v7_0}[revision]
             connectors = {"7.0": _connectors_v7_0}[revision]
         if board == "i9":
-            assert revision in ["7.2"]
-            self.revision = revision
             device     = {"7.2": "LFE5U-45F-6BG381C"}[revision]
             io         = {"7.2": _io_v7_2}[revision]
             connectors = {"7.2": _connectors_v7_2}[revision]
@@ -212,3 +195,16 @@ class Platform(LatticeECP5Platform):
         self.add_period_constraint(self.lookup_request("clk25",            loose=True), 1e9/25e6)
         self.add_period_constraint(self.lookup_request("eth_clocks:rx", 0, loose=True), 1e9/125e6)
         self.add_period_constraint(self.lookup_request("eth_clocks:rx", 1, loose=True), 1e9/125e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodSDCard
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "sdcard_pmod_io"  : ('platform.add_extension(PmodSDCard(pmod, sdcard_slew_fast=False))',
+        lambda pmod: PmodSDCard(pmod, sdcard_slew_fast=False).get_io(LatticeECP5Platform)),
+    "_sdcard_pmod_io" : ('platform.add_extension(PmodSDCard("pmode", sdcard_slew_fast=False))',
+        PmodSDCard("pmode", sdcard_slew_fast=False).get_io(LatticeECP5Platform)),
+})

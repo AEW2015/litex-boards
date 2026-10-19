@@ -24,6 +24,7 @@ from litex.soc.integration.soc import *
 from litex.soc.integration.soc import SoCRegion
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -59,6 +60,7 @@ class BaseSoC(SoCCore):
     def __init__(self, sys_clk_freq=75e6, toolchain="radiant",
         hyperram        = "none",
         with_led_chaser = True,
+        with_buttons    = False,
         **kwargs):
         platform = lattice_crosslink_nx_vip.Platform(toolchain=toolchain)
         platform.add_platform_command("ldc_set_sysconfig {{MASTER_SPI_PORT=SERIAL}}")
@@ -93,22 +95,31 @@ class BaseSoC(SoCCore):
                 pads         = Cat(*[platform.request("user_led", i) for i in range(4)]),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons ---------------------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request_all("user_btn")))
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=lattice_crosslink_nx_vip.Platform, description="LiteX SoC on Crosslink-NX VIP Board.")
     parser.add_target_argument("--sys-clk-freq",  default=75e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--with-hyperram", default="none",           help="Enable use of HyperRAM chip (none, 0 or 1).")
+    parser.add_target_argument("--with-buttons",  action="store_true",      help="Enable Buttons.")
     parser.add_target_argument("--prog-target",   default="direct",         help="Programming Target (direct or flash).")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
         sys_clk_freq = args.sys_clk_freq,
         hyperram     = args.with_hyperram,
         toolchain    = args.toolchain,
+        with_buttons = args.with_buttons,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
     builder = Builder(soc, **parser.builder_argdict)
     if args.build:
         builder.build(**parser.toolchain_argdict)

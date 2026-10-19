@@ -187,35 +187,6 @@ _connectors = [
             "AD12 AC12"),
 ]
 
-# PMODS --------------------------------------------------------------------------------------------
-
-def sdcard_pmod_io(pmod):
-    return [
-        # SDCard PMOD:
-        # - https://store.digilentinc.com/pmod-microsd-microsd-card-slot/
-        ("spisdcard", 0,
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("mosi", Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("cs_n", Pins(f"{pmod}:0"), Misc("PULLUP True")),
-            Subsignal("miso", Pins(f"{pmod}:2"), Misc("PULLUP True")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-        ("sdcard", 0,
-            Subsignal("data", Pins(f"{pmod}:2 {pmod}:4 {pmod}:5 {pmod}:0"), Misc("PULLUP True")),
-            Subsignal("cmd",  Pins(f"{pmod}:1"), Misc("PULLUP True")),
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("cd",   Pins(f"{pmod}:6")),
-            Misc("SLEW=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-]
-_sdcard_pmod_io = sdcard_pmod_io("j10") # SDCARD PMOD on J10.
-def ps2_pmod_io(pmod):
-    return [
-        ("ps2kbd", 0, Pins(f"{pmod}:0 {pmod}:2"), IOStandard("LVCMOS33")), # data, clk
-]
-_ps2_pmod_io = ps2_pmod_io("j11") # PS2 PMOD on top line of J11
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -228,7 +199,7 @@ class Platform(Xilinx7SeriesPlatform):
         if speedgrade not in [-1,-2]:
             raise ValueError(f"Speedgrade {speedgrade} unsupported.")
         # Create IOs and extend to with board's revision specific IOs.
-        io = _io_common
+        io = list(_io_common)
         io.extend({
             1 : _io_v1,
             2 : _io_v2,
@@ -255,3 +226,20 @@ class Platform(Xilinx7SeriesPlatform):
     def do_finalize(self, fragment):
         Xilinx7SeriesPlatform.do_finalize(self, fragment)
         self.add_period_constraint(self.lookup_request("clk50", loose=True), 1e9/50e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodPS2, PmodSDCard
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "sdcard_pmod_io"  : ('platform.add_extension(PmodSDCard(pmod))',
+        lambda pmod: PmodSDCard(pmod).get_io(Xilinx7SeriesPlatform)),
+    "_sdcard_pmod_io" : ('platform.add_extension(PmodSDCard("j10"))',
+        PmodSDCard("j10").get_io(Xilinx7SeriesPlatform)),
+    "ps2_pmod_io"     : ('platform.add_extension(PmodPS2(pmod))',
+        lambda pmod: PmodPS2(pmod).get_io(Xilinx7SeriesPlatform)),
+    "_ps2_pmod_io"    : ('platform.add_extension(PmodPS2("j11"))',
+        PmodPS2("j11").get_io(Xilinx7SeriesPlatform)),
+})

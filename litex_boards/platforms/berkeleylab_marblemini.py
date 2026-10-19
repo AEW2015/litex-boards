@@ -237,12 +237,6 @@ _connectors = [
     })
 ]
 
-_pmod0_pins    = ["PMOD0:{}".format(i) for i in range(8)]
-_pmod1_pins    = ["PMOD1:{}".format(i) for i in range(8)]
-break_off_pmod = [
-    ("pmod0", 0, Pins(*_pmod0_pins), IOStandard("LVCMOS33")),
-    ("pmod1", 0, Pins(*_pmod1_pins), IOStandard("LVCMOS33")),
-]
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -271,3 +265,17 @@ class Platform(Xilinx7SeriesPlatform):
         self.add_period_constraint(self.lookup_request("mgt_clk", 0,  loose=True),   1e9/125e6)
         self.add_period_constraint(self.lookup_request("mgt_clk", 1,  loose=True),   1e9/125e6)
         self.add_period_constraint(self.lookup_request("eth_clocks:rx", loose=True), 1e9/125e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodGPIO
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "break_off_pmod" : ('platform.add_extension(PmodGPIO("PMOD0", name="pmod0")) and platform.add_extension(PmodGPIO("PMOD1", name="pmod1"))',
+        [
+            *PmodGPIO("PMOD0", name="pmod0").get_io(Xilinx7SeriesPlatform),
+            *PmodGPIO("PMOD1", name="pmod1").get_io(Xilinx7SeriesPlatform),
+        ]),
+})

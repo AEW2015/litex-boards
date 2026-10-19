@@ -21,6 +21,7 @@ from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -60,6 +61,7 @@ class _CRG(LiteXModule):
 class BaseSoC(SoCCore):
     def __init__(self, sys_clk_freq=75e6, toolchain="radiant",
         with_led_chaser = True,
+        with_buttons    = False,
         **kwargs):
         platform = lattice_certuspro_nx_vvml.Platform(toolchain=toolchain)
 
@@ -75,19 +77,28 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons ---------------------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request_all("user_btn")))
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=lattice_certuspro_nx_vvml.Platform, description="LiteX SoC on CertusPro-NX VVML EVN Board.")
     parser.add_target_argument("--sys-clk-freq", default=75e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--flash",        action="store_true",      help="Flash bitstream to SPI Flash.")
+    parser.add_target_argument("--with-buttons", action="store_true",      help="Enable Buttons.")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
         sys_clk_freq = args.sys_clk_freq,
+        with_buttons = args.with_buttons,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
 
     builder = Builder(soc, **parser.builder_argdict)
     if args.build:

@@ -15,6 +15,7 @@ from litex.gen import *
 from litex_boards.platforms import trenz_tec0117
 
 from litex.build.io import DDROutput
+from litex_boards.extensions.pmod import PmodSDCard
 
 from litex.soc.cores.clock.gowin_gw1n import  GW1NPLL
 from litex.soc.integration.soc import *
@@ -151,7 +152,8 @@ def flash(bios_flash_offset, toolchain="gowin"):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=trenz_tec0117.Platform, description="LiteX SoC on TEC0117.")
     parser.add_target_argument("--bios-flash-offset", default="0x0000",         help="BIOS offset in SPI Flash.")
     parser.add_target_argument("--flash",             action="store_true",      help="Flash bitstream and BIOS.")
@@ -160,6 +162,7 @@ def main():
     sdopts = parser.target_group.add_mutually_exclusive_group()
     sdopts.add_argument("--with-spi-sdcard", action="store_true", help="Enable SPI-mode SDCard support.")
     sdopts.add_argument("--with-sdcard",     action="store_true", help="Enable SDCard support.")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -168,7 +171,8 @@ def main():
         toolchain         = args.toolchain,
         **parser.soc_argdict
     )
-    soc.platform.add_extension(trenz_tec0117._sdcard_pmod_io)
+    add_pmods(soc, args.pmod)
+    soc.platform.add_extension(PmodSDCard("pmod"))
     if args.with_spi_sdcard:
         soc.add_spi_sdcard()
     if args.with_sdcard:

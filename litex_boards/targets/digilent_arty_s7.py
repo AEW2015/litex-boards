@@ -17,6 +17,7 @@ from litex.soc.cores.clock import *
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 
 from litedram.modules import MT41K128M16
 from litedram.phy import s7ddrphy
@@ -52,6 +53,8 @@ class BaseSoC(SoCCore):
     def __init__(self, variant="s7-50", sys_clk_freq=100e6,
         with_spi_flash  = False,
         with_led_chaser = True,
+        with_buttons    = False,
+        with_switches   = False,
         **kwargs):
         platform = digilent_arty_s7.Platform(variant=variant)
 
@@ -85,22 +88,35 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons / Switches -----------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request_all("user_btn")))
+        if with_switches:
+            self.switches = GPIOIn(Cat(platform.request_all("user_sw")))
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=digilent_arty_s7.Platform, description="LiteX SoC on Arty S7.")
     parser.add_target_argument("--variant",        default="s7-50",           help="Board variant (s7-50 or s7-25).")
     parser.add_target_argument("--sys-clk-freq",   default=100e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--with-spi-flash", action="store_true",       help="Enable memory-mapped SPI flash.")
+    parser.add_target_argument("--with-buttons",   action="store_true",       help="Enable Buttons.")
+    parser.add_target_argument("--with-switches",  action="store_true",       help="Enable Switches.")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
         variant        = args.variant,
         sys_clk_freq   = args.sys_clk_freq,
         with_spi_flash = args.with_spi_flash,
+        with_buttons   = args.with_buttons,
+        with_switches  = args.with_switches,
         **parser.soc_argdict
     )
+    add_pmods(soc, args.pmod)
     builder = Builder(soc, **parser.builder_argdict)
     if args.build:
         builder.build(**parser.toolchain_argdict)

@@ -109,7 +109,7 @@ class BaseSoC(SoCCore):
         with_video_terminal = False,
         with_lcd_terminal   = False,
         with_lcd_colorbars  = False,
-        with_lcd_backlight  = True,
+        with_lcd_backlight  = False,
         with_ethernet       = False,
         with_etherbone      = False,
         eth_ip              = "192.168.1.50",
@@ -118,12 +118,12 @@ class BaseSoC(SoCCore):
         dock                = "standard",
         **kwargs):
 
-        assert dock in ["standard", "lite"]
-
         platform = sipeed_tang_primer_20k.Platform(dock, toolchain=toolchain)
 
-        if dock == "lite":
+        if dock != "standard":
             with_led_chaser = False # No leds on core board nor on dock lite.
+        if dock is None:
+            with_buttons    = False # No buttons on core board.
 
         # CRG --------------------------------------------------------------------------------------
         with_video = with_video_terminal or with_lcd_terminal or with_lcd_colorbars
@@ -136,11 +136,11 @@ class BaseSoC(SoCCore):
 
         # DDR3 SDRAM -------------------------------------------------------------------------------
         if with_dram:
-            # At CK <= 125 MHz, use DDR3 DLL-off mode (CL6/CWL6, no ODT).
+            # DLL-off mode (CL6/CWL6) fails read leveling on this board at low frequencies.
             self.ddrphy = GW2DDRPHY(
                 pads         = platform.request("ddram"),
                 sys_clk_freq = sys_clk_freq,
-                dll_off      = (2*sys_clk_freq <= 125e6),
+                dll_off      = False,
             )
             self.ddrphy.settings.rtt_nom = "disabled"
             self.comb += self.crg.stop.eq(self.ddrphy.init.stop)
@@ -184,8 +184,9 @@ class BaseSoC(SoCCore):
             self.add_video_terminal(phy=self.videophy, timings="640x480@75Hz", clock_domain="hdmi")
 
         # LCD -------------------------------------------------------------------------------------
-        lcd = platform.request("lcd") if (with_lcd_terminal or with_lcd_colorbars or with_lcd_backlight) else None
-        if lcd is not None:
+        with_lcd_video = with_lcd_terminal or with_lcd_colorbars
+        lcd = platform.request("lcd") if (with_lcd_video or with_lcd_backlight) else None
+        if with_lcd_video:
             self.lcdphy = VideoLCDPHY(lcd, clock_domain="hdmi", with_clk_ddr_output=False)
             if with_lcd_terminal:
                 self.add_video_terminal(phy=self.lcdphy, timings="640x480@60Hz", clock_domain="hdmi")
@@ -193,7 +194,7 @@ class BaseSoC(SoCCore):
                 self.add_video_colorbars(phy=self.lcdphy, timings="640x480@60Hz", clock_domain="hdmi")
 
         # LCD Backlight ----------------------------------------------------------------------------
-        if with_lcd_backlight and lcd is not None:
+        if with_lcd_backlight:
             self.comb += lcd.bl.eq(1)
 
         # Leds -------------------------------------------------------------------------------------
@@ -224,7 +225,7 @@ class BaseSoC(SoCCore):
 def main():
     from litex.build.parser import LiteXArgumentParser
     parser = LiteXArgumentParser(platform=sipeed_tang_primer_20k.Platform, description="LiteX SoC on Tang Primer 20K.")
-    parser.add_target_argument("--dock",         default="standard",       help="Dock version (standard (default) or lite.")
+    parser.add_target_argument("--dock",         default="standard",       choices=[*sipeed_tang_primer_20k.docks, "none"], help="Dock (standard, lite or none for SoM only).")
     parser.add_target_argument("--flash",        action="store_true",      help="Flash bitstream.")
     parser.add_target_argument("--prog-kit",     default="openfpgaloader", help="Programmer select from Gowin/openFPGALoader.")
     parser.add_target_argument("--sys-clk-freq", default=48e6, type=float, help="System clock frequency.")
@@ -257,7 +258,7 @@ def main():
         eth_ip              = args.eth_ip,
         remote_ip           = args.remote_ip,
         eth_dynamic_ip      = args.eth_dynamic_ip,
-        dock                = args.dock,
+        dock                = None if args.dock == "none" else args.dock,
         **parser.soc_argdict
     )
     if args.with_spi_sdcard:

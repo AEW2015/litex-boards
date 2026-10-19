@@ -14,10 +14,12 @@ from litex.gen.genlib.misc import WaitTimer
 
 from litex_boards.platforms import efinix_t120_f576_dev_kit
 
-from litex.build.generic_platform import Pins, Subsignal, IOStandard
+from litex_boards.extensions.pmod import PmodI2C, PmodUSBUART
+
 
 from litex.soc.cores.clock import *
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.gpio import GPIOIn
 from litex.soc.cores.ram.efinix_ddr import EfinixTrionDDR, add_efinix_trion_ddr
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
@@ -77,11 +79,13 @@ class BaseSoC(SoCCore):
         eth_dynamic_ip  = False,
         with_led_chaser = True,
         with_i2c        = False,
+        with_buttons    = False,
+        with_switches   = False,
         **kwargs):
         platform = efinix_t120_f576_dev_kit.Platform()
 
         # USB-UART PMOD as Serial ------------------------------------------------------------------
-        platform.add_extension(efinix_t120_f576_dev_kit.usb_pmod_io("pmod_e"))
+        platform.add_extension(PmodUSBUART("pmod_e"))
         if kwargs.get("uart_name", "serial") == "serial":
             kwargs["uart_name"] = "usb_uart"
 
@@ -109,10 +113,16 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        # Buttons / Switches -----------------------------------------------------------------------
+        if with_buttons:
+            self.buttons = GPIOIn(Cat(platform.request_all("user_btn_n")[1:]))
+        if with_switches:
+            self.switches = GPIOIn(Cat(platform.request_all("user_sw")))
+
         # I2C --------------------------------------------------------------------------------------
         if with_i2c:
             from litex.soc.cores.bitbang import I2CMaster
-            platform.add_extension(efinix_t120_f576_dev_kit.i2c_pmod_io("pmod_a"))
+            platform.add_extension(PmodI2C("pmod_a"))
             self.i2c = I2CMaster(pads=platform.request("i2c"))
 
         # Ethernet / Etherbone ---------------------------------------------------------------------
@@ -132,22 +142,8 @@ class BaseSoC(SoCCore):
                     with_hw_init_reset = False)
             # Use Ethernet RMII PMOD.
             else:
-                def eth_lan8720_rmii_pmod_io(pmod):
-                    # Lan8020 RMII PHY "PMOD": To be used as a PMOD, MDIO should be disconnected and TX1 connected to PMOD8 IO.
-                    return [
-                        ("eth_rmii_clocks", 0,
-                            Subsignal("ref_clk", Pins(f"{pmod}:6")),
-                            IOStandard("3.3_V_LVTTL_/_LVCMOS"),
-                        ),
-                        ("eth_rmii", 0,
-                            Subsignal("rx_data", Pins(f"{pmod}:5 {pmod}:1")),
-                            Subsignal("crs_dv",  Pins(f"{pmod}:2")),
-                            Subsignal("tx_en",   Pins(f"{pmod}:4")),
-                            Subsignal("tx_data", Pins(f"{pmod}:0 {pmod}:7")),
-                            IOStandard("3.3_V_LVTTL_/_LVCMOS")
-                        ),
-                    ]
-                platform.add_extension(eth_lan8720_rmii_pmod_io("pmod_d"))
+                from litex_boards.extensions.pmod import PmodLAN8720
+                platform.add_extension(PmodLAN8720("pmod_d"))
 
                 from liteeth.phy.rmii import LiteEthPHYRMII
                 self.ethphy = LiteEthPHYRMII(
@@ -164,12 +160,15 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=efinix_t120_f576_dev_kit.Platform, description="LiteX SoC on Efinix Trion T120 BGA576 Dev Kit.")
     parser.add_target_argument("--flash",          action="store_true",      help="Flash bitstream.")
     parser.add_target_argument("--sys-clk-freq",   default=75e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--with-spi-flash", action="store_true",      help="Enable memory-mapped SPI flash.")
     parser.add_target_argument("--with-i2c",       action="store_true",      help="Enable I2C on PMOD A.")
+    parser.add_target_argument("--with-buttons",   action="store_true",      help="Enable Buttons.")
+    parser.add_target_argument("--with-switches",  action="store_true",      help="Enable Switches.")
     ethopts = parser.target_group.add_mutually_exclusive_group()
     ethopts.add_argument("--with-ethernet",  action="store_true", help="Enable Ethernet support.")
     ethopts.add_argument("--with-etherbone", action="store_true", help="Enable Etherbone support.")
@@ -178,12 +177,15 @@ def main():
     parser.add_target_argument("--remote-ip",      default="192.168.1.100", help="Remote IP address of TFTP server.")
     parser.add_target_argument("--eth-rgmii-phy",  action="store_true",     help="Uses onboard RGMII Phy instead of RMII PMOD.")
     parser.add_target_argument("--eth-phy",        default=0, type=int, choices=[0, 1], help="Ethernet PHY (only available with --eth-rgmii-phy).")
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
         sys_clk_freq   = args.sys_clk_freq,
         with_spi_flash = args.with_spi_flash,
         with_i2c       = args.with_i2c,
+        with_buttons   = args.with_buttons,
+        with_switches  = args.with_switches,
         with_ethernet  = args.with_ethernet,
         with_etherbone = args.with_etherbone,
         eth_ip         = args.eth_ip,
@@ -192,6 +194,7 @@ def main():
         eth_phy        = args.eth_phy,
         eth_rgmii_phy  = args.eth_rgmii_phy,
         **parser.soc_argdict)
+    add_pmods(soc, args.pmod)
     builder = Builder(soc, **parser.builder_argdict)
     if args.build:
         builder.build(**parser.toolchain_argdict)

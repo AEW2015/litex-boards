@@ -77,21 +77,6 @@ _connectors = [
     ("J7",    "48 - 3 47 - 2"), # Numbering similar to PMODS: 0: Marked pin.
 ]
 
-# PMODS --------------------------------------------------------------------------------------------
-
-def led_pmod_io_v11(pmod, offset=0):
-    return [
-        # LED PMOD: https://www.aliexpress.com/item/1005001504777342.html
-        # Contrary to the supplied schematic, the two nibbles seem to be swapped on the board.
-        ("user_led_n", offset + 0,  Pins(f"{pmod}:4"), IOStandard("LVCMOS33")),
-        ("user_led_n", offset + 1,  Pins(f"{pmod}:5"), IOStandard("LVCMOS33")),
-        ("user_led_n", offset + 2,  Pins(f"{pmod}:6"), IOStandard("LVCMOS33")),
-        ("user_led_n", offset + 3,  Pins(f"{pmod}:7"), IOStandard("LVCMOS33")),
-        ("user_led_n", offset + 4,  Pins(f"{pmod}:0"), IOStandard("LVCMOS33")),
-        ("user_led_n", offset + 5,  Pins(f"{pmod}:1"), IOStandard("LVCMOS33")),
-        ("user_led_n", offset + 6,  Pins(f"{pmod}:2"), IOStandard("LVCMOS33")),
-        ("user_led_n", offset + 7,  Pins(f"{pmod}:3"), IOStandard("LVCMOS33")),
-    ]
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -108,3 +93,14 @@ class Platform(LatticeiCE40Platform):
     def do_finalize(self, fragment):
         LatticeiCE40Platform.do_finalize(self, fragment)
         self.add_period_constraint(self.lookup_request("clk12", loose=True), 1e9/12e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodLED
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "led_pmod_io_v11" : ('platform.add_extension(PmodLED(pmod, order=[4, 5, 6, 7, 0, 1, 2, 3], name="user_led_n", number=offset))',
+        lambda pmod, offset=0: PmodLED(pmod, order=[4, 5, 6, 7, 0, 1, 2, 3], name="user_led_n", number=offset).get_io(LatticeiCE40Platform)),
+})

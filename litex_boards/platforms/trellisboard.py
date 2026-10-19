@@ -226,35 +226,6 @@ _connectors = [
 ]
 
 
-# PMODS --------------------------------------------------------------------------------------------
-
-def raw_pmod_io(pmod):
-    return [(pmod, 0, Pins(" ".join([f"{pmod}:{i:d}" for i in range(8)])), IOStandard("LVCMOS33"))]
-
-def sdcard_pmod_io(pmod):
-    return [
-        # SDCard PMOD:
-        # - https://store.digilentinc.com/pmod-microsd-microsd-card-slot/
-        # - https://github.com/antmicro/arty-expansion-board
-        ("spisdcard", 0,
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("mosi", Pins(f"{pmod}:1"), Misc("PULLMODE=UP")),
-            Subsignal("cs_n", Pins(f"{pmod}:0"), Misc("PULLMODE=UP")),
-            Subsignal("miso", Pins(f"{pmod}:2"), Misc("PULLMODE=UP")),
-            Misc("SLEWRATE=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-        ("sdcard", 0,
-            Subsignal("data", Pins(f"{pmod}:2 {pmod}:4 {pmod}:5 {pmod}:0"), Misc("PULLMODE=UP")),
-            Subsignal("cmd",  Pins(f"{pmod}:1"), Misc("PULLMODE=UP")),
-            Subsignal("clk",  Pins(f"{pmod}:3")),
-            Subsignal("cd",   Pins(f"{pmod}:6")),
-            Misc("SLEWRATE=FAST"),
-            IOStandard("LVCMOS33"),
-        ),
-]
-_sdcard_pmod_io = sdcard_pmod_io("pmoda") # SDCARD PMOD on PMODA.
-
 # Platform -----------------------------------------------------------------------------------------
 
 class Platform(LatticeECP5Platform):
@@ -272,3 +243,18 @@ class Platform(LatticeECP5Platform):
         self.add_period_constraint(self.lookup_request("clk100",        loose=True), 1e9/100e6)
         self.add_period_constraint(self.lookup_request("clk12",         loose=True), 1e9/12e6)
         self.add_period_constraint(self.lookup_request("eth_clocks:rx", loose=True), 1e9/125e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodGPIO, PmodSDCard
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "raw_pmod_io"     : ('platform.add_extension(PmodGPIO(pmod))',
+        lambda pmod: PmodGPIO(pmod).get_io(LatticeECP5Platform)),
+    "sdcard_pmod_io"  : ('platform.add_extension(PmodSDCard(pmod))',
+        lambda pmod: PmodSDCard(pmod).get_io(LatticeECP5Platform)),
+    "_sdcard_pmod_io" : ('platform.add_extension(PmodSDCard("pmoda"))',
+        PmodSDCard("pmoda").get_io(LatticeECP5Platform)),
+})

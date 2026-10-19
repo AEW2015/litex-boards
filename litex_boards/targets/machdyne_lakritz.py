@@ -19,6 +19,7 @@ from litex.build.io import DDROutput
 
 from litex.soc.cores.clock import *
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.pwm import PWM
 from litex.soc.cores.usb_ohci import USBOHCI
 from litex.soc.cores.video import VideoHDMIPHY
 
@@ -102,7 +103,7 @@ class BaseSoC(SoCCore):
     mem_map = {**SoCCore.mem_map, **{
         "usb_ohci":     0xc0000000,
     }}
-    def __init__(self, revision="v0", device="25F", sdram_device="W9825G6KH6", sdram_rate="1:2", sys_clk_freq=int(48e6), toolchain="trellis", with_led_chaser=False, with_video_framebuffer=False, with_usb_host=False, **kwargs):
+    def __init__(self, revision="v0", device="25F", sdram_device="W9825G6KH6", sdram_rate="1:2", sys_clk_freq=int(48e6), toolchain="trellis", with_led_chaser=False, with_video_framebuffer=False, with_usb_host=False, with_audio_pwm=False, **kwargs):
 
         platform = machdyne_lakritz.Platform(revision=revision, device=device ,toolchain=toolchain)
 
@@ -142,7 +143,8 @@ class BaseSoC(SoCCore):
         if with_usb_host:
             self.usb_ohci = USBOHCI(platform, platform.request("usb_host"), usb_clk_freq=int(48e6))
             self.bus.add_slave("usb_ohci_ctrl", self.usb_ohci.wb_ctrl, region=SoCRegion(origin=self.mem_map["usb_ohci"], size=0x100000, cached=False))
-            self.dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
+            dma_bus = getattr(self, "dma_bus", self.bus)
+            dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
             self.comb += self.cpu.interrupt[16].eq(self.usb_ohci.interrupt)
 
         # DDMI Framebuffer -------------------------------------------------------------------------------------
@@ -160,10 +162,17 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        # Audio PWM -------------------------------------------------------------------------------
+        if with_audio_pwm:
+            audio = platform.request("audio_pwm")
+            self.audio_left  = PWM(pwm=audio.left,  with_csr=True)
+            self.audio_right = PWM(pwm=audio.right, with_csr=True)
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=machdyne_lakritz.Platform, description="LiteX SoC on Lakritz")
     parser.add_target_argument("--sys-clk-freq",           default=48e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--revision",               default="v0",             help="Board Revision (v0).")
@@ -173,8 +182,10 @@ def main():
     parser.add_target_argument("--with-spi-sdcard",        action="store_true",      help="Enable SPI-mode SDCard support.")
     parser.add_target_argument("--with-video-framebuffer", action="store_true",      help="Enable DDMI framebuffer.")
     parser.add_target_argument("--with-usb-host",          action="store_true",      help="Enable USB host support.")
+    parser.add_target_argument("--with-audio-pwm",         action="store_true",      help="Enable Audio PWM output.")
     parser.add_target_argument("--sdram-device",           default="W9825G6KH6",     help="SDRAM device (W9825G6KH6 or IS42S16320).")
 
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -183,7 +194,9 @@ def main():
         sys_clk_freq  = int(float(args.sys_clk_freq)),
         sdram_device  = args.sdram_device,
         with_usb_host = args.with_usb_host,
+        with_audio_pwm = args.with_audio_pwm,
         **parser.soc_argdict)
+    add_pmods(soc, args.pmod)
 
     if args.with_sdcard:
         soc.add_sdcard()

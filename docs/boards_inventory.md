@@ -19,7 +19,7 @@ python3 .github/scripts/generate_board_inventory.py --write
 | `alibaba_vu13p` | alibaba_vu13p | vivado | `125000000.0` | Ethernet, Etherbone, PCIe | included |
 | `alibaba_xcku3p` | alibaba_xcku3p | vivado | `100000000.0` | Ethernet, Etherbone, PCIe | included |
 | `alientek_davincipro` | alientek_davincipro | vivado | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, PCIe, Video Terminal, Video Framebuffer, Video Colorbars | included |
-| `aliexpress_rk_xcku5p` | aliexpress_rk_xcku5p | vivado | `100000000.0` | - | included |
+| `aliexpress_rk_xcku5p` | aliexpress_rk_xcku5p | vivado | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, SPI Flash, PCIe | included |
 | `aliexpress_xc7k420t` | aliexpress_xc7k420t | vivado | `100000000.0` | SPI Flash | included |
 | `aliexpress_xc7k70t` | aliexpress_xc7k70t | vivado | `90000000.0` | Ethernet, PCIe, Video Terminal, Video Framebuffer, Video Colorbars | included |
 | `alinx_ax7010` | alinx_ax7010 | - | `100000000.0` | - | included |
@@ -58,13 +58,14 @@ python3 .github/scripts/generate_board_inventory.py --write
 | `digilent_atlys` | digilent_atlys | ise | `default` | Ethernet, Etherbone | included |
 | `digilent_basys3` | digilent_basys3 | vivado | `75000000.0` | SDCard, SPI SDCard, Video Terminal | included |
 | `digilent_cmod_a7` | digilent_cmod_a7 | vivado | `48000000.0` | SPI Flash | included |
+| `digilent_eclypse_z7` | digilent_eclypse_z7 | vivado | `125000000.0` | - | included |
 | `digilent_genesys2` | digilent_genesys2 | vivado | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, Video Terminal, Video Framebuffer | included |
 | `digilent_netfpga_sume` | digilent_netfpga_sume | vivado | `125000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard | included |
 | `digilent_nexys4` | digilent_nexys4 | vivado | `75000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, Video Terminal, Video Framebuffer | included |
 | `digilent_nexys4ddr` | digilent_nexys4ddr | vivado | `75000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, SPI Flash, Video Terminal, Video Framebuffer | included |
 | `digilent_nexys_video` | digilent_nexys_video | vivado | `100000000.0` | Ethernet, SDCard, SPI SDCard, SATA, Video Terminal, Video Framebuffer, USB | included |
 | `digilent_pynq_z1` | digilent_pynq_z1 | vivado | `125000000.0` | Video Terminal | included |
-| `digilent_zedboard` | digilent_arty, digilent_zedboard | vivado | `100000000.0` | - | included |
+| `digilent_zedboard` | digilent_zedboard | vivado | `100000000.0` | - | included |
 | `ebaz4205` | ebaz4205 | vivado | `100000000.0` | - | included |
 | `efinix_t120_f576_dev_kit` | efinix_t120_f576_dev_kit | efinity | `75000000.0` | Ethernet, Etherbone, SPI Flash | toolchain-gated: Require Efinity toolchain. |
 | `efinix_t20_f256_dev_kit` | efinix_t20_f256_dev_kit | efinity | `45000000.0` | SPI Flash | toolchain-gated: Require Efinity toolchain. |
@@ -76,7 +77,7 @@ python3 .github/scripts/generate_board_inventory.py --write
 | `efinix_xyloni_dev_kit` | efinix_xyloni_dev_kit | efinity | `33333000.0` | - | toolchain-gated: Require Efinity toolchain. |
 | `ego1` | ego1 | vivado | `100000000.0` | Video Terminal | included |
 | `embedfire_rise_pro` | embedfire_rise_pro | vivado | `50000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard | included |
-| `enclustra_mercury_kx2` | enclustra_mercury_kx2, enclustra_st1 | vivado | `100000000.0` | - | included |
+| `enclustra_mercury_kx2` | enclustra_mercury_kx2 | vivado | `100000000.0` | - | included |
 | `enclustra_mercury_xu5` | enclustra_mercury_xu5 | vivado | `125000000.0` | - | included |
 | `enclustra_mercury_xu8_pe3` | enclustra_mercury_xu8_pe3 | vivado | `125000000.0` | PCIe | included |
 | `fairwaves_xtrx` | fairwaves_xtrx | vivado | `125000000.0` | PCIe | included |
@@ -138,7 +139,7 @@ python3 .github/scripts/generate_board_inventory.py --write
 | `mlk_cu07_ku15p` | mlk_cu07_ku15p | vivado | `75000000.0` | SDCard | included |
 | `mlkpai_fs01_dr1v90m` | mlkpai_fs01_dr1v90m | td | `25000000.0` | - | included |
 | `mnt_rkx7` | mnt_rkx7 | vivado | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, SPI Flash, USB Host | included |
-| `modretro_chromatic` | modretro_chromatic | gowin | `33554320.0` | - | included |
+| `modretro_chromatic` | modretro_chromatic | gowin | `33554320.0` | HDMI Video Terminal, HDMI Video Colorbars, QSPI SPI Master, I2S Audio, ESP32 UART, USB CDC-ACM, Cartridge GPIO, Link GPIO, IR | included |
 | `modretro_m64` | modretro_m64 | vivado | `100000000.0` | Video Terminal, Video Colorbars | included |
 | `muselab_icesugar` | muselab_icesugar | icestorm | `24000000.0` | - | included |
 | `muselab_icesugar_pro` | muselab_icesugar_pro | trellis | `50000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, SPI Flash, Video Terminal, Video Framebuffer | included |
@@ -168,7 +169,7 @@ python3 .github/scripts/generate_board_inventory.py --write
 | `qmtech_kintex7_devboard` | qmtech_kintex7_devboard | vivado | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, SPI Flash, Video Terminal, Video Framebuffer, Video Colorbars | included |
 | `qmtech_wukong` | qmtech_wukong | vivado | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, Video Terminal, Video Framebuffer | included |
 | `qmtech_xc7a35t` | qmtech_xc7a35t | vivado | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, SPI Flash, Video Terminal, Video Framebuffer | included |
-| `qmtech_xc7k325t` | qmtech_daughterboard, qmtech_xc7k325t | vivado | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, SPI Flash, Video Terminal, Video Framebuffer, Video Colorbars | included |
+| `qmtech_xc7k325t` | qmtech_xc7k325t | vivado | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, SPI Flash, Video Terminal, Video Framebuffer, Video Colorbars | included |
 | `quicklogic_quickfeather` | quicklogic_quickfeather | f4pga | `default` | - | No default clock. |
 | `qwertyembedded_beaglewire` | qwertyembedded_beaglewire | icestorm | `50000000.0` | - | included |
 | `radiona_ulx3s` | radiona_ulx3s | trellis | `50000000.0` | SDCard, SPI SDCard, SPI Flash, Video Terminal, Video Framebuffer | included |
@@ -194,7 +195,7 @@ python3 .github/scripts/generate_board_inventory.py --write
 | `sipeed_tang_nano_9k` | sipeed_tang_nano_9k | gowin | `27000000.0` | SPI SDCard, Video Terminal, Video Framebuffer | included |
 | `sipeed_tang_primer` | sipeed_tang_primer | td | `24000000.0` | - | included |
 | `sipeed_tang_primer_20k` | sipeed_tang_primer_20k | gowin | `48000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, SPI Flash, Video Terminal | included |
-| `sipeed_tang_primer_25k` | sipeed_tang_primer_25k | gowin | `50000000.0` | SPI Flash | included |
+| `sipeed_tang_primer_25k` | sipeed_tang_primer_25k | gowin | `50000000.0` | SPI Flash, USB CDC-ACM | included |
 | `sitlinv_a_e115fb` | sitlinv_a_e115fb | quartus | `50000000.0` | - | included |
 | `sitlinv_stlv7325_v1` | sitlinv_stlv7325_v1 | - | `100000000.0` | Ethernet, Etherbone, SDCard, SPI SDCard, PCIe, SATA, Video Terminal, Video Framebuffer, Video Colorbars | included |
 | `sitlinv_stlv7325_v2` | sitlinv_stlv7325_v2 | - | `100000000.0` | Ethernet, SDCard, SPI SDCard, PCIe, SATA, Video Terminal, Video Framebuffer, Video Colorbars | included |
@@ -237,7 +238,7 @@ python3 .github/scripts/generate_board_inventory.py --write
 | `xilinx_alveo_u250` | xilinx_alveo_u250 | vivado | `125000000.0` | PCIe | included |
 | `xilinx_alveo_u280` | xilinx_alveo_u280 | vivado | `150000000.0` | PCIe | included |
 | `xilinx_kc705` | xilinx_kc705 | vivado | `125000000.0` | Ethernet, SPI Flash, PCIe, SATA | included |
-| `xilinx_kcu105` | xilinx_kcu105 | vivado | `125000000.0` | Ethernet, Etherbone, PCIe, SATA | included |
+| `xilinx_kcu105` | xilinx_kcu105 | vivado | `125000000.0` | Ethernet, Etherbone, SDCard, PCIe, SATA | included |
 | `xilinx_kcu116` | xilinx_kcu116 | vivado | `125000000.0` | Ethernet, Etherbone, PCIe, SATA | included |
 | `xilinx_kv260` | xilinx_kv260 | vivado | `100000000.0` | - | included |
 | `xilinx_sp605` | xilinx_sp605 | ise | `54000000.0` | Video Terminal, Video Framebuffer, Video Colorbars | included |
@@ -250,5 +251,5 @@ python3 .github/scripts/generate_board_inventory.py --write
 | `xilinx_zcu106` | xilinx_zcu106 | vivado | `125000000.0` | PCIe | included |
 | `xilinx_zcu216` | xilinx_zcu216 | vivado | `100000000.0` | - | included |
 | `xilinx_zybo_z7` | digilent_zybo_z7 | vivado | `125000000.0` | - | included |
-| `ypcb_00338_1p1` | ypcb_00338_1p1 | vivado | `125000000.0` | PCIe | included |
+| `ypcb_00338_1p1` | ypcb_00338_1p1 | vivado | `400000000.0 / 3` | PCIe | included |
 | `ztex213` | ztex213 | vivado | `100000000.0` | SDCard, SPI SDCard | included |

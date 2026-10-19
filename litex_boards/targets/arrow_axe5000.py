@@ -113,23 +113,8 @@ class BaseSoC(SoCCore):
 
         # Ethernet / Etherbone (Requires ziggybridge-mkr) ------------------------------------------
         if with_ethernet or with_etherbone:
-            from litex.build.generic_platform import Pins, Subsignal, IOStandard
-            def eth_lan8720_rmii_pmod_io(pmod):
-                # Lan8720 RMII PHY "PMOD": To be used as a PMOD, MDIO should be disconnected and TX1 connected to PMOD8 IO.
-                return [
-                    ("eth_rmii_clocks", 0,
-                        Subsignal("ref_clk", Pins(f"j7_8:6")),
-                        IOStandard("3.3-V LVCMOS"),
-                    ),
-                    ("eth_rmii", 0,
-                        Subsignal("rx_data", Pins(f"j7_8:5 j7_8:1")),
-                        Subsignal("crs_dv",  Pins(f"j7_8:2")),
-                        Subsignal("tx_en",   Pins(f"j7_8:4")),
-                        Subsignal("tx_data", Pins(f"j7_8:0 j7_8:7")),
-                        IOStandard("3.3-V LVCMOS")
-                    ),
-                ]
-            platform.add_extension(eth_lan8720_rmii_pmod_io("pmod_d"))
+            from litex_boards.extensions.pmod import PmodLAN8720
+            platform.add_extension(PmodLAN8720("j7_8", iostandard="3.3-V LVCMOS"))
 
             from liteeth.phy.rmii import LiteEthPHYRMII
             self.ethphy = LiteEthPHYRMII(

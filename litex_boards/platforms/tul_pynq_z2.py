@@ -6,6 +6,7 @@
 
 from litex.build.generic_platform import *
 from litex.build.xilinx import Xilinx7SeriesPlatform, VivadoProgrammer
+from litex_boards.extensions.pmod import PmodUSBUART
 
 # IOs ----------------------------------------------------------------------------------------------
 
@@ -64,15 +65,6 @@ _ps7_io = [
     ),
 ]
 
-_usb_uart_pmod_io = [
-    # USB-UART PMOD on JB:
-    # - https://store.digilentinc.com/pmod-usbuart-usb-to-uart-interface/
-    ("usb_uart", 0,
-        Subsignal("tx", Pins("pmodb:1")),
-        Subsignal("rx", Pins("pmodb:2")),
-        IOStandard("LVCMOS33")
-    ),
-]
 
 # Connectors ---------------------------------------------------------------------------------------
 
@@ -90,7 +82,7 @@ class Platform(Xilinx7SeriesPlatform):
     def __init__(self, toolchain="vivado"):
         Xilinx7SeriesPlatform.__init__(self, "xc7z020clg400-1", _io,  _connectors, toolchain=toolchain)
         self.add_extension(_ps7_io)
-        self.add_extension(_usb_uart_pmod_io)
+        self.add_extension(PmodUSBUART("pmodb")) # USB-UART Pmod on JB.
 
     def create_programmer(self):
         return VivadoProgrammer()
@@ -98,3 +90,14 @@ class Platform(Xilinx7SeriesPlatform):
     def do_finalize(self, fragment):
         Xilinx7SeriesPlatform.do_finalize(self, fragment)
         self.add_period_constraint(self.lookup_request("clk125", loose=True), 1e9/125e6)
+
+# Deprecated Pmod Helpers --------------------------------------------------------------------------
+# Kept for compatibility (emit a FutureWarning), use litex_boards.extensions.pmod modules directly instead.
+
+from litex_boards.extensions.pmod import PmodUSBUART
+from litex_boards.compat import deprecated_pmod_helpers
+
+__getattr__ = deprecated_pmod_helpers(__name__, {
+    "_usb_uart_pmod_io" : ('platform.add_extension(PmodUSBUART("pmodb"))',
+        PmodUSBUART("pmodb").get_io(Xilinx7SeriesPlatform)),
+})

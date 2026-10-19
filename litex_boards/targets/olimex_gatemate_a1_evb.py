@@ -12,12 +12,13 @@ from litex.gen import *
 
 from litex_boards.platforms import olimex_gatemate_a1_evb
 
+from litex_boards.extensions.pmod import PmodSDCard
+
 
 from litex.soc.cores.clock.colognechip import GateMatePLL
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 
-from litex.build.generic_platform import Pins
 
 from litex.soc.cores.led import LedChaser
 from litex.soc.cores.video import VideoVGAPHY
@@ -89,21 +90,8 @@ class BaseSoC(SoCCore):
 
         # Ethernet / Etherbone ---------------------------------------------------------------------
         if with_ethernet or with_etherbone:
-            from litex.build.generic_platform import Subsignal
-            def eth_lan8720_rmii_pmod_io(pmod):
-                # Lan8720 RMII PHY "PMOD": To be used as a PMOD, MDIO should be disconnected and TX1 connected to PMOD8 IO.
-                return [
-                    ("eth_rmii_clocks", 0,
-                        Subsignal("ref_clk", Pins(f"{pmod}:6")),
-                    ),
-                    ("eth_rmii", 0,
-                        Subsignal("rx_data", Pins(f"{pmod}:5 {pmod}:1")),
-                        Subsignal("crs_dv",  Pins(f"{pmod}:2")),
-                        Subsignal("tx_en",   Pins(f"{pmod}:4")),
-                        Subsignal("tx_data", Pins(f"{pmod}:0 {pmod}:7")),
-                    ),
-                ]
-            platform.add_extension(eth_lan8720_rmii_pmod_io("PMOD"))
+            from litex_boards.extensions.pmod import PmodLAN8720
+            platform.add_extension(PmodLAN8720("PMOD"))
 
             from liteeth.phy.rmii import LiteEthPHYRMII
             self.ethphy = LiteEthPHYRMII(
@@ -120,7 +108,8 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    from litex.build.parser import LiteXArgumentParser
+    from litex.build.parser           import LiteXArgumentParser
+    from litex_boards.extensions.pmod import add_pmod_args, add_pmods
     parser = LiteXArgumentParser(platform=olimex_gatemate_a1_evb.Platform, description="LiteX SoC on Olimex Gatemate A1 EVB")
     parser.add_target_argument("--sys-clk-freq",        default=24e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--with-video-terminal", action="store_true",      help="Enable Video Terminal (VGA).")
@@ -134,6 +123,7 @@ def main():
     parser.add_target_argument("--eth-dynamic-ip", action="store_true",     help="Enable dynamic Ethernet IP assignment.")
     parser.add_target_argument("--remote-ip",      default="192.168.1.100", help="Remote IP address of TFTP server.")
 
+    add_pmod_args(parser)
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -146,8 +136,9 @@ def main():
         eth_dynamic_ip      = args.eth_dynamic_ip,
         remote_ip           = args.remote_ip,
         **parser.soc_argdict)
+    add_pmods(soc, args.pmod)
 
-    soc.platform.add_extension(olimex_gatemate_a1_evb._pmods_io)
+    soc.platform.add_extension(PmodSDCard("PMOD"))
     if args.with_spi_sdcard:
         soc.add_spi_sdcard()
     if args.with_sdcard:

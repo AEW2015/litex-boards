@@ -148,7 +148,8 @@ class BaseSoC(SoCCore):
         if with_usb_host:
             self.usb_ohci = USBOHCI(platform, platform.request("usb_host"), usb_clk_freq=int(48e6))
             self.bus.add_slave("usb_ohci_ctrl", self.usb_ohci.wb_ctrl, region=SoCRegion(origin=self.mem_map["usb_ohci"], size=0x100000, cached=False))
-            self.dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
+            dma_bus = getattr(self, "dma_bus", self.bus)
+            dma_bus.add_master("usb_ohci_dma", master=self.usb_ohci.wb_dma)
             self.comb += self.cpu.interrupt[16].eq(self.usb_ohci.interrupt)
 
         # Ethernet ---------------------------------------------------------------------------------
@@ -163,21 +164,24 @@ class BaseSoC(SoCCore):
             self.add_ethernet(
                 name       = "ethmac",
                 phy        = self.ethphy,
-                phy_cd     = "ethphy_eth",
+                # PHY clock domains are prefixed only when several PHYs are present (ML1 v2).
+                phy_cd     = "ethphy_eth" if platform.revision == "v2" else "eth",
                 dynamic_ip = eth_dynamic_ip,
                 local_ip   = None if eth_dynamic_ip else eth_ip,
                 remote_ip  = remote_ip)
 
-            self.ethphy1 = LiteEthPHYRMII(
-                clock_pads=None,
-                pads = platform.request("eth", 1),
-                with_hw_init_reset=True,
-                refclk_cd="eth")
-            self.csr.add("ethphy1")
-            self.add_ethernet(
-                name   = "ethmac1",
-                phy    = self.ethphy1,
-                phy_cd = "ethphy1_eth")
+            # 2nd Ethernet port only available with ML1 v2.
+            if platform.revision == "v2":
+                self.ethphy1 = LiteEthPHYRMII(
+                    clock_pads=None,
+                    pads = platform.request("eth", 1),
+                    with_hw_init_reset=True,
+                    refclk_cd="eth")
+                self.csr.add("ethphy1")
+                self.add_ethernet(
+                    name   = "ethmac1",
+                    phy    = self.ethphy1,
+                    phy_cd = "ethphy1_eth")
 
 # Build --------------------------------------------------------------------------------------------
 
