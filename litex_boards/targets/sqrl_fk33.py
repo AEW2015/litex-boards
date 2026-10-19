@@ -28,6 +28,10 @@ from litex.soc.cores.ram.xilinx_usp_hbm2 import (
     usphbm2_channel_origins,
     usphbm2_window_end,
 )
+from litex.soc.cores.ram.xilinx_usp_hbm2_runtime import (
+    HBMRuntimeQuiesce,
+    WishboneAdmissionGate,
+)
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.integration.export import MockCSR
@@ -178,19 +182,23 @@ class BaseSoC(SoCCore):
                 # Four RV32 windows select eight groups of four native ports.
                 # AXILiteDecoder holds each route through its response, including
                 # when a selector write arrives while a request is outstanding.
-                # Change banks only after all four windows have completed
-                # their transactions; request buffers do not capture the bank.
+                # The runtime interposer gates each Wishbone root and drains all
+                # 32 native ports before software may change bank or retune HBM.
                 self.hbm_window = LiteXModule()
                 self.hbm_window.bank = CSRStorage(3, name="bank")
+                self.hbm_window.bank_effective = Signal(3, name="hbm_window_bank_effective")
+                self.hbm_window.bank_fault = Signal(name="hbm_window_bank_fault")
+                self.hbm_runtime = HBMRuntimeQuiesce(platform)
+                admission_gates = []
                 for channel in range(4):
                     host   = wishbone.Interface(data_width=32, adr_width=30)
                     gated  = wishbone.Interface(data_width=32, adr_width=30)
                     narrow = axi.AXILiteInterface(data_width=32, address_width=32)
                     native = axi.AXILiteInterface(data_width=32, address_width=33)
-                    # The existing watchdog supplies bounded errors while
-                    # READY is clear, without queuing a request in the bridge.
-                    self.comb += host.connect(gated, omit={"cyc"})
-                    self.comb += gated.cyc.eq(host.cyc & self.hbm.memory_ready)
+                    admission = WishboneAdmissionGate(host, gated,
+                        self.hbm.memory_ready, self.hbm_runtime.quiesce_request)
+                    admission_gates.append(admission)
+                    self.submodules += admission
                     self.submodules += axi.Wishbone2AXILite(gated, narrow)
                     converted = axi.AXILiteInterface(data_width=32, address_width=32)
                     for name in ("aw", "w", "ar"):
@@ -212,7 +220,7 @@ class BaseSoC(SoCCore):
                         local = axi.AXILiteInterface(data_width=32, address_width=33)
                         wide = axi.AXILiteInterface(data_width=256, address_width=33)
                         routed = axi.AXILiteInterface(data_width=256, address_width=33)
-                        ports.append((lambda address, bank=bank: self.hbm_window.bank.storage == bank, port))
+                        ports.append((lambda address, bank=bank: self.hbm_window.bank_effective == bank, port))
                         for name in ("aw", "w", "ar"):
                             self.comb += getattr(port, name).connect(getattr(local, name))
                         self.comb += local.b.connect(port.b)
@@ -237,7 +245,11 @@ class BaseSoC(SoCCore):
                             self.submodules += buffer
                             self.comb += response.connect(buffer.sink)
                             self.comb += buffer.source.connect(getattr(wide, name))
-                        self.submodules += axi.AXILite2AXI(routed, self.hbm.axi[4*bank + channel])
+                        native_channel = 4*bank + channel
+                        native_upstream = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
+                        self.hbm_runtime.add_port(native_channel, native_upstream,
+                            self.hbm.axi[native_channel], host_idle=admission.idle)
+                        self.submodules += axi.AXILite2AXI(routed, native_upstream)
                     self.submodules += axi.AXILiteDecoder(native, ports)
                     self.bus.add_slave(f"hbm{channel}", host,
                         SoCRegion(origin=hbm_origins[channel], size=0x1000_0000, cached=True))
@@ -248,6 +260,20 @@ class BaseSoC(SoCCore):
                 self.add_constant("HBM_WINDOW_BANKS", 8)
                 self.add_constant("HBM_MAIN_CHANNEL", 0)
                 self.add_constant("HBM_HIGH_BASE", hbm_high_base)
+                all_windows_idle = Signal(name="hbm_all_windows_idle")
+                self.comb += all_windows_idle.eq(Reduce("AND", [gate.idle for gate in admission_gates]))
+                bank_change = (self.hbm_window.bank.wr_stb &
+                    (self.hbm_window.bank.storage != self.hbm_window.bank_effective))
+                bank_change_safe = (all_windows_idle & self.hbm_runtime.all_drained &
+                    (self.hbm_runtime.error.status == 0) & ~self.hbm_window.bank_fault)
+                self.sync += If(bank_change,
+                    If(bank_change_safe,
+                        self.hbm_window.bank_effective.eq(self.hbm_window.bank.storage),
+                    ).Else(
+                        self.hbm_window.bank_fault.eq(1),
+                    ),
+                )
+                self.comb += self.hbm_runtime.external_fault.eq(self.hbm_window.bank_fault)
 
         # PCIe -------------------------------------------------------------------------------------
         if with_pcie:
@@ -270,7 +296,8 @@ class BaseSoC(SoCCore):
 
         if self.hbm_primitive:
             for name, location in (("ctrl", 0), ("hbm", 1), ("identifier_mem", 2),
-                    ("leds", 3), ("timer0", 4), ("uart", 5), ("hbm_control", 6), ("hbm_window", 7)):
+                    ("leds", 3), ("timer0", 4), ("uart", 5), ("hbm_control", 6),
+                    ("hbm_window", 7), ("hbm_runtime", 8)):
                 if name in self.csr.locs and self.csr.locs[name] != location:
                     raise ValueError(f"Primitive HBM requires CSR bank {name} at {location}")
                 self.csr.add(name, location, use_loc_if_exists=True)
