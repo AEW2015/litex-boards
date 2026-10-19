@@ -1,10 +1,11 @@
-/* Autonomous CPU APB cold initialization and bounded HBM transactions.
+/* Autonomous CPU APB cold initialization, destructive retuning and HBM tests.
  * The host writes mailbox.command=1 only after checking the board's PL
  * temperature. Firmware does not depend on a host APB initializer.
  */
 #include <stdint.h>
 
 typedef struct { uint32_t address, value; } reg_write;
+typedef struct { uint32_t mhz, pll_words[3], refresh_period_cycles; } clock_profile;
 #include "profile.h"
 
 typedef struct {
@@ -14,14 +15,18 @@ typedef struct {
     uint32_t bus_errors_before, bus_errors_after, hbm_mhz, sys_hz, byte_reads;
     uint32_t written_channels, checked_channels, selected_bank;
     uint32_t stress_rounds, stress_words, stress_completed;
+    uint32_t target_mhz, transition_count, contents_generation;
+    uint32_t runtime_status, drained_mask, runtime_error, command_result;
 } mailbox;
 static volatile mailbox *const mb = (volatile mailbox *)0x10000000u;
 static uint32_t phy06[2][8];
 
-enum { WAIT = 1, INITIALIZING = 2, READY = 3, TESTING = 4, STOPPED = 5 };
+enum { WAIT = 1, INITIALIZING = 2, READY = 3, TESTING = 4, STOPPED = 5, QUIESCING = 6 };
 enum { BAD_ABI = 1, APB_TIMEOUT = 2, APB_ERROR = 3, DFI_TIMEOUT = 4,
        CAL_TIMEOUT = 5, CAL_WINDOW = 6, DRIVE_CHANGED = 7, BAD_TEMP = 8,
-       TRIP = 9, COMMIT_FAILED = 10, MEMORY_ERROR = 11, BUS_ERROR = 12 };
+       TRIP = 9, COMMIT_FAILED = 10, MEMORY_ERROR = 11, BUS_ERROR = 12,
+       DRAIN_TIMEOUT = 13, DRAIN_ERROR = 14, INTERVAL_MODE = 15 };
+static const clock_profile *active_profile;
 
 static inline uint32_t rd(uint32_t address) { return *(volatile uint32_t *)address; }
 static inline void wr(uint32_t address, uint32_t value) {
@@ -40,7 +45,10 @@ static void mark(uint32_t phase, uint32_t stack, uint32_t region) {
 }
 static void fail(uint32_t reason) __attribute__((noreturn));
 static void fail(uint32_t reason) {
-    wr(HBM_CONTROL_BASE + 16, 16); /* BLOCK is a SYS-domain operation. */
+    /* A failed drain may still own transactions. Keep admission closed and
+     * allow their responses to retire without asserting native AXI reset. */
+    if (reason == DRAIN_ERROR || reason == DRAIN_TIMEOUT) wr(HBM_RUNTIME_BASE, 1);
+    else wr(HBM_CONTROL_BASE + 16, 16); /* BLOCK is a SYS-domain operation. */
     mb->failure = reason;
     mb->errors++;
     mb->ready_status = rd(HBM_CONTROL_BASE + 20);
@@ -107,11 +115,47 @@ static uint32_t temperature(uint32_t stack) {
     return temp;
 }
 static void refresh_temperatures(void) { check_trip(); temperature(0); temperature(1); }
-static void initialize(void) {
+static const clock_profile *find_profile(uint32_t mhz) {
+    for (uint32_t i = 0; i < CLOCK_PROFILE_COUNT; i++)
+        if (clock_profiles[i].mhz == mhz) return &clock_profiles[i];
+    return 0;
+}
+static void quiesce(void) {
+    mb->state = QUIESCING;
+    __asm__ volatile("fence iorw, iorw" ::: "memory");
+    wr(HBM_RUNTIME_BASE, 1);
+    uint32_t start = ticks();
+    for (;;) {
+        mb->runtime_error = rd(HBM_RUNTIME_BASE + 8);
+        mb->runtime_status = rd(HBM_RUNTIME_BASE + 12);
+        mb->drained_mask = rd(HBM_RUNTIME_BASE + 4);
+        if (mb->runtime_error || (mb->runtime_status & 4)) fail(DRAIN_ERROR);
+        if ((mb->runtime_status & 3) == 3 && mb->drained_mask == 0xffffffffu) return;
+        if ((uint32_t)(start - ticks()) >= 25000000u) fail(DRAIN_TIMEOUT);
+        check_trip();
+    }
+}
+static void resume(void) {
+    if (rd(HBM_RUNTIME_BASE + 8)) fail(DRAIN_ERROR);
+    wr(HBM_RUNTIME_BASE, 0);
+    mb->runtime_status = rd(HBM_RUNTIME_BASE + 12);
+    if (mb->runtime_status & 5) fail(DRAIN_ERROR);
+}
+static void initialize(const clock_profile *profile) {
+    quiesce();
     mb->state = INITIALIZING;
     mb->calibrated_mask = 0;
     wr(HBM_CONTROL_BASE + 16, 16);
     if (rd(HBM_CONTROL_BASE) != 0x4c48424d || rd(HBM_CONTROL_BASE + 4) != 1) fail(BAD_ABI);
+    /* These optional maximum-interval modes have no scaled policy here.
+     * Reject them before changing any PLL or memory-controller settings. */
+    static const uint32_t intervals[] = {0x10422c, 0x104324, 0x104328, 0x10432c};
+    for (uint32_t stack = 0; stack < 2; stack++)
+        for (uint32_t region = 0; region < 8; region++)
+            for (uint32_t i = 0; i < 4; i++)
+                if (apb(stack, region * 0x20000 + intervals[i], 0, 0)) fail(INTERVAL_MODE);
+    active_profile = profile;
+    mb->contents_generation++; /* All prior application buffers are invalid. */
     for (uint32_t stack = 0; stack < 2; stack++)
         for (uint32_t region = 0; region < 8; region++) {
             mark(1, stack, region);
@@ -122,11 +166,19 @@ static void initialize(void) {
         for (uint32_t region = 0; region < 8; region++) apb(stack, region * 0x20000 + 0x104000, 0, 1);
         delay_ms(1000);
         mark(3, stack, 0); table(stack, 0, ms_pre, MS_PRE_COUNT);
-        mark(4, stack, 0); table(stack, 0, pll, PLL_COUNT);
+        mark(4, stack, 0);
+        for (uint32_t i = 0; i < PLL_COUNT; i++)
+            apb(stack, pll[i].address, i < 3 ? profile->pll_words[i] : pll[i].value, 1);
+        for (uint32_t i = 0; i < 4; i++)
+            if (apb(stack, pll[i].address, 0, 0) != (i < 3 ? profile->pll_words[i] : pll[i].value)) fail(COMMIT_FAILED);
         mark(5, stack, 0); table(stack, 0, ms_post, MS_POST_COUNT);
         for (uint32_t region = 0; region < 8; region++) {
             mark(6, stack, region); table(stack, region * 0x20000, phy, PHY_COUNT);
-            mark(7, stack, region); table(stack, region * 0x20000, mc, MC_COUNT);
+            mark(7, stack, region);
+            for (uint32_t i = 0; i < MC_COUNT; i++)
+                apb(stack, region * 0x20000 + mc[i].address,
+                    mc[i].address == 0x1040cc ? profile->refresh_period_cycles : mc[i].value, 1);
+            if (apb(stack, region * 0x20000 + 0x1040cc, 0, 0) != profile->refresh_period_cycles) fail(COMMIT_FAILED);
         }
         for (uint32_t region = 0; region < 8; region++) {
             uint32_t offset = region * 0x20000;
@@ -154,6 +206,8 @@ static void initialize(void) {
     if (mb->calibrated_mask != 0xffff) fail(COMMIT_FAILED);
     wr(HBM_CONTROL_BASE + 16, 32);
     if (((rd(HBM_CONTROL_BASE + 20) >> 8) & 3) != 3) fail(COMMIT_FAILED);
+    mb->hbm_mhz = profile->mhz;
+    resume();
     mb->state = READY;
 }
 static uint32_t pattern(uint32_t channel, uint32_t offset, uint32_t word) {
@@ -287,14 +341,26 @@ int main(void) {
     wr(TIMER_BASE + 8, 0); wr(TIMER_BASE, 0xffffffffu);
     wr(TIMER_BASE + 4, 0xffffffffu); wr(TIMER_BASE + 28, 0); wr(TIMER_BASE + 8, 1);
     for (uint32_t i = 0; i < 128; i++) ((volatile uint32_t *)mb)[i] = 0;
-    mb->magic = 0x464b4842; mb->version = 2; mb->hbm_mhz = 1000; mb->sys_hz = 250000000;
+    mb->magic = 0x464b4842; mb->version = 3; mb->hbm_mhz = BOOT_HBM_MHZ; mb->sys_hz = 250000000;
+    active_profile = find_profile(BOOT_HBM_MHZ);
+    if (!active_profile) fail(BAD_ABI);
+    mb->target_mhz = BOOT_HBM_MHZ;
     mb->temp0 = 0xffffffffu; mb->temp1 = 0xffffffffu; mb->state = WAIT;
     for (;;) {
         uint32_t command = mb->command;
         if (command) mb->command = 0;
-        if (command == 1 && (mb->state == WAIT || mb->state == STOPPED)) { initialize(); transactions(); }
+        if (command == 1 && (mb->state == WAIT || mb->state == STOPPED)) { initialize(active_profile); transactions(); }
         if (command == 2 && mb->state == READY) transactions();
         if (command == 4 && mb->state == READY) stress();
+        if (command == 5 && (mb->state == READY || mb->state == STOPPED)) {
+            const clock_profile *profile = find_profile(mb->target_mhz);
+            mb->command_result = profile ? 0 : 1;
+            if (profile) {
+                initialize(profile);
+                mb->transition_count++;
+                transactions();
+            }
+        }
         if (command == 3) { wr(HBM_CONTROL_BASE + 16, 16); mb->state = STOPPED; }
         if (mb->state == READY) refresh_temperatures();
         mb->heartbeat++;

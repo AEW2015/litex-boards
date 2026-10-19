@@ -1,4 +1,4 @@
-"""Build the freestanding, fixed-clock FK33 processor demonstration."""
+"""Build the freestanding FK33 destructive-clock processor demonstration."""
 import argparse
 import hashlib
 import json
@@ -23,8 +23,17 @@ def build(output_dir, csr_json=None, profile_path=None):
         profile_path = Path(xilinx_usp_hbm2.__file__).with_suffix("") / "fk33_hbm_profile.json"
     profile_path = Path(profile_path).resolve()
     p = json.loads(profile_path.read_text(encoding="utf-8-sig"))
-    if tuple(p[k] for k in ("reference_mhz", "hbm_mhz", "stacks", "regions_per_stack", "region_stride")) != (200, 1000, 2, 8, 0x20000):
-        raise ValueError("Firmware requires the reviewed fixed 200/1000 MHz two-stack profile")
+    if tuple(p[k] for k in ("reference_mhz", "hbm_mhz", "stacks", "regions_per_stack", "region_stride")) != (200, 900, 2, 8, 0x20000):
+        raise ValueError("Firmware requires the reviewed 200/900 MHz two-stack boot profile")
+    profiles = p["destructive_clock_profiles"]
+    approved = {"800": ([0xa402, 0x6300, 0x1212], 3120), "900": ([0xa482, 0x9600, 0x1414], 3510)}
+    if set(profiles) != set(approved):
+        raise ValueError("Only reviewed 800/900 MHz destructive profiles are supported")
+    for mhz, (words, refresh) in approved.items():
+        if profiles[mhz]["pll_words"] != words or profiles[mhz]["refresh_period_cycles"] != refresh:
+            raise ValueError("Unreviewed runtime PLL/refresh values")
+    if [row["value"] for row in p["pll"][:3]] != profiles["900"]["pll_words"]:
+        raise ValueError("Boot PLL table differs from the 900 MHz runtime profile")
     for name, count in (("ms_pre", 11), ("pll", 16), ("ms_post", 3), ("phy", 9), ("mc", 42)):
         if len(p[name]) != count:
             raise ValueError(f"Incomplete {name} table")
@@ -38,16 +47,22 @@ def build(output_dir, csr_json=None, profile_path=None):
     layout = csr_json
     if isinstance(layout, (str, Path)):
         layout = json.loads(Path(layout).read_text(encoding="utf-8-sig"))
-    addresses = {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008, "HBM_WINDOW_BASE": 0xf0003800}
+    addresses = {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008, "HBM_WINDOW_BASE": 0xf0003800, "HBM_RUNTIME_BASE": 0xf0004000}
     if layout is not None:
         addresses = {"HBM_CONTROL_BASE": layout["csr_bases"]["hbm_control"],
                      "TIMER_BASE": layout["csr_bases"]["timer0"],
                      "CTRL_BUS_ERRORS": layout["csr_registers"]["ctrl_bus_errors"]["addr"],
-                     "HBM_WINDOW_BASE": layout["csr_bases"]["hbm_window"]}
-        if addresses != {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008, "HBM_WINDOW_BASE": 0xf0003800}:
+                     "HBM_WINDOW_BASE": layout["csr_bases"]["hbm_window"],
+                     "HBM_RUNTIME_BASE": layout["csr_bases"]["hbm_runtime"]}
+        if addresses != {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008, "HBM_WINDOW_BASE": 0xf0003800, "HBM_RUNTIME_BASE": 0xf0004000}:
             raise ValueError("Unqualified CPU CSR map")
     header = ["/* Generated from the source-bound, reviewed cold-init profile. */"]
     header.extend(f"#define {key} 0x{value:08x}u" for key, value in addresses.items())
+    header.extend([f"#define BOOT_HBM_MHZ {p['hbm_mhz']}u", f"#define CLOCK_PROFILE_COUNT {len(profiles)}u", "static const clock_profile clock_profiles[] = {"])
+    for mhz, profile in sorted(profiles.items(), key=lambda row: int(row[0])):
+        words = ", ".join(f"0x{word:08x}u" for word in profile["pll_words"])
+        header.append(f"    {{{int(mhz)}u, {{{words}}}, {profile['refresh_period_cycles']}u}},")
+    header.append("};")
     for key in ("calibration_status_mask", "calibration_status_expected", "calibration_result_mask", "calibration_result_expected"):
         header.append(f"#define {key.upper()} 0x{p[key]:08x}u")
     for name in ("ms_pre", "pll", "ms_post", "phy", "mc"):
