@@ -208,7 +208,7 @@ int main(void) {
     wr(TIMER_BASE + 8, 0); wr(TIMER_BASE, 0xffffffffu);
     wr(TIMER_BASE + 4, 0xffffffffu); wr(TIMER_BASE + 28, 0); wr(TIMER_BASE + 8, 1);
     for (uint32_t i = 0; i < 128; i++) ((volatile uint32_t *)mb)[i] = 0;
-    mb->magic = 0x464b4842; mb->version = 1; mb->hbm_mhz = 900; mb->sys_hz = 250000000;
+    mb->magic = 0x464b4842; mb->version = 1; mb->hbm_mhz = 1000; mb->sys_hz = 250000000;
     mb->temp0 = 0xffffffffu; mb->temp1 = 0xffffffffu; mb->state = WAIT;
     for (;;) {
         uint32_t command = mb->command;

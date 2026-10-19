@@ -48,7 +48,7 @@ def ensure_hbm_xci(url, hbm_xci=os.path.join("ip", "hbm", "hbm_0.xci")):
 # CRG ----------------------------------------------------------------------------------------------
 
 class _CRG(LiteXModule):
-    def __init__(self, platform, sys_clk_freq, with_hbm):
+    def __init__(self, platform, sys_clk_freq, with_hbm, hbm_ref_clk_freq=100e6):
         self.rst    = Signal()
         self.cd_sys = ClockDomain()
         if with_hbm:
@@ -64,7 +64,7 @@ class _CRG(LiteXModule):
         platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin) # Ignore sys_clk to pll.clkin path created by SoC's rst.
 
         if with_hbm:
-            pll.create_clkout(self.cd_hbm_ref, 100e6)
+            pll.create_clkout(self.cd_hbm_ref, hbm_ref_clk_freq)
             pll.create_clkout(self.cd_apb,     100e6)
 
 # BaseSoC ------------------------------------------------------------------------------------------
@@ -137,7 +137,8 @@ class BaseSoC(SoCCore):
                 hbm_strip_origin = True
 
         # CRG --------------------------------------------------------------------------------------
-        self.crg = _CRG(platform, sys_clk_freq, with_hbm)
+        self.crg = _CRG(platform, sys_clk_freq, with_hbm,
+            hbm_ref_clk_freq=200e6 if self.hbm_primitive else 100e6)
         if self.hbm_primitive:
             platform.toolchain.pre_placement_commands += [
                 "create_clock -name jtag_tck -period 100.0 [get_pins BSCANE2/INTERNAL_TCK]",

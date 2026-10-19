@@ -23,9 +23,9 @@ def build(output_dir, csr_json=None, profile_path=None):
         profile_path = Path(xilinx_usp_hbm2.__file__).with_suffix("") / "fk33_hbm_profile.json"
     profile_path = Path(profile_path).resolve()
     p = json.loads(profile_path.read_text(encoding="utf-8-sig"))
-    if tuple(p[k] for k in ("reference_mhz", "hbm_mhz", "stacks", "regions_per_stack", "region_stride")) != (100, 900, 2, 8, 0x20000):
-        raise ValueError("Firmware requires the reviewed fixed 100/900 MHz two-stack profile")
-    for name, count in (("ms_pre", 11), ("pll", 16), ("ms_post", 3), ("phy", 9), ("mc", 43)):
+    if tuple(p[k] for k in ("reference_mhz", "hbm_mhz", "stacks", "regions_per_stack", "region_stride")) != (200, 1000, 2, 8, 0x20000):
+        raise ValueError("Firmware requires the reviewed fixed 200/1000 MHz two-stack profile")
+    for name, count in (("ms_pre", 11), ("pll", 16), ("ms_post", 3), ("phy", 9), ("mc", 42)):
         if len(p[name]) != count:
             raise ValueError(f"Incomplete {name} table")
         for row in p[name]:
