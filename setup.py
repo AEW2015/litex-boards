@@ -34,5 +34,6 @@ setup(
         "Programming Language :: Python",
     ],
     packages                      = find_packages(exclude=['test*']),
-    package_data                  = {"litex_boards": ["prog/*.cfg"]},
+    package_data                  = {"litex_boards": ["prog/*.cfg", "software/fk33_hbm/*.py",
+        "software/fk33_hbm/*.c", "software/fk33_hbm/*.S", "software/fk33_hbm/*.ld"]},
 )
