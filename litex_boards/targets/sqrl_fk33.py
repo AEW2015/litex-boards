@@ -31,7 +31,7 @@ from litex.soc.cores.ram.xilinx_usp_hbm2 import (
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 from litex.soc.integration.export import MockCSR
-from litex.soc.interconnect import axi, csr_bus, wishbone
+from litex.soc.interconnect import axi, csr_bus, stream, wishbone
 from litex.soc.interconnect.csr import CSR, CSRStatus, CSRStorage
 from litex.soc.cores.led import LedChaser
 
@@ -193,12 +193,25 @@ class BaseSoC(SoCCore):
                     self.submodules += axi.Wishbone2AXILite(gated, narrow)
                     self.submodules += axi.AXILiteConverter(narrow, wide)
                     self.submodules += axi.AXILiteOffset(wide, native, offset=0)
+                    routed = axi.AXILiteInterface(data_width=256, address_width=33)
+                    for name in ("aw", "w", "ar"):
+                        self.comb += getattr(native, name).connect(getattr(routed, name))
+                    # Cut the native-port response mux from the CPU path.
+                    # Buffer payload/valid and ready so backpressure cannot
+                    # reconnect the long return path combinatorially.
+                    for name in ("b", "r"):
+                        response = getattr(routed, name)
+                        buffer = stream.Buffer(response.description,
+                            pipe_valid=True, pipe_ready=True)
+                        self.submodules += buffer
+                        self.comb += response.connect(buffer.sink)
+                        self.comb += buffer.source.connect(getattr(native, name))
                     ports = []
                     for bank in range(8):
                         port = axi.AXILiteInterface(data_width=256, address_width=33)
                         ports.append((lambda address, bank=bank: self.hbm_window.bank.storage == bank, port))
                         self.submodules += axi.AXILite2AXI(port, self.hbm.axi[4*bank + channel])
-                    self.submodules += axi.AXILiteDecoder(native, ports)
+                    self.submodules += axi.AXILiteDecoder(routed, ports)
                     self.bus.add_slave(f"hbm{channel}", host,
                         SoCRegion(origin=hbm_origins[channel], size=0x1000_0000, cached=True))
                 self.bus.add_region("main_ram", SoCRegion(
