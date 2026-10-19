@@ -186,8 +186,7 @@ class BaseSoC(SoCCore):
                     host   = wishbone.Interface(data_width=32, adr_width=30)
                     gated  = wishbone.Interface(data_width=32, adr_width=30)
                     narrow = axi.AXILiteInterface(data_width=32, address_width=32)
-                    wide   = axi.AXILiteInterface(data_width=256, address_width=32)
-                    native = axi.AXILiteInterface(data_width=256, address_width=33)
+                    native = axi.AXILiteInterface(data_width=32, address_width=33)
                     # The existing watchdog supplies bounded errors while
                     # READY is clear, without queuing a request in the bridge.
                     self.comb += host.connect(gated, omit={"cyc"})
@@ -197,41 +196,49 @@ class BaseSoC(SoCCore):
                     for name in ("aw", "w", "ar"):
                         self.comb += getattr(narrow, name).connect(getattr(converted, name))
                     self.comb += converted.b.connect(narrow.b)
-                    # Register the 256-to-32 lane mux before the shared CPU
-                    # return path; its selector otherwise follows live AR.
                     read_buffer = stream.Buffer(converted.r.description,
                         pipe_valid=True, pipe_ready=True)
                     self.submodules += read_buffer
                     self.comb += converted.r.connect(read_buffer.sink)
                     self.comb += read_buffer.source.connect(narrow.r)
-                    self.submodules += axi.AXILiteConverter(converted, wide)
-                    self.submodules += axi.AXILiteOffset(wide, native, offset=0)
-                    routed = axi.AXILiteInterface(data_width=256, address_width=33)
-                    # Register commands and data before the native-port fanout,
-                    # including ready, to bound the path back into the CPU bus.
-                    for name in ("aw", "w", "ar"):
-                        request = getattr(native, name)
-                        buffer = stream.Buffer(request.description,
-                            pipe_valid=True, pipe_ready=True)
-                        self.submodules += buffer
-                        self.comb += request.connect(buffer.sink)
-                        self.comb += buffer.source.connect(getattr(routed, name))
-                    # Cut the native-port response mux from the CPU path.
-                    # Buffer payload/valid and ready so backpressure cannot
-                    # reconnect the long return path combinatorially.
-                    for name in ("b", "r"):
-                        response = getattr(routed, name)
-                        buffer = stream.Buffer(response.description,
-                            pipe_valid=True, pipe_ready=True)
-                        self.submodules += buffer
-                        self.comb += response.connect(buffer.sink)
-                        self.comb += buffer.source.connect(getattr(native, name))
+                    self.submodules += axi.AXILiteOffset(converted, native, offset=0)
                     ports = []
                     for bank in range(8):
-                        port = axi.AXILiteInterface(data_width=256, address_width=33)
+                        # Route only 32-bit data across the bank switch. Width
+                        # conversion and registered native channels stay local
+                        # to each physical HBM port instead of broadcasting a
+                        # 256-bit payload to eight distant ports.
+                        port = axi.AXILiteInterface(data_width=32, address_width=33)
+                        local = axi.AXILiteInterface(data_width=32, address_width=33)
+                        wide = axi.AXILiteInterface(data_width=256, address_width=33)
+                        routed = axi.AXILiteInterface(data_width=256, address_width=33)
                         ports.append((lambda address, bank=bank: self.hbm_window.bank.storage == bank, port))
-                        self.submodules += axi.AXILite2AXI(port, self.hbm.axi[4*bank + channel])
-                    self.submodules += axi.AXILiteDecoder(routed, ports)
+                        for name in ("aw", "w", "ar"):
+                            self.comb += getattr(port, name).connect(getattr(local, name))
+                        self.comb += local.b.connect(port.b)
+                        # Register the local lane mux before the narrow bank mux.
+                        local_read = stream.Buffer(local.r.description,
+                            pipe_valid=True, pipe_ready=True)
+                        self.submodules += local_read
+                        self.comb += local.r.connect(local_read.sink)
+                        self.comb += local_read.source.connect(port.r)
+                        self.submodules += axi.AXILiteConverter(local, wide)
+                        for name in ("aw", "w", "ar"):
+                            request = getattr(wide, name)
+                            buffer = stream.Buffer(request.description,
+                                pipe_valid=True, pipe_ready=True)
+                            self.submodules += buffer
+                            self.comb += request.connect(buffer.sink)
+                            self.comb += buffer.source.connect(getattr(routed, name))
+                        for name in ("b", "r"):
+                            response = getattr(routed, name)
+                            buffer = stream.Buffer(response.description,
+                                pipe_valid=True, pipe_ready=True)
+                            self.submodules += buffer
+                            self.comb += response.connect(buffer.sink)
+                            self.comb += buffer.source.connect(getattr(wide, name))
+                        self.submodules += axi.AXILite2AXI(routed, self.hbm.axi[4*bank + channel])
+                    self.submodules += axi.AXILiteDecoder(native, ports)
                     self.bus.add_slave(f"hbm{channel}", host,
                         SoCRegion(origin=hbm_origins[channel], size=0x1000_0000, cached=True))
                 self.bus.add_region("main_ram", SoCRegion(
