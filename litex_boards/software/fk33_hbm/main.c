@@ -223,6 +223,15 @@ static void transactions(void) {
  * Each round writes all channels before checking any channel, so aliases
  * cannot pass by reading data immediately after writing the same location.
  */
+static uint32_t stress_stop(void) {
+    if (mb->command != 3) return 0;
+    mb->command = 0;
+    channel_base(0);
+    wr(HBM_CONTROL_BASE + 16, 16);
+    mb->ready_status = rd(HBM_CONTROL_BASE + 20);
+    mb->state = STOPPED;
+    return 1;
+}
 static void stress(void) {
     uint32_t rounds = mb->stress_rounds, words = mb->stress_words;
     if (rounds == 0 || rounds > 32 || words == 0 || words > 4096) fail(BAD_ABI);
@@ -236,7 +245,10 @@ static void stress(void) {
             uint32_t base = channel_base(channel);
             mark(13, channel >> 4, channel);
             for (uint32_t word = 0; word < words; word++) {
-                if ((word & 255u) == 0) refresh_temperatures();
+                if ((word & 255u) == 0) {
+                    if (stress_stop()) return;
+                    refresh_temperatures();
+                }
                 write_word(base + offset + 4*word, pattern(channel, offset, word));
             }
             mb->written_channels |= 1u << channel;
@@ -244,7 +256,10 @@ static void stress(void) {
         for (uint32_t channel = 0; channel < 32; channel++) {
             uint32_t base = channel_base(channel);
             for (uint32_t word = 0; word < words; word++) {
-                if ((word & 255u) == 0) refresh_temperatures();
+                if ((word & 255u) == 0) {
+                    if (stress_stop()) return;
+                    refresh_temperatures();
+                }
                 read_word(base + offset + 4*word, pattern(channel, offset, word));
             }
             mb->checked_channels |= 1u << channel;
