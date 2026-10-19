@@ -30,6 +30,9 @@ from litex.soc.cores.ram.xilinx_usp_hbm2 import (
 )
 from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
+from litex.soc.integration.export import MockCSR
+from litex.soc.interconnect import axi, csr_bus, wishbone
+from litex.soc.interconnect.csr import CSR, CSRStatus, CSRStorage
 from litex.soc.cores.led import LedChaser
 
 from litepcie.phy.usppciephy import USPHBMPCIEPHY
@@ -81,7 +84,31 @@ class BaseSoC(SoCCore):
         hbm_base              = USPHBM2_DEFAULT_BASE,
         hbm_high_base         = USPHBM2_HIGH_BASE,
         hbm_strip_origin      = False,
+        hbm_primitive_rtl     = None,
         **kwargs):
+        self.hbm_primitive_rtl = hbm_primitive_rtl
+        if hbm_primitive_rtl is not None:
+            if not with_hbm:
+                raise ValueError("--hbm-primitive-rtl requires --with-hbm")
+            if (sys_clk_freq != 250e6 or with_pcie or not with_led_chaser or
+                    tuple(parse_usphbm2_channels(hbm_channels)) != (0, 1, 2, 3) or
+                    hbm_main_channel != 0 or hbm_base != USPHBM2_DEFAULT_BASE or
+                    hbm_high_base != USPHBM2_HIGH_BASE or hbm_strip_origin):
+                raise ValueError("Primitive HBM requires the fixed 250 MHz, PC0-3 FK33 profile without PCIe")
+            if kwargs.get("cpu_type", "vexriscv") not in (None, "None"):
+                raise ValueError("Primitive HBM requires --cpu-type=None and software APB initialization")
+            required = {"bus_standard": "wishbone", "bus_data_width": 32,
+                "bus_address_width": 32, "bus_bursting": False, "bus_interconnect": "shared",
+                "bus_timeout": int(1e6),
+                "csr_data_width": 32, "csr_address_width": 14, "csr_paging": 0x800,
+                "with_ctrl": True, "with_timer": True, "with_uart": True}
+            for name, value in required.items():
+                if kwargs.get(name, value) != value:
+                    raise ValueError(f"Primitive HBM requires {name}={value!r}")
+            if kwargs.get("bus_addressing") not in (None, "word"):
+                raise ValueError("Primitive HBM requires word-addressed Wishbone")
+            if kwargs.get("uart_name", "serial") not in ("serial", "crossover"):
+                raise ValueError("Primitive HBM requires the crossover UART")
         platform = sqrl_fk33.Platform()
         if with_hbm:
             assert 225e6 <= sys_clk_freq <= 450e6
@@ -110,17 +137,42 @@ class BaseSoC(SoCCore):
         # HBM --------------------------------------------------------------------------------------
         if with_hbm:
             # Add HBM Core.
-            self.hbm = hbm = ClockDomainsRenamer({"axi": "sys"})(USPHBM2(platform))
-
-            ensure_hbm_xci("https://github.com/litex-hub/litex-boards/files/8178874/hbm_0.xci.txt")
-            add_usphbm2_pseudochannels(
-                soc              = self,
-                hbm              = hbm,
-                channels         = hbm_channels,
-                main_channel     = hbm_main_channel,
-                origins          = hbm_origins,
-                hbm_high_base    = hbm_high_base,
-                hbm_strip_origin = hbm_strip_origin)
+            if hbm_primitive_rtl is None:
+                self.hbm = hbm = ClockDomainsRenamer({"axi": "sys"})(USPHBM2(platform))
+                ensure_hbm_xci("https://github.com/litex-hub/litex-boards/files/8178874/hbm_0.xci.txt")
+                add_usphbm2_pseudochannels(
+                    soc              = self,
+                    hbm              = hbm,
+                    channels         = hbm_channels,
+                    main_channel     = hbm_main_channel,
+                    origins          = hbm_origins,
+                    hbm_high_base    = hbm_high_base,
+                    hbm_strip_origin = hbm_strip_origin)
+            else:
+                from litex.soc.cores.ram.xilinx_usp_hbm2 import PrimitiveHBM2
+                self.hbm = ClockDomainsRenamer({"axi": "sys"})(
+                    PrimitiveHBM2(platform, rtl_dir=hbm_primitive_rtl))
+                for channel in range(4):
+                    host   = wishbone.Interface(data_width=32, adr_width=30)
+                    gated  = wishbone.Interface(data_width=32, adr_width=30)
+                    narrow = axi.AXILiteInterface(data_width=32, address_width=32)
+                    wide   = axi.AXILiteInterface(data_width=256, address_width=32)
+                    native = axi.AXILiteInterface(data_width=256, address_width=33)
+                    # The existing watchdog supplies bounded errors while
+                    # READY is clear, without queuing a request in the bridge.
+                    self.comb += host.connect(gated, omit={"cyc"})
+                    self.comb += gated.cyc.eq(host.cyc & self.hbm.memory_ready)
+                    self.submodules += axi.Wishbone2AXILite(gated, narrow)
+                    self.submodules += axi.AXILiteConverter(narrow, wide)
+                    self.submodules += axi.AXILiteOffset(wide, native, offset=0)
+                    self.submodules += axi.AXILite2AXI(native, self.hbm.axi[channel])
+                    self.bus.add_slave(f"hbm{channel}", host,
+                        SoCRegion(origin=hbm_origins[channel], size=0x1000_0000, cached=True))
+                self.bus.add_region("main_ram", SoCRegion(
+                    origin=hbm_origins[0], size=0x1000_0000, linker=True))
+                self.add_constant("HBM_CHANNELS", 4)
+                self.add_constant("HBM_MAIN_CHANNEL", 0)
+                self.add_constant("HBM_HIGH_BASE", hbm_high_base)
 
         # PCIe -------------------------------------------------------------------------------------
         if with_pcie:
@@ -141,6 +193,41 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
+        if hbm_primitive_rtl is not None:
+            for name, location in (("ctrl", 0), ("hbm", 1), ("identifier_mem", 2),
+                    ("leds", 3), ("timer0", 4), ("uart", 5), ("hbm_control", 6)):
+                if name in self.csr.locs and self.csr.locs[name] != location:
+                    raise ValueError(f"Primitive HBM requires CSR bank {name} at {location}")
+                self.csr.add(name, location, use_loc_if_exists=True)
+
+    def _finalize_csr(self):
+        if self.hbm_primitive_rtl is None:
+            return super()._finalize_csr()
+        from litex.soc.cores.ram.xilinx_usp_hbm2 import MANAGEMENT_REGISTERS
+        # The control RTL already decodes bank 6. Attach its raw CSR bus to
+        # the normal interconnect, exporting metadata without another decoder.
+        if any(isinstance(x, (CSR, CSRStatus, CSRStorage)) for x in self.__dict__.values()):
+            raise ValueError("Primitive HBM raw CSR hook does not support top-level CSRs")
+        if (self.csr.data_width, self.csr.address_width, self.csr.alignment,
+                self.csr.paging, self.bus.regions["csr"].origin) != (32, 14, 32, 0x800, 0):
+            raise ValueError("Primitive HBM requires CSR32/14, 32-bit alignment, 0x800 paging and origin zero")
+        self.csr_bankarray = csr_bus.CSRBankArray(self,
+            address_map=self.csr.address_map, data_width=self.csr.data_width,
+            address_width=self.csr.address_width, alignment=self.csr.alignment,
+            paging=self.csr.paging, ordering=self.csr.ordering)
+        self.csr_interconnect = csr_bus.InterconnectShared(
+            list(self.csr.masters.values()), self.csr_bankarray.get_buses() + [self.hbm.control_bus])
+        for name, registers, address, bank in self.csr_bankarray.banks:
+            self.csr.add_region(name, SoCCSRRegion(address*0x800, 32, registers))
+        for name, memory, address, bank in self.csr_bankarray.srams:
+            self.csr.add_region(name + "_" + memory.name_override, SoCCSRRegion(address*0x800, 32, memory))
+        metadata = [MockCSR(name, 1, "ro" if access == "ro" else "rw", 32)
+                    for name, access in MANAGEMENT_REGISTERS]
+        self.csr.add_region("hbm_control", SoCCSRRegion(0x3000, 32, metadata))
+        self.csr.regions = dict(sorted(self.csr.regions.items(), key=lambda item: item[1].origin))
+        for name, constant in self.csr_bankarray.constants:
+            self.add_constant(name + "_" + constant.name, constant.value.value)
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
@@ -154,6 +241,7 @@ def main():
     parser.add_target_argument("--pcie-with-dma-status",  action="store_true", help="Enable PCIe DMA status CSRs.")
     parser.add_target_argument("--pcie-with-dma-monitor", action="store_true", help="Enable PCIe DMA monitor CSRs.")
     parser.add_target_argument("--with-hbm",              action="store_true", help="Use HBM2.")
+    parser.add_target_argument("--hbm-primitive-rtl", help="Directory containing external primitive/control RTL; requires the CPU-less fixed HBM profile.")
     parser.add_target_argument("--hbm-channels", default="0,1,2,3",         help="HBM channels to map (comma/range list or all).")
     parser.add_target_argument("--hbm-main-channel", default=0, type=int,   help="Mapped HBM channel used as main RAM.")
     parser.add_target_argument("--hbm-base",       default=USPHBM2_DEFAULT_BASE,
@@ -184,6 +272,7 @@ def main():
         hbm_base              = args.hbm_base,
         hbm_high_base         = args.hbm_high_base,
         hbm_strip_origin      = args.hbm_strip_origin,
+        hbm_primitive_rtl     = args.hbm_primitive_rtl,
         **parser.soc_argdict
     )
     builder = Builder(soc, **parser.builder_argdict)
