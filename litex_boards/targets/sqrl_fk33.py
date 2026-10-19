@@ -191,7 +191,18 @@ class BaseSoC(SoCCore):
                     self.comb += host.connect(gated, omit={"cyc"})
                     self.comb += gated.cyc.eq(host.cyc & self.hbm.memory_ready)
                     self.submodules += axi.Wishbone2AXILite(gated, narrow)
-                    self.submodules += axi.AXILiteConverter(narrow, wide)
+                    converted = axi.AXILiteInterface(data_width=32, address_width=32)
+                    for name in ("aw", "w", "ar"):
+                        self.comb += getattr(narrow, name).connect(getattr(converted, name))
+                    self.comb += converted.b.connect(narrow.b)
+                    # Register the 256-to-32 lane mux before the shared CPU
+                    # return path; its selector otherwise follows live AR.
+                    read_buffer = stream.Buffer(converted.r.description,
+                        pipe_valid=True, pipe_ready=True)
+                    self.submodules += read_buffer
+                    self.comb += converted.r.connect(read_buffer.sink)
+                    self.comb += read_buffer.source.connect(narrow.r)
+                    self.submodules += axi.AXILiteConverter(converted, wide)
                     self.submodules += axi.AXILiteOffset(wide, native, offset=0)
                     routed = axi.AXILiteInterface(data_width=256, address_width=33)
                     for name in ("aw", "w", "ar"):
