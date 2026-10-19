@@ -56,7 +56,9 @@ static void fail(uint32_t reason) {
     for (;;) { mb->heartbeat++; delay_ms(1); }
 }
 void firmware_trap(uint32_t cause, uint32_t pc) {
-    wr(HBM_CONTROL_BASE + 16, 16);
+    if (mb->state == QUIESCING || (rd(HBM_RUNTIME_BASE + 12) & 4))
+        wr(HBM_RUNTIME_BASE, 1);
+    else wr(HBM_CONTROL_BASE + 16, 16);
     mb->failure = 0x100u | cause;
     mb->errors++;
     mb->memory_address = pc;
@@ -225,6 +227,9 @@ static uint32_t channel_base(uint32_t channel) {
     __asm__ volatile("fence iorw, iorw" ::: "memory");
     wr(HBM_WINDOW_BASE, bank);
     if (rd(HBM_WINDOW_BASE) != bank) fail(BAD_ABI);
+    /* Storage echoes requests even if the guarded effective bank rejected
+     * one. Detect that fault before issuing any HBM memory transaction. */
+    if (rd(HBM_RUNTIME_BASE + 12) & 4) fail(DRAIN_ERROR);
     mb->selected_bank = bank;
     return 0x40000000u + (channel & 3u) * 0x10000000u;
 }
