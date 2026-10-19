@@ -141,7 +141,7 @@ static void resume(void) {
     if (rd(HBM_RUNTIME_BASE + 8)) fail(DRAIN_ERROR);
     wr(HBM_RUNTIME_BASE, 0);
     mb->runtime_status = rd(HBM_RUNTIME_BASE + 12);
-    if (mb->runtime_status & 5) fail(DRAIN_ERROR);
+    if (mb->runtime_status != 2) fail(DRAIN_ERROR);
 }
 static void initialize(const clock_profile *profile) {
     quiesce();
