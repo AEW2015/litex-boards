@@ -12,6 +12,8 @@ typedef struct {
     uint32_t calibrated_mask, writes, reads, errors, temp0, temp1, heartbeat, sequence;
     uint32_t signature, memory_address, expected, actual, byte_writes, ready_status;
     uint32_t bus_errors_before, bus_errors_after, hbm_mhz, sys_hz, byte_reads;
+    uint32_t written_channels, checked_channels, selected_bank;
+    uint32_t stress_rounds, stress_words, stress_completed;
 } mailbox;
 static volatile mailbox *const mb = (volatile mailbox *)0x10000000u;
 static uint32_t phy06[2][8];
@@ -164,23 +166,34 @@ static void read_word(uint32_t address, uint32_t expected) {
     if (actual != expected) fail(MEMORY_ERROR);
     mb->signature = (mb->signature << 1) ^ actual;
 }
+static uint32_t channel_base(uint32_t channel) {
+    uint32_t bank = channel >> 2;
+    __asm__ volatile("fence iorw, iorw" ::: "memory");
+    wr(HBM_WINDOW_BASE, bank);
+    if (rd(HBM_WINDOW_BASE) != bank) fail(BAD_ABI);
+    mb->selected_bank = bank;
+    return 0x40000000u + (channel & 3u) * 0x10000000u;
+}
 static void transactions(void) {
     static const uint32_t offsets[] = {0, 0x08000000, 0x0fffffe0, 0x00003ff0, 0x00020000};
     mb->state = TESTING; mb->sequence++; mb->writes = 0; mb->reads = 0;
     mb->byte_writes = 0; mb->byte_reads = 0; mb->signature = 0;
+    mb->written_channels = 0; mb->checked_channels = 0;
     mb->bus_errors_before = rd(CTRL_BUS_ERRORS);
     refresh_temperatures();
-    for (uint32_t channel = 0; channel < 4; channel++) {
-        mark(12, 0, channel);
-        uint32_t base = 0x40000000u + channel * 0x10000000u;
+    for (uint32_t channel = 0; channel < 32; channel++) {
+        mark(12, channel >> 4, channel);
+        refresh_temperatures();
+        uint32_t base = channel_base(channel);
         for (uint32_t sample = 0; sample < 5; sample++) {
             uint32_t words = sample < 3 ? 8 : (sample == 3 ? 32 : 64);
             for (uint32_t i = 0; i < words; i++) write_word(base + offsets[sample] + 4 * i, pattern(channel, offsets[sample], i));
         }
+        mb->written_channels |= 1u << channel;
     }
     /* All channel/address markers were written before reading any of them. */
-    for (uint32_t channel = 0; channel < 4; channel++) {
-        uint32_t base = 0x40000000u + channel * 0x10000000u;
+    for (uint32_t channel = 0; channel < 32; channel++) {
+        uint32_t base = channel_base(channel);
         refresh_temperatures();
         for (uint32_t sample = 0; sample < 5; sample++) {
             uint32_t words = sample < 3 ? 8 : (sample == 3 ? 32 : 64);
@@ -198,7 +211,47 @@ static void transactions(void) {
             uint32_t actual = *(volatile uint8_t *)(base + 0x3000 + lane); mb->byte_reads++;
             if (actual != value) { mb->actual = actual; mb->expected = value; fail(MEMORY_ERROR); }
         }
+        mb->checked_channels |= 1u << channel;
     }
+    channel_base(0);
+    mb->bus_errors_after = rd(CTRL_BUS_ERRORS);
+    if (mb->bus_errors_after != mb->bus_errors_before) fail(BUS_ERROR);
+    refresh_temperatures();
+    mb->state = READY;
+}
+/* Bounded sustained traffic. The host may repeat CMD4 while monitoring PL.
+ * Each round writes all channels before checking any channel, so aliases
+ * cannot pass by reading data immediately after writing the same location.
+ */
+static void stress(void) {
+    uint32_t rounds = mb->stress_rounds, words = mb->stress_words;
+    if (rounds == 0 || rounds > 32 || words == 0 || words > 4096) fail(BAD_ABI);
+    mb->state = TESTING; mb->sequence++; mb->stress_completed = 0;
+    mb->writes = 0; mb->reads = 0; mb->byte_writes = 0; mb->byte_reads = 0;
+    mb->signature = 0; mb->written_channels = 0; mb->checked_channels = 0;
+    mb->bus_errors_before = rd(CTRL_BUS_ERRORS);
+    for (uint32_t round = 0; round < rounds; round++) {
+        uint32_t offset = 0x00100000u + round * 0x4000u;
+        for (uint32_t channel = 0; channel < 32; channel++) {
+            uint32_t base = channel_base(channel);
+            mark(13, channel >> 4, channel);
+            for (uint32_t word = 0; word < words; word++) {
+                if ((word & 255u) == 0) refresh_temperatures();
+                write_word(base + offset + 4*word, pattern(channel, offset, word));
+            }
+            mb->written_channels |= 1u << channel;
+        }
+        for (uint32_t channel = 0; channel < 32; channel++) {
+            uint32_t base = channel_base(channel);
+            for (uint32_t word = 0; word < words; word++) {
+                if ((word & 255u) == 0) refresh_temperatures();
+                read_word(base + offset + 4*word, pattern(channel, offset, word));
+            }
+            mb->checked_channels |= 1u << channel;
+        }
+        mb->stress_completed++;
+    }
+    channel_base(0);
     mb->bus_errors_after = rd(CTRL_BUS_ERRORS);
     if (mb->bus_errors_after != mb->bus_errors_before) fail(BUS_ERROR);
     refresh_temperatures();
@@ -208,13 +261,14 @@ int main(void) {
     wr(TIMER_BASE + 8, 0); wr(TIMER_BASE, 0xffffffffu);
     wr(TIMER_BASE + 4, 0xffffffffu); wr(TIMER_BASE + 28, 0); wr(TIMER_BASE + 8, 1);
     for (uint32_t i = 0; i < 128; i++) ((volatile uint32_t *)mb)[i] = 0;
-    mb->magic = 0x464b4842; mb->version = 1; mb->hbm_mhz = 1000; mb->sys_hz = 250000000;
+    mb->magic = 0x464b4842; mb->version = 2; mb->hbm_mhz = 1000; mb->sys_hz = 250000000;
     mb->temp0 = 0xffffffffu; mb->temp1 = 0xffffffffu; mb->state = WAIT;
     for (;;) {
         uint32_t command = mb->command;
         if (command) mb->command = 0;
         if (command == 1 && (mb->state == WAIT || mb->state == STOPPED)) { initialize(); transactions(); }
         if (command == 2 && mb->state == READY) transactions();
+        if (command == 4 && mb->state == READY) stress();
         if (command == 3) { wr(HBM_CONTROL_BASE + 16, 16); mb->state = STOPPED; }
         if (mb->state == READY) refresh_temperatures();
         mb->heartbeat++;

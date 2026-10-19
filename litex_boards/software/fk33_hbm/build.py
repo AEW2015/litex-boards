@@ -38,12 +38,13 @@ def build(output_dir, csr_json=None, profile_path=None):
     layout = csr_json
     if isinstance(layout, (str, Path)):
         layout = json.loads(Path(layout).read_text(encoding="utf-8-sig"))
-    addresses = {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008}
+    addresses = {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008, "HBM_WINDOW_BASE": 0xf0003800}
     if layout is not None:
         addresses = {"HBM_CONTROL_BASE": layout["csr_bases"]["hbm_control"],
                      "TIMER_BASE": layout["csr_bases"]["timer0"],
-                     "CTRL_BUS_ERRORS": layout["csr_registers"]["ctrl_bus_errors"]["addr"]}
-        if addresses != {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008}:
+                     "CTRL_BUS_ERRORS": layout["csr_registers"]["ctrl_bus_errors"]["addr"],
+                     "HBM_WINDOW_BASE": layout["csr_bases"]["hbm_window"]}
+        if addresses != {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008, "HBM_WINDOW_BASE": 0xf0003800}:
             raise ValueError("Unqualified CPU CSR map")
     header = ["/* Generated from the source-bound, reviewed cold-init profile. */"]
     header.extend(f"#define {key} 0x{value:08x}u" for key, value in addresses.items())

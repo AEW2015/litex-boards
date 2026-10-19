@@ -175,6 +175,11 @@ class BaseSoC(SoCCore):
                 from litex.soc.cores.ram.xilinx_usp_hbm2 import PrimitiveHBM2
                 self.hbm = ClockDomainsRenamer({"axi": "sys"})(
                     PrimitiveHBM2(platform, rtl_dir=hbm_primitive_rtl))
+                # Four RV32 windows select eight groups of four native ports.
+                # AXILiteDecoder holds each route through its response, including
+                # when a selector write arrives while a request is outstanding.
+                self.hbm_window = LiteXModule()
+                self.hbm_window.bank = CSRStorage(3, name="bank")
                 for channel in range(4):
                     host   = wishbone.Interface(data_width=32, adr_width=30)
                     gated  = wishbone.Interface(data_width=32, adr_width=30)
@@ -188,12 +193,19 @@ class BaseSoC(SoCCore):
                     self.submodules += axi.Wishbone2AXILite(gated, narrow)
                     self.submodules += axi.AXILiteConverter(narrow, wide)
                     self.submodules += axi.AXILiteOffset(wide, native, offset=0)
-                    self.submodules += axi.AXILite2AXI(native, self.hbm.axi[channel])
+                    ports = []
+                    for bank in range(8):
+                        port = axi.AXILiteInterface(data_width=256, address_width=33)
+                        ports.append((lambda address, bank=bank: self.hbm_window.bank.storage == bank, port))
+                        self.submodules += axi.AXILite2AXI(port, self.hbm.axi[4*bank + channel])
+                    self.submodules += axi.AXILiteDecoder(native, ports)
                     self.bus.add_slave(f"hbm{channel}", host,
                         SoCRegion(origin=hbm_origins[channel], size=0x1000_0000, cached=True))
                 self.bus.add_region("main_ram", SoCRegion(
                     origin=hbm_origins[0], size=0x1000_0000, linker=True))
-                self.add_constant("HBM_CHANNELS", 4)
+                self.add_constant("HBM_CHANNELS", 32)
+                self.add_constant("HBM_WINDOW_CHANNELS", 4)
+                self.add_constant("HBM_WINDOW_BANKS", 8)
                 self.add_constant("HBM_MAIN_CHANNEL", 0)
                 self.add_constant("HBM_HIGH_BASE", hbm_high_base)
 
@@ -218,7 +230,7 @@ class BaseSoC(SoCCore):
 
         if self.hbm_primitive:
             for name, location in (("ctrl", 0), ("hbm", 1), ("identifier_mem", 2),
-                    ("leds", 3), ("timer0", 4), ("uart", 5), ("hbm_control", 6)):
+                    ("leds", 3), ("timer0", 4), ("uart", 5), ("hbm_control", 6), ("hbm_window", 7)):
                 if name in self.csr.locs and self.csr.locs[name] != location:
                     raise ValueError(f"Primitive HBM requires CSR bank {name} at {location}")
                 self.csr.add(name, location, use_loc_if_exists=True)
