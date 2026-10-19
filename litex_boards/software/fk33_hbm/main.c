@@ -291,6 +291,7 @@ static uint32_t stress_pattern(uint32_t channel, uint32_t offset, uint32_t word,
 static uint32_t stress_stop(void) {
     if (mb->command != 3) return 0;
     mb->command = 0;
+    quiesce();
     channel_base(0);
     wr(HBM_CONTROL_BASE + 16, 16);
     mb->ready_status = rd(HBM_CONTROL_BASE + 20);
@@ -361,7 +362,13 @@ int main(void) {
                 transactions();
             }
         }
-        if (command == 3) { wr(HBM_CONTROL_BASE + 16, 16); mb->state = STOPPED; }
+        if (command == 3) {
+            quiesce();
+            channel_base(0);
+            wr(HBM_CONTROL_BASE + 16, 16);
+            mb->ready_status = rd(HBM_CONTROL_BASE + 20);
+            mb->state = STOPPED;
+        }
         if (mb->state == READY) refresh_temperatures();
         mb->heartbeat++;
         delay_ms(10);
