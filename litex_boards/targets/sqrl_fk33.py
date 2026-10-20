@@ -90,8 +90,11 @@ class BaseSoC(SoCCore):
         hbm_strip_origin      = False,
         hbm_primitive         = False,
         hbm_primitive_rtl     = None,
+        hbm_bist              = False,
         **kwargs):
         self.hbm_primitive = hbm_primitive or hbm_primitive_rtl is not None
+        if hbm_bist and not self.hbm_primitive:
+            raise ValueError("HBM burst testing requires the primitive HBM profile")
         if self.hbm_primitive:
             if not with_hbm:
                 raise ValueError("Primitive HBM requires --with-hbm")
@@ -189,6 +192,18 @@ class BaseSoC(SoCCore):
                 self.hbm_window.bank_effective = Signal(3, name="hbm_window_bank_effective")
                 self.hbm_window.bank_fault = Signal(name="hbm_window_bank_fault")
                 self.hbm_runtime = HBMRuntimeQuiesce(platform)
+                all_windows_idle = Signal(name="hbm_all_windows_idle")
+                if hbm_bist:
+                    from litex.soc.cores.ram.xilinx_usp_hbm2_bist import HBMBurstBIST
+                    self.hbm_bist = HBMBurstBIST(platform,
+                        ready=self.hbm.memory_ready,
+                        quiesce_request=self.hbm_runtime.quiesce_request,
+                        all_drained=self.hbm_runtime.all_drained,
+                        host_idle=all_windows_idle)
+                    self.add_constant("HBM_BIST_CHANNELS", 32)
+                host_quiesce = self.hbm_runtime.quiesce_request
+                if hbm_bist:
+                    host_quiesce = host_quiesce | self.hbm_bist.owner
                 admission_gates = []
                 for channel in range(4):
                     host   = wishbone.Interface(data_width=32, adr_width=30)
@@ -196,7 +211,7 @@ class BaseSoC(SoCCore):
                     narrow = axi.AXILiteInterface(data_width=32, address_width=32)
                     native = axi.AXILiteInterface(data_width=32, address_width=33)
                     admission = WishboneAdmissionGate(host, gated,
-                        self.hbm.memory_ready, self.hbm_runtime.quiesce_request)
+                        self.hbm.memory_ready, host_quiesce)
                     admission_gates.append(admission)
                     self.submodules += admission
                     self.submodules += axi.Wishbone2AXILite(gated, narrow)
@@ -247,8 +262,15 @@ class BaseSoC(SoCCore):
                             self.comb += buffer.source.connect(getattr(wide, name))
                         native_channel = 4*bank + channel
                         native_upstream = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
-                        self.hbm_runtime.add_port(native_channel, native_upstream,
-                            self.hbm.axi[native_channel], host_idle=admission.idle)
+                        tracked_upstream = native_upstream
+                        port_idle = admission.idle
+                        if hbm_bist:
+                            tracked_upstream = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
+                            engine_idle = self.hbm_bist.add_port(native_channel,
+                                native_upstream, tracked_upstream)
+                            port_idle = port_idle & engine_idle
+                        self.hbm_runtime.add_port(native_channel, tracked_upstream,
+                            self.hbm.axi[native_channel], host_idle=port_idle)
                         self.submodules += axi.AXILite2AXI(routed, native_upstream)
                     self.submodules += axi.AXILiteDecoder(native, ports)
                     self.bus.add_slave(f"hbm{channel}", host,
@@ -260,12 +282,13 @@ class BaseSoC(SoCCore):
                 self.add_constant("HBM_WINDOW_BANKS", 8)
                 self.add_constant("HBM_MAIN_CHANNEL", 0)
                 self.add_constant("HBM_HIGH_BASE", hbm_high_base)
-                all_windows_idle = Signal(name="hbm_all_windows_idle")
                 self.comb += all_windows_idle.eq(Reduce("AND", [gate.idle for gate in admission_gates]))
                 bank_change = (self.hbm_window.bank.wr_stb &
                     (self.hbm_window.bank.storage != self.hbm_window.bank_effective))
                 bank_change_safe = (all_windows_idle & self.hbm_runtime.all_drained &
                     (self.hbm_runtime.error.status == 0) & ~self.hbm_window.bank_fault)
+                if hbm_bist:
+                    bank_change_safe = bank_change_safe & ~self.hbm_bist.owner
                 self.sync += If(bank_change,
                     If(bank_change_safe,
                         self.hbm_window.bank_effective.eq(self.hbm_window.bank.storage),
@@ -273,7 +296,10 @@ class BaseSoC(SoCCore):
                         self.hbm_window.bank_fault.eq(1),
                     ),
                 )
-                self.comb += self.hbm_runtime.external_fault.eq(self.hbm_window.bank_fault)
+                external_fault = self.hbm_window.bank_fault
+                if hbm_bist:
+                    external_fault = external_fault | (self.hbm_bist.error_mask != 0)
+                self.comb += self.hbm_runtime.external_fault.eq(external_fault)
 
         # PCIe -------------------------------------------------------------------------------------
         if with_pcie:
@@ -301,6 +327,8 @@ class BaseSoC(SoCCore):
                 if name in self.csr.locs and self.csr.locs[name] != location:
                     raise ValueError(f"Primitive HBM requires CSR bank {name} at {location}")
                 self.csr.add(name, location, use_loc_if_exists=True)
+            if hbm_bist:
+                self.csr.add("hbm_bist", 9, use_loc_if_exists=True)
 
     def _finalize_csr(self):
         if not self.hbm_primitive:
@@ -346,6 +374,7 @@ def main():
     parser.add_target_argument("--with-hbm",              action="store_true", help="Use HBM2.")
     parser.add_target_argument("--hbm-primitive", action="store_true", help="Use bundled primitive HBM and processor calibration firmware.")
     parser.add_target_argument("--hbm-primitive-rtl", help="Override the bundled primitive/control RTL directory.")
+    parser.add_target_argument("--hbm-bist", action="store_true", help="Add exclusive per-channel burst test masters and counters.")
     parser.add_target_argument("--hbm-channels", default="0,1,2,3",         help="HBM channels to map (comma/range list or all).")
     parser.add_target_argument("--hbm-main-channel", default=0, type=int,   help="Mapped HBM channel used as main RAM.")
     parser.add_target_argument("--hbm-base",       default=USPHBM2_DEFAULT_BASE,
@@ -378,6 +407,7 @@ def main():
         hbm_strip_origin      = args.hbm_strip_origin,
         hbm_primitive         = args.hbm_primitive,
         hbm_primitive_rtl     = args.hbm_primitive_rtl,
+        hbm_bist              = args.hbm_bist,
         **parser.soc_argdict
     )
     builder = Builder(soc, **parser.builder_argdict)
