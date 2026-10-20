@@ -191,7 +191,7 @@ class BaseSoC(SoCCore):
                 self.hbm_window.bank = CSRStorage(3, name="bank")
                 self.hbm_window.bank_effective = Signal(3, name="hbm_window_bank_effective")
                 self.hbm_window.bank_fault = Signal(name="hbm_window_bank_fault")
-                self.hbm_runtime = HBMRuntimeQuiesce(platform)
+                self.hbm_runtime = HBMRuntimeQuiesce(platform, registered_request=hbm_bist)
                 all_windows_idle = Signal(name="hbm_all_windows_idle")
                 if hbm_bist:
                     from litex.soc.cores.ram.xilinx_usp_hbm2_bist import HBMBurstBIST
