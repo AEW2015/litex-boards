@@ -330,6 +330,26 @@ class BaseSoC(SoCCore):
             if hbm_bist:
                 self.csr.add("hbm_bist", 9, use_loc_if_exists=True)
 
+    def _finalize_bus(self):
+        if not (self.hbm_primitive and hasattr(self, "hbm_bist")):
+            return super()._finalize_bus()
+        # The primitive-HBM BIST CSR bank is reached through the JTAG Wishbone
+        # master. Register this bridge to split the address/decode path before
+        # it reaches the CSR read mux. The CSR map remains unchanged.
+        csr_origin = self.mem_map.get("csr", None)
+        if csr_origin is None:
+            self.logger.error("CSR main-bus origin is not defined.")
+            raise SoCError()
+        self.add_csr_bridge(name="csr", origin=csr_origin, with_register=True)
+        self.bus.finalize()
+        if hasattr(self, "ctrl") and self.bus.timeout is not None:
+            if hasattr(self.ctrl, "bus_error") and hasattr(self.bus._interconnect, "timeout"):
+                self.comb += self.ctrl.bus_error.eq(self.bus._interconnect.timeout.error)
+        self.add_config("BUS_STANDARD",      self.bus.standard)
+        self.add_config("BUS_DATA_WIDTH",    self.bus.data_width)
+        self.add_config("BUS_ADDRESS_WIDTH", self.bus.address_width)
+        self.add_config("BUS_BURSTING",      int(self.bus.bursting))
+
     def _finalize_csr(self):
         if not self.hbm_primitive:
             return super()._finalize_csr()
