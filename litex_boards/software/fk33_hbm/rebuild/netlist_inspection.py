@@ -13,19 +13,22 @@ import subprocess
 RESET_CHAINS = {'sys_reset_sync': 'main_clkout0', 'apb_reset_sync': 'main_clkout2',
                 'apb_monitor_reset_sync': 'main_clkout2'}
 
+def expected_reset_chains(axi_domain=False):
+    return dict(RESET_CHAINS, **({'axi_domain_reset': 'main_clkout3'} if axi_domain else {}))
+
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def output_paths(evidence):
+def output_paths(evidence, axi_domain=False):
     return [evidence / name for name in (
         'implemented-hbm-properties.txt', 'implemented-clocks.txt',
         'implemented-reset-chains.txt', 'netlist-inspection-console.log',
-        *(f'implemented-reset-{name}-timing.rpt' for name in RESET_CHAINS))]
+        *(f'implemented-reset-{name}-timing.rpt' for name in expected_reset_chains(axi_domain)))]
 
 
-def query_tcl(checkpoint, evidence):
+def query_tcl(checkpoint, evidence, axi_domain=False):
     template = r'''set checkpoint {@@CHECKPOINT@@}
 puts "INSPECT_SELECTED_CHECKPOINT $checkpoint"
 open_checkpoint $checkpoint
@@ -94,12 +97,50 @@ puts HBM_RESET_SYNCHRONIZERS_VERIFIED
 puts HBM_NETLIST_INSPECTION_COMPLETE
 quit
 '''
+    if axi_domain:
+        # Identify the extra MMCM output reset by its physical clock and tags,
+        # rather than unstable Migen instance numbering. This remains distinct
+        # from the three management-control reset chains checked above.
+        axi_query = r'''
+set axi_stage0s {}
+foreach cell [get_cells -hier -filter {ars_ff1 == TRUE}] {
+    set pin [require_one [get_pins -of_objects $cell -filter {REF_PIN_NAME == C}] "AXI reset candidate clock pin"]
+    set clocks [get_clocks -of_objects $pin]
+    if {[llength $clocks] == 1 && [lindex $clocks 0] eq "main_clkout3"} {lappend axi_stage0s $cell}
+}
+set stage0 [require_one $axi_stage0s "AXI domain reset stage0"]
+set q0 [require_one [get_pins -of_objects $stage0 -filter {REF_PIN_NAME == Q}] "AXI reset Q0"]
+set sinks [get_pins -leaf -of_objects [get_nets -segments -of_objects $q0] -filter {REF_PIN_NAME == D}]
+set stage1 [require_one [get_cells -of_objects $sinks -filter {ars_ff2 == TRUE}] "AXI domain reset stage1"]
+foreach cell [list $stage0 $stage1] {
+    if {[get_property REF_NAME $cell] ne "FDPE" || ![true_attribute $cell ASYNC_REG]} {error "AXI reset lost FDPE/ASYNC_REG: $cell"}
+}
+if {![true_attribute $stage0 ars_ff1] || [true_attribute $stage0 ars_ff2] ||
+    ![true_attribute $stage1 ars_ff2] || [true_attribute $stage1 ars_ff1]} {error "AXI reset stage tags missing or swapped"}
+set clock0 [require_one [get_pins -of_objects $stage0 -filter {REF_PIN_NAME == C}] "AXI reset C0"]
+set clock1 [require_one [get_pins -of_objects $stage1 -filter {REF_PIN_NAME == C}] "AXI reset C1"]
+foreach pin [list $clock0 $clock1] {
+    if {[require_one [get_clocks -of_objects $pin] "AXI reset clock"] ne "main_clkout3"} {error "AXI reset clock mapping changed"}
+}
+set d1 [require_one [get_pins -of_objects $stage1 -filter {REF_PIN_NAME == D}] "AXI reset D1"]
+set pre0 [require_one [get_pins -of_objects $stage0 -filter {REF_PIN_NAME == PRE}] "AXI reset PRE0"]
+set pre1 [require_one [get_pins -of_objects $stage1 -filter {REF_PIN_NAME == PRE}] "AXI reset PRE1"]
+set path [require_one [get_timing_paths -from $clock0 -to $d1 -delay_type max -max_paths 1] "AXI reset max path"]
+set requirement [get_property REQUIREMENT $path]
+set slack [get_property SLACK $path]
+if {![string is double -strict $requirement] || abs($requirement - 2.0) > 0.001} {error "AXI reset lost 2ns bound: $requirement"}
+if {![string is double -strict $slack] || $slack < 0 || $slack > 100} {error "AXI reset timing invalid/failing: $slack"}
+report_timing -from $clock0 -to $d1 -delay_type max -max_paths 1 -input_pins -file {@@EVIDENCE@@/implemented-reset-axi_domain_reset-timing.rpt}
+puts $reset_out "RESET_CHAIN axi_domain_reset STAGE0=$stage0 STAGE1=$stage1 CLOCK=main_clkout3 REF0=FDPE REF1=FDPE ASYNC0=TRUE ASYNC1=TRUE ARS0=ars_ff1 ARS1=ars_ff2 PRE0=$pre0 PRE1=$pre1 DIRECT=1 REQUIREMENT_NS=$requirement SLACK_NS=$slack"
+'''
+        template = template.replace('close $reset_out', axi_query + '\nclose $reset_out')
     template = template.replace('report_timing -from $clock0 -to $d1 -delay_type max -max_paths 1 -input_pins -file {@@EVIDENCE@@/implemented-reset-PLACEHOLDER-timing.rpt}',
         'report_timing -from $clock0 -to $d1 -delay_type max -max_paths 1 -input_pins -file [file join {@@EVIDENCE@@} "implemented-reset-${chain}-timing.rpt"]')
     return template.replace('@@CHECKPOINT@@', checkpoint.as_posix()).replace('@@EVIDENCE@@', evidence.as_posix())
 
 
-def parse_reset_chains(path):
+def parse_reset_chains(path, axi_domain=False):
+    expected = expected_reset_chains(axi_domain)
     rows = []
     for line in path.read_text().splitlines():
         fields = line.split()
@@ -107,7 +148,7 @@ def parse_reset_chains(path):
             raise ValueError('Malformed native reset-chain row: ' + line)
         row = dict(item.split('=', 1) for item in fields[2:])
         name = fields[1]
-        if name not in RESET_CHAINS or row['CLOCK'] != RESET_CHAINS[name]:
+        if name not in expected or row['CLOCK'] != expected[name]:
             raise ValueError('Unexpected control reset chain/clock: ' + name)
         if (row['REF0'], row['REF1'], row['ASYNC0'], row['ASYNC1'], row['ARS0'], row['ARS1'], row['DIRECT']) != (
                 'FDPE', 'FDPE', 'TRUE', 'TRUE', 'ars_ff1', 'ars_ff2', '1'):
@@ -116,6 +157,6 @@ def parse_reset_chains(path):
             raise ValueError('Control reset interstage timing failed: ' + name)
         row['name'] = name
         rows.append(row)
-    if len(rows) != 3 or {row['name'] for row in rows} != set(RESET_CHAINS):
-        raise ValueError('Expected exactly three control reset chains')
+    if len(rows) != len(expected) or {row['name'] for row in rows} != set(expected):
+        raise ValueError('Unexpected reset-chain inventory: expected ' + str(sorted(expected)))
     return rows

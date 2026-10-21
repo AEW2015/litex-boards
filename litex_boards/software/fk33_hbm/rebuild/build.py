@@ -61,16 +61,19 @@ def executable(value):
     return path
 
 
-def generate(attempt):
+def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False):
     # Execute the checked-out board target rather than an unrelated installed copy.
     sys.path.insert(0, str(BOARDS))
     import litex
     core = Path(litex.__file__).resolve().parents[1]
     pinned = subprocess.check_output(['git', '-C', str(core), 'rev-parse', 'HEAD'], text=True).strip()
-    if pinned != CORE_COMMIT:
-        raise ValueError(f'Install the pinned LiteX commit {CORE_COMMIT}; found {pinned}')
+    if pinned != core_commit:
+        raise ValueError(f'Install the requested LiteX commit {core_commit}; found {pinned}')
     if subprocess.check_output(['git', '-C', str(core), 'status', '--porcelain'], text=True).strip():
-        raise ValueError('Pinned LiteX checkout must be clean')
+        raise ValueError('Requested LiteX checkout must be clean')
+    boards_commit = subprocess.check_output(['git', '-C', str(BOARDS), 'rev-parse', 'HEAD'], text=True).strip()
+    if subprocess.check_output(['git', '-C', str(BOARDS), 'status', '--porcelain'], text=True).strip():
+        raise ValueError('Boards checkout must be clean')
     args = ['sqrl_fk33', '--with-hbm', '--hbm-primitive', '--hbm-bist',
         '--sys-clk-freq', '250e6', '--cpu-type', 'vexriscv', '--cpu-variant', 'minimal',
         '--build', '--no-compile-gateware', '--output-dir', str(attempt/'output'),
@@ -79,8 +82,11 @@ def generate(attempt):
         '--vivado-route-directive', 'Explore',
         '--vivado-post-route-phys-opt-directive', 'AggressiveExplore',
         '--vivado-report-level', 'signoff']
+    if axi_domain:
+        args.append('--hbm-axi-domain')
     save(attempt/'generation-command.json', dict(python=sys.executable, args=args,
-        core=str(core), core_commit=pinned, boards=str(BOARDS),
+        core=str(core), core_commit=pinned, requested_core_commit=core_commit,
+        boards=str(BOARDS), boards_commit=boards_commit, hbm_axi_domain=axi_domain,
         python_version=sys.version, packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions()}))
     sys.argv = args
     runpy.run_module('litex_boards.targets.sqrl_fk33', run_name='__main__')
@@ -105,9 +111,12 @@ def generate(attempt):
     save(attempt/'generated-hashes.json', [binding(p) for p in sorted((attempt/'output').rglob('*')) if p.is_file()])
 
 
-def audit(attempt, stage):
+def audit(attempt, stage, axi_domain=False):
     from timing_audit import audit as run_audit
-    result = run_audit(attempt, stage=stage)
+    options = {'stage': stage}
+    if axi_domain:
+        options['contract_path'] = HERE/'timing-contract-axi-domain.json'
+    result = run_audit(attempt, **options)
     save(attempt/f'timing-audit-{stage}.json', result)
     if result['status'] != 'PASS':
         raise ValueError(f'{stage} timing audit failed: inspect timing-audit-{stage}.json')
@@ -145,7 +154,7 @@ def implement(attempt, vivado):
         save(attempt/'implementation-result.json', result)
 
 
-def inspect(attempt, vivado):
+def inspect(attempt, vivado, axi_domain=False):
     from netlist_inspection import query_tcl, parse_reset_chains, output_paths
     evidence = attempt/'inspection'
     evidence.mkdir(exist_ok=False)
@@ -155,13 +164,18 @@ def inspect(attempt, vivado):
     for path in (dcp, evidence):
         if any(c in path.as_posix() for c in '{}\n\r'):
             raise ValueError('Unsupported Tcl path characters')
-    query.write_text(query_tcl(dcp, evidence), encoding='utf-8')
+    inspection_tcl = query_tcl(dcp, evidence, axi_domain=axi_domain)
+    if axi_domain:
+        import gray_cdc
+        inspection_tcl = inspection_tcl.replace('puts HBM_NETLIST_INSPECTION_COMPLETE',
+            gray_cdc.query_tcl(evidence) + '\nputs HBM_NETLIST_INSPECTION_COMPLETE')
+    query.write_text(inspection_tcl, encoding='utf-8')
     command([vivado, '-mode', 'batch', '-source', query, '-log', evidence/'vivado.log',
         '-journal', evidence/'vivado.jou'], evidence, evidence/'netlist-inspection-console.log')
     text = (evidence/'netlist-inspection-console.log').read_text(errors='replace')
     if 'HBM_NETLIST_INSPECTION_COMPLETE' not in text or re.search(r'(?m)^\s*(?:ERROR:|CRITICAL WARNING:)', text):
         raise ValueError('Native netlist inspection did not complete cleanly')
-    chains = parse_reset_chains(evidence/'implemented-reset-chains.txt')
+    chains = parse_reset_chains(evidence/'implemented-reset-chains.txt', axi_domain=axi_domain)
     properties = (evidence/'implemented-hbm-properties.txt').read_text()
     rates = re.findall(r'^DATARATE\s*=\s*(\d+)\s*$', properties, re.M)
     all_rates = re.findall(r'^DATARATE(?:_\d+)?\s*=\s*(\d+)\s*$', properties, re.M)
@@ -170,7 +184,10 @@ def inspect(attempt, vivado):
     if sha(dcp) != before:
         raise ValueError('Read-only inspection changed the checkpoint')
     result = dict(status='PASS', checkpoint=binding(dcp), reset_chains=chains,
-        outputs=[binding(p) for p in output_paths(evidence)], datarate_mt_s=1800)
+        outputs=[binding(p) for p in output_paths(evidence, axi_domain=axi_domain)], datarate_mt_s=1800)
+    if axi_domain:
+        result['gray_cdc'] = gray_cdc.parse(evidence)
+        result['outputs'] += [binding(p) for p in gray_cdc.output_paths(evidence)]
     save(evidence/'result.json', result)
     return result
 
@@ -204,18 +221,33 @@ def main():
     parser.add_argument('--vivado', default=os.environ.get('FK33_VIVADO', 'vivado.bat' if os.name=='nt' else 'vivado'))
     parser.add_argument('--rapidwright-python', default=os.environ.get('FK33_RAPIDWRIGHT_PYTHON'))
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
+    parser.add_argument('--core-commit', default=CORE_COMMIT,
+        help='Required LiteX core HEAD (default: the reviewed baseline commit)')
+    parser.add_argument('--hbm-axi-domain', action='store_true',
+        help='Build the separate AXI clock domain and use its timing/reset contracts')
     parser.add_argument('--generate-only', action='store_true', help='Generate RTL/firmware and audit source constraints; no CAD or build PASS')
     parser.add_argument('--resume', action='store_true', help='Implement an unchanged GENERATED output; never retry a failed native build')
     args = parser.parse_args()
     attempt = args.output_dir.resolve()
     result = dict(status='FAIL', attempt=str(attempt), started_utc=datetime.now(timezone.utc).isoformat(),
         hardware_tested=False, published=False,
+        hbm_axi_domain=args.hbm_axi_domain, requested_core_commit=args.core_commit,
         scope='Portable build/timing/netlist/RapidWright checks. Local historical simulations and hardware campaign are separate evidence.')
     if args.generate_only and args.resume:
         parser.error('--generate-only and --resume are mutually exclusive')
     if args.resume:
         if load(attempt/'result.json')['status'] != 'GENERATED':
             parser.error('--resume accepts only an unchanged GENERATED attempt')
+        try:
+            generation = load(attempt/'generation-command.json')
+        except (OSError, ValueError) as error:
+            parser.error(f'--resume requires a readable generation-command.json: {error}')
+        recorded_axi_domain = generation.get('hbm_axi_domain', False)
+        recorded_core_commit = generation.get('requested_core_commit', generation.get('core_commit'))
+        if recorded_axi_domain != args.hbm_axi_domain:
+            parser.error('--resume HBM AXI-domain profile does not match generation-command.json')
+        if recorded_core_commit != args.core_commit:
+            parser.error('--resume core commit does not match generation-command.json; pass the original --core-commit')
     else:
         attempt.mkdir(parents=True, exist_ok=False)
     try:
@@ -242,8 +274,12 @@ def main():
             command([rw_python, '-B', HERE/'rapidwright_assist.py', '--check-environment'],
                     attempt, attempt/'rapidwright-environment.log', environment)
         if not args.resume:
-            command([sys.executable, '-B', __file__, '--generate-child', attempt], BOARDS, attempt/'generation.log')
-        audit(attempt, 'source')
+            child_args = [sys.executable, '-B', __file__, '--generate-child', attempt,
+                '--core-commit', args.core_commit]
+            if args.hbm_axi_domain:
+                child_args.append('--hbm-axi-domain')
+            command(child_args, BOARDS, attempt/'generation.log')
+        audit(attempt, 'source', axi_domain=args.hbm_axi_domain)
         if args.generate_only:
             result['status'] = 'GENERATED'
         else:
@@ -260,9 +296,9 @@ def main():
                     or len(physical.get('native_timing_paths', [])) != 400):
                 raise ValueError('RapidWright receipt lacks required routed pin/channel/path evidence')
             result['rapidwright'] = binding(attempt/'rapidwright/result.json')
-            result['timing'] = audit(attempt, 'final')['checks']['routed_sta']['detail']
+            result['timing'] = audit(attempt, 'final', axi_domain=args.hbm_axi_domain)['checks']['routed_sta']['detail']
             result['diagnostics'] = diagnostics(attempt)
-            result['inspection'] = inspect(attempt, vivado)
+            result['inspection'] = inspect(attempt, vivado, axi_domain=args.hbm_axi_domain)
             unchanged(load(attempt/'input-hashes.json'))
             result.update(status='BUILD_PASS', bitstream=binding(attempt/'output/gateware/sqrl_fk33.bit'))
             result['artifacts'] = [binding(attempt/path) for path in (
@@ -281,7 +317,12 @@ def main():
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 3 and sys.argv[1] == '--generate-child':
-        generate(Path(sys.argv[2]).resolve())
+    if len(sys.argv) >= 2 and sys.argv[1] == '--generate-child':
+        child = argparse.ArgumentParser(description='Internal RTL generation worker')
+        child.add_argument('--generate-child', required=True, type=Path)
+        child.add_argument('--core-commit', default=CORE_COMMIT)
+        child.add_argument('--hbm-axi-domain', action='store_true')
+        child_args = child.parse_args()
+        generate(child_args.generate_child.resolve(), child_args.core_commit, child_args.hbm_axi_domain)
     else:
         raise SystemExit(main())

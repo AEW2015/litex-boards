@@ -13,7 +13,7 @@ from pathlib import Path
 import re
 
 SCHEMA = "fk33-timing-constraint-audit-v1"
-TIMING_COMMAND = re.compile(r"^(?:create_(?:generated_)?clock|set_(?:false_path|max_delay|min_delay|multicycle_path|clock_groups|input_delay|output_delay|disable_timing|clock_uncertainty|clock_latency))\b")
+TIMING_COMMAND = re.compile(r"^(?:create_(?:generated_)?clock|set_(?:false_path|max_delay|min_delay|bus_skew|multicycle_path|clock_groups|input_delay|output_delay|disable_timing|clock_uncertainty|clock_latency))\b")
 
 
 def sha(path):
@@ -67,7 +67,16 @@ def audit(attempt, contract_path=None, stage="final"):
         need(period and 0 < float(period[1]) <= c["clocks"]["jtag_tck"]["maximum_period_ns"],
              "JTAG clock constraint does not cover15MHz cable envelope")
         need(jtag[0].endswith("[get_pins BSCANE2/INTERNAL_TCK]"), "JTAG source must be BSCAN TCK, not DRCK")
-        need(Counter(tc) == Counter([jtag[0], c["accepted_tcl_async_command"]]), "Unexpected Tcl timing exception/clock command")
+        accepted = [jtag[0], c["accepted_tcl_async_command"]]
+        if c.get("separate_axi_domain"):
+            gray = read(Path(__file__).with_name("gray-constraints.tcl")).replace("\r\n", "\n").strip()
+            normalized_tcl = tcl.replace("\r\n", "\n")
+            need(normalized_tcl.count(gray) == 1, "Generated Gray constraints differ from source or are duplicated")
+            need(normalized_tcl.index(jtag[0]) < normalized_tcl.index(gray) <
+                 normalized_tcl.index("place_design -directive"), "Gray constraints must follow clock creation and precede placement")
+            accepted += [norm(line) for line in gray.splitlines() if TIMING_COMMAND.match(line.strip())]
+            need("report_bus_skew -file sqrl_fk33_bus_skew.rpt" in tcl, "Missing routed Gray bus-skew report")
+        need(Counter(tc) == Counter(accepted), "Unexpected Tcl timing exception/clock command")
         return dict(xdc_timing_commands=commands, tcl_timing_commands=tc,
                     legacy_sys_parent_group_present=False, broadening=False)
 
@@ -96,16 +105,19 @@ def audit(attempt, contract_path=None, stage="final"):
         v = read(g / "sqrl_fk33.v")
         csr = json.loads(read(a / "output/csr.json"))
         need(csr["constants"]["config_clock_frequency"] == 250000000, "SYS frequency changed")
-        expected = {"CLKFBOUT_MULT_F":5, "DIVCLK_DIVIDE":1, "CLKOUT0_DIVIDE_F":4,
-                    "CLKOUT1_DIVIDE":5, "CLKOUT2_DIVIDE":10}
+        expected = c.get("mmcm_parameters", {
+            "CLKFBOUT_MULT_F":5, "DIVCLK_DIVIDE":1, "CLKOUT0_DIVIDE_F":4,
+            "CLKOUT1_DIVIDE":5, "CLKOUT2_DIVIDE":10})
         values = {}
         for key, wanted in expected.items():
             hits = re.findall(r"\." + key + r"\s*\(\s*\d+'d(\d+)\s*\)", v)
             need(hits == [str(wanted)], "MMCM parameter mismatch: " + key + "=" + str(hits))
             values[key] = wanted
-        for index in range(3):
+        for index in range(c.get("mmcm_output_count", 3)):
             need(re.search(r"\.CLKOUT"+str(index)+r"\s*\(main_clkout"+str(index)+r"\)",v), "Clock output mapping changed")
-        return dict(mmcm=values, sys_axi_mhz=250, hbm_ref_mhz=200, apb_mhz=100,
+        return dict(mmcm=values, sys_mhz=250, axi_mhz=250,
+                    separate_axi_domain=c.get("separate_axi_domain", False),
+                    hbm_ref_mhz=200, apb_mhz=100,
                     hbm_internal_pll_profiles_are_not_fabric_clocks=True)
 
     def completed():
@@ -151,8 +163,12 @@ def audit(attempt, contract_path=None, stage="final"):
         for (source,dest),line in rows.items():
             if source in related and dest in related:
                 need("Asynchronous" not in line and "Ignored" not in line, "Related clock pair cut: "+line)
-        for pair in (("main_clkout0","main_clkout2"),("main_clkout2","main_clkout0")):
-            need(pair in rows and "Timed" in rows[pair] or pair in rows and "Partial False Path" in rows[pair], "SYS/APB timed paths missing")
+        timed_pairs = c.get("required_timed_clock_pairs", [
+            ["main_clkout0", "main_clkout2"], ["main_clkout2", "main_clkout0"]])
+        for source, destination in timed_pairs:
+            pair = (source, destination)
+            need(pair in rows and ("Timed" in rows[pair] or "Partial False Path" in rows[pair]),
+                 "Related functional timed paths missing: " + str(pair))
         for pair in (("jtag_tck","main_clkout0"),("main_clkout0","jtag_tck")):
             need(pair in rows and "Asynchronous Groups" in rows[pair], "JTAG crossing not inventoried")
         return list(rows.values())
@@ -162,7 +178,19 @@ def audit(attempt, contract_path=None, stage="final"):
         positions = re.findall(r"^\s*(\d+)\s+",text,re.M)
         # After removing legacy group, XDC exceptions are positions2/3/4 and
         # the pre-placement JTAG clock+group are5/6, giving two group rows6.
-        need(positions == ["2","3","4","6","6"], "Unexpected native exception positions/inventory: "+str(positions))
+        if c.get("separate_axi_domain"):
+            # Native positions are assigned as each loop iteration creates an
+            # exception; do not identify their scope by a guessed position.
+            rows = [line for line in text.splitlines() if re.match(r"^\s*\d+\s+", line)]
+            gray_rows = [line for line in rows if "max=4" in line]
+            need(len(gray_rows) == 320, "Expected 320 native Gray max-delay exceptions")
+            need(len(rows) == 325, "Unexpected native exception count: " + str(len(rows)))
+            # datapath_only intentionally removes hold analysis on these
+            # first-stage CDC paths; the max bound itself must remain active.
+            need(all("overridden" not in line.lower() for line in gray_rows),
+                 "Gray max-delay exception overridden")
+        else:
+            need(positions == ["2","3","4","6","6"], "Unexpected native exception positions/inventory: "+str(positions))
         for marker in ("mr_ff == TRUE", "ars_ff1 == TRUE", "ars_ff2 == TRUE", "max=2", "jtag_tck"):
             need(marker in text, "Native exception missing expected object: "+marker)
         need(not re.search(r"\[get_clocks \{ main_clkout0 \}\].*\[get_clocks \{ clk200_p \}\]",text), "Legacy related-clock cut remains")
@@ -223,7 +251,7 @@ def audit(attempt, contract_path=None, stage="final"):
                 checks=checks,artifacts=list(artifacts.values()),limitations=[
                 "No CAD/DCP/hardware operation. Source stage does not claim native timing closure.",
                 "Known LED and BSCAN/TDI external timing boundaries remain explicitly untimed; report is not universal timing/CDC signoff.",
-                "SYS/APB common-MMCM crossings retain real timing; no clock relaxation or added exceptions.",
+                "Common-MMCM functional crossings retain real timing; no blanket asynchronous groups for SYS/APB/AXI.",
                 "RapidWright physical analysis cannot guarantee closure; native route/STA and independent hardware gates remain mandatory."])
 
 

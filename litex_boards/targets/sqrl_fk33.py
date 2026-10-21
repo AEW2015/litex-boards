@@ -13,8 +13,10 @@
 
 import os
 import math
+from pathlib import Path
 
 from migen import *
+from migen.genlib.cdc import MultiReg
 
 from litex.gen import *
 
@@ -30,6 +32,7 @@ from litex.soc.cores.ram.xilinx_usp_hbm2 import (
     usphbm2_window_end,
 )
 from litex.soc.cores.ram.xilinx_usp_hbm2_runtime import (
+    HBMClockMailbox,
     HBMRuntimeQuiesce,
     WishboneAdmissionGate,
 )
@@ -76,12 +79,14 @@ class _HBMResetRequest(LiteXModule):
 
 class _CRG(LiteXModule):
     def __init__(self, platform, sys_clk_freq, with_hbm, hbm_ref_clk_freq=100e6,
-            strict_timing=False):
+            strict_timing=False, hbm_axi_domain=False):
         self.rst    = Signal()
         self.cd_sys = ClockDomain()
         if with_hbm:
             self.cd_hbm_ref = ClockDomain()
             self.cd_apb     = ClockDomain()
+            if hbm_axi_domain:
+                self.cd_axi = ClockDomain()
 
         # # #
 
@@ -99,8 +104,117 @@ class _CRG(LiteXModule):
         if with_hbm:
             pll.create_clkout(self.cd_hbm_ref, hbm_ref_clk_freq)
             pll.create_clkout(self.cd_apb,     100e6)
+            if hbm_axi_domain:
+                # Preserve SYS/ref/APB CLKOUT0/1/2 assignments. This output is
+                # independently reset-synchronized by USPMMCM.create_clkout.
+                pll.create_clkout(self.cd_axi, 250e6)
 
 # BaseSoC ------------------------------------------------------------------------------------------
+
+class HBMHostDrainBarrier(LiteXModule):
+    """Acknowledge the current close generation after all SYS work retires.
+
+    A synchronized idle level can remain high from the previous operation.
+    The command token and runtime generation prevent a new owner or STOP
+    request from consuming that old acknowledgment.
+    """
+    def __init__(self, admission_closed, host_idle, command_token, generation):
+        self.idle_native = Signal()
+        self.observed_idle_native = Signal()
+        self.token_native = Signal()
+        self.generation_native = Signal(32)
+        level = Signal()
+        self.sync += level.eq(admission_closed & host_idle)
+        self.specials += MultiReg(level, self.idle_native, "axi")
+        # Open-admission idle observation remains distinct from the tokenized
+        # close acknowledgment used for ownership and STOP authorization.
+        observed_idle = Signal()
+        self.sync += observed_idle.eq(host_idle)
+        self.specials += MultiReg(observed_idle, self.observed_idle_native, "axi")
+        self.mailbox = mailbox = HBMClockMailbox(33, "sys", "axi")
+        sent = Signal(33)
+        valid = Signal()
+        value = Cat(command_token, generation)
+        self.comb += [
+            mailbox.data.eq(value),
+            mailbox.send.eq(admission_closed & host_idle &
+                (~valid | (sent != value))),
+            self.token_native.eq(mailbox.output[0]),
+            self.generation_native.eq(mailbox.output[1:]),
+        ]
+        self.sync += If(mailbox.send & ~mailbox.busy,
+            sent.eq(value), valid.eq(1))
+
+class HBMCPUTransactionLatch(LiteXModule):
+    """Finish an admitted CPU operation even if its Wishbone master times out.
+
+    The AXI-Lite bridge reads Wishbone payload throughout independent AW/W
+    acceptance. Hold that payload and CYC until its terminal response; an
+    abandoned operation must never acknowledge a subsequent Wishbone cycle.
+    """
+    def __init__(self, master, slave):
+        self.active = Signal()
+        self.idle = Signal()
+        abandoned = Signal()
+        blocked = Signal()
+        address = Signal.like(master.adr)
+        data = Signal.like(master.dat_w)
+        select = Signal.like(master.sel)
+        write = Signal()
+        self.comb += [
+            slave.adr.eq(address), slave.dat_w.eq(data), slave.sel.eq(select),
+            slave.we.eq(write), slave.cyc.eq(self.active), slave.stb.eq(self.active),
+            master.dat_r.eq(slave.dat_r),
+            master.ack.eq(slave.ack & self.active & ~abandoned & master.cyc),
+            master.err.eq(slave.err & self.active & ~abandoned & master.cyc),
+            self.idle.eq(~self.active),
+        ]
+        self.sync += [
+            If(~master.cyc, blocked.eq(0)),
+            If(self.active,
+                If(~master.cyc, abandoned.eq(1)),
+                If(slave.ack | slave.err,
+                    self.active.eq(0),
+                    # A newer cycle may already have arrived while the old
+                    # response was outstanding. Require its withdrawal too.
+                    If(abandoned & master.cyc, blocked.eq(1)),
+                ),
+            ).Elif(master.cyc & master.stb & ~blocked,
+                self.active.eq(1), abandoned.eq(0),
+                address.eq(master.adr), data.eq(master.dat_w),
+                select.eq(master.sel), write.eq(master.we),
+            ),
+        ]
+
+
+class HBMCPUWindowCDC(LiteXModule):
+    """Narrow per-port CDC with SYS-side terminal-response accounting.
+
+    Counts extend through the return FIFOs, not just native AXI completion.
+    Separate AW/W counts retain half-writes across STOP and arbitrary channel
+    skew. One CPU window permits at most one read and one write outstanding.
+    """
+    def __init__(self, master, slave, gray_bus_prefix=None):
+        self.idle = Signal()
+        self.fault = Signal()
+        self.crossing = axi.AXILiteClockDomainCrossing(master, slave,
+            cd_from="sys", cd_to="axi", gray_bus_prefix=gray_bus_prefix)
+        pending = [Signal(4, name=f"hbm_cdc_{name}_pending")
+            for name in ("aw", "w", "ar")]
+        self.pending = pending
+        self.sync += [
+            If((getattr(master, name).valid & getattr(master, name).ready) !=
+                    (getattr(master, response).valid & getattr(master, response).ready),
+                If(getattr(master, name).valid & getattr(master, name).ready,
+                    If(count == 15, self.fault.eq(1)).Else(count.eq(count + 1)),
+                ).Else(
+                    If(count == 0, self.fault.eq(1)).Else(count.eq(count - 1)),
+                ),
+            ) for name, response, count in zip(("aw", "w", "ar"), ("b", "b", "r"), pending)
+        ]
+        self.comb += self.idle.eq(~self.fault &
+            (Cat(*pending) == 0) & ~master.aw.valid & ~master.w.valid &
+            ~master.ar.valid & ~master.b.valid & ~master.r.valid)
 
 class HBMCPUWindowPipeline(LiteXModule):
     """BIST-aware narrow AXI-Lite window boundary with idle accounting."""
@@ -188,8 +302,12 @@ class BaseSoC(SoCCore):
         hbm_primitive         = False,
         hbm_primitive_rtl     = None,
         hbm_bist              = False,
+        hbm_axi_domain        = False,
         **kwargs):
         self.hbm_primitive = hbm_primitive or hbm_primitive_rtl is not None
+        self.hbm_axi_domain = bool(hbm_axi_domain)
+        if hbm_axi_domain and not (self.hbm_primitive and hbm_bist):
+            raise ValueError("Separate HBM AXI domain requires primitive HBM and BIST")
         if hbm_bist and not self.hbm_primitive:
             raise ValueError("HBM burst testing requires the primitive HBM profile")
         if self.hbm_primitive:
@@ -243,7 +361,7 @@ class BaseSoC(SoCCore):
         # CRG --------------------------------------------------------------------------------------
         self.crg = _CRG(platform, sys_clk_freq, with_hbm,
             hbm_ref_clk_freq=200e6 if self.hbm_primitive else 100e6,
-            strict_timing=self.hbm_primitive)
+            strict_timing=self.hbm_primitive, hbm_axi_domain=hbm_axi_domain)
         if self.hbm_primitive:
             platform.toolchain.pre_placement_commands += [
                 "create_clock -name jtag_tck -period 66.666667 [get_pins BSCANE2/INTERNAL_TCK]",
@@ -254,6 +372,14 @@ class BaseSoC(SoCCore):
                 "report_cdc -details -file {build_name}_cdc.rpt",
                 "report_clock_interaction -file {build_name}_clock_interaction.rpt",
             ]
+            if hbm_axi_domain:
+                gray_constraints = (Path(__file__).resolve().parents[1] / "software" /
+                    "fk33_hbm" / "rebuild" / "gray-constraints.tcl").read_text()
+                # Vivado command templates expand braces with str.format.
+                platform.toolchain.pre_placement_commands.append(
+                    gray_constraints.replace("{", "{{").replace("}", "}}"))
+                platform.toolchain.additional_commands.append(
+                    "report_bus_skew -file {build_name}_bus_skew.rpt")
 
         # SoCCore ----------------------------------------------------------------------------------
         if kwargs.get("uart_name", "serial") == "serial":
@@ -278,8 +404,9 @@ class BaseSoC(SoCCore):
                     hbm_strip_origin = hbm_strip_origin)
             else:
                 from litex.soc.cores.ram.xilinx_usp_hbm2 import PrimitiveHBM2
-                self.hbm = ClockDomainsRenamer({"axi": "sys"})(
-                    PrimitiveHBM2(platform, rtl_dir=hbm_primitive_rtl))
+                hbm_core = PrimitiveHBM2(platform, rtl_dir=hbm_primitive_rtl)
+                self.hbm = hbm_core if hbm_axi_domain else ClockDomainsRenamer({"axi": "sys"})(hbm_core)
+                axi_domain = "axi" if hbm_axi_domain else "sys"
                 # Four RV32 windows select eight groups of four native ports.
                 # AXILiteDecoder holds each route through its response, including
                 # when a selector write arrives while a request is outstanding.
@@ -289,22 +416,46 @@ class BaseSoC(SoCCore):
                 self.hbm_window.bank = CSRStorage(3, name="bank")
                 self.hbm_window.bank_effective = Signal(3, name="hbm_window_bank_effective")
                 self.hbm_window.bank_fault = Signal(name="hbm_window_bank_fault")
-                self.hbm_runtime = HBMRuntimeQuiesce(platform,
-                    registered_request=hbm_bist, registered_completions=hbm_bist)
                 all_windows_idle = Signal(name="hbm_all_windows_idle")
+                self.hbm_runtime = HBMRuntimeQuiesce(platform,
+                    registered_request=hbm_bist, registered_completions=hbm_bist,
+                    clock_domain=axi_domain,
+                    sys_host_idle=all_windows_idle if hbm_axi_domain else None)
+                host_idle_axi = Signal(name="hbm_host_admission_closed_and_idle_axi")
+                observed_idle_axi = Signal(name="hbm_host_observed_idle_axi")
                 if hbm_bist:
                     from litex.soc.cores.ram.xilinx_usp_hbm2_bist import HBMBurstBIST
                     self.hbm_bist = HBMBurstBIST(platform,
-                        ready=self.hbm.memory_ready,
-                        quiesce_request=self.hbm_runtime.quiesce_request,
-                        all_drained=self.hbm_runtime.all_drained,
-                        host_idle=all_windows_idle)
+                        ready=self.hbm.memory_ready_axi if hbm_axi_domain else self.hbm.memory_ready,
+                        quiesce_request=self.hbm_runtime.native_quiesce_request,
+                        all_drained=self.hbm_runtime.native_all_drained,
+                        host_idle=host_idle_axi if hbm_axi_domain else all_windows_idle,
+                        clock_domain=axi_domain)
                     self.add_constant("HBM_BIST_CHANNELS", 32)
                 host_quiesce = self.hbm_runtime.quiesce_request
                 if hbm_bist:
-                    host_quiesce = host_quiesce | self.hbm_bist.owner
+                    host_quiesce = host_quiesce | self.hbm_bist.owner_sys
+                    if hbm_axi_domain:
+                        host_quiesce = host_quiesce | self.hbm_bist.admission_block_sys
+                if hbm_axi_domain:
+                    # Roundtrip barrier: stale native idle is insufficient.
+                    # This level only rises after SYS admission has closed and
+                    # every accepted request AND returned response has retired.
+                    self.hbm_host_barrier = HBMHostDrainBarrier(host_quiesce,
+                        all_windows_idle, self.hbm_bist.command_token_sys,
+                        self.hbm_runtime.request_generation_sys)
+                    self.comb += [
+                        host_idle_axi.eq(self.hbm_host_barrier.idle_native),
+                        observed_idle_axi.eq(self.hbm_host_barrier.observed_idle_native),
+                        self.hbm_bist.host_barrier_token_native.eq(
+                            self.hbm_host_barrier.token_native),
+                        self.hbm_runtime.host_barrier_generation_native.eq(
+                            self.hbm_host_barrier.generation_native),
+                    ]
                 admission_gates = []
                 window_idle_signals = []
+                cdc_idle_signals = []
+                cdc_fault_signals = []
                 for channel in range(4):
                     host   = wishbone.Interface(data_width=32, adr_width=30)
                     gated  = wishbone.Interface(data_width=32, adr_width=30)
@@ -314,11 +465,18 @@ class BaseSoC(SoCCore):
                         self.hbm.memory_ready, host_quiesce)
                     admission_gates.append(admission)
                     self.submodules += admission
-                    self.submodules += axi.Wishbone2AXILite(gated, narrow)
+                    if hbm_axi_domain:
+                        held = wishbone.Interface(data_width=32, adr_width=30)
+                        hold = HBMCPUTransactionLatch(gated, held)
+                        self.submodules += hold
+                        self.submodules += axi.Wishbone2AXILite(held, narrow)
+                    else:
+                        self.submodules += axi.Wishbone2AXILite(gated, narrow)
                     window_pipeline = HBMCPUWindowPipeline(narrow, native, bist=hbm_bist,
                         name=f"hbm_window_{channel}")
                     self.submodules += window_pipeline
-                    window_idle_signals.append(window_pipeline.idle)
+                    window_idle_signals.append(window_pipeline.idle & hold.idle
+                        if hbm_axi_domain else window_pipeline.idle)
                     ports = []
                     for bank in range(8):
                         # Route only 32-bit data across the bank switch. Width
@@ -330,34 +488,42 @@ class BaseSoC(SoCCore):
                         wide = axi.AXILiteInterface(data_width=256, address_width=33)
                         routed = axi.AXILiteInterface(data_width=256, address_width=33)
                         ports.append((lambda address, bank=bank: self.hbm_window.bank_effective == bank, port))
+                        if hbm_axi_domain:
+                            crossed = axi.AXILiteInterface(data_width=32, address_width=33)
+                            crossing = HBMCPUWindowCDC(port, crossed,
+                                gray_bus_prefix=f"hbm_cpu_pc{4*bank + channel:02d}")
+                            self.submodules += crossing
+                            cdc_idle_signals.append(crossing.idle)
+                            cdc_fault_signals.append(crossing.fault)
+                            port = crossed
                         for name in ("aw", "w", "ar"):
                             self.comb += getattr(port, name).connect(getattr(local, name))
                         self.comb += local.b.connect(port.b)
                         # Register the local lane mux before the narrow bank mux.
                         local_read = stream.Buffer(local.r.description,
                             pipe_valid=True, pipe_ready=True)
-                        self.submodules += local_read
+                        self.submodules += ClockDomainsRenamer(axi_domain)(local_read)
                         self.comb += local.r.connect(local_read.sink)
                         self.comb += local_read.source.connect(port.r)
-                        self.submodules += axi.AXILiteConverter(local, wide)
+                        self.submodules += ClockDomainsRenamer(axi_domain)(axi.AXILiteConverter(local, wide))
                         for name in ("aw", "w", "ar"):
                             request = getattr(wide, name)
                             buffer = stream.Buffer(request.description,
                                 pipe_valid=True, pipe_ready=True)
-                            self.submodules += buffer
+                            self.submodules += ClockDomainsRenamer(axi_domain)(buffer)
                             self.comb += request.connect(buffer.sink)
                             self.comb += buffer.source.connect(getattr(routed, name))
                         for name in ("b", "r"):
                             response = getattr(routed, name)
                             buffer = stream.Buffer(response.description,
                                 pipe_valid=True, pipe_ready=True)
-                            self.submodules += buffer
+                            self.submodules += ClockDomainsRenamer(axi_domain)(buffer)
                             self.comb += response.connect(buffer.sink)
                             self.comb += buffer.source.connect(getattr(wide, name))
                         native_channel = 4*bank + channel
                         native_upstream = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
                         tracked_upstream = native_upstream
-                        port_idle = admission.idle & window_pipeline.idle
+                        port_idle = observed_idle_axi if hbm_axi_domain else admission.idle & window_pipeline.idle
                         if hbm_bist:
                             tracked_upstream = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
                             engine_idle = self.hbm_bist.add_port(native_channel,
@@ -365,7 +531,7 @@ class BaseSoC(SoCCore):
                             port_idle = port_idle & engine_idle
                         self.hbm_runtime.add_port(native_channel, tracked_upstream,
                             self.hbm.axi[native_channel], host_idle=port_idle)
-                        self.submodules += axi.AXILite2AXI(routed, native_upstream)
+                        self.submodules += ClockDomainsRenamer(axi_domain)(axi.AXILite2AXI(routed, native_upstream))
                     self.submodules += axi.AXILiteDecoder(native, ports)
                     self.bus.add_slave(f"hbm{channel}", host,
                         SoCRegion(origin=hbm_origins[channel], size=0x1000_0000, cached=True))
@@ -376,15 +542,18 @@ class BaseSoC(SoCCore):
                 self.add_constant("HBM_WINDOW_BANKS", 8)
                 self.add_constant("HBM_MAIN_CHANNEL", 0)
                 self.add_constant("HBM_HIGH_BASE", hbm_high_base)
+                if hbm_axi_domain:
+                    self.add_constant("HBM_AXI_CLOCK_DOMAIN", 1)
+                    self.add_constant("HBM_AXI_CLK_FREQ", 250000000)
                 self.comb += all_windows_idle.eq(Reduce("AND",
                     [admission_gates[index].idle & window_idle_signals[index]
-                        for index in range(4)]))
+                        for index in range(4)] + cdc_idle_signals))
                 bank_change = (self.hbm_window.bank.wr_stb &
                     (self.hbm_window.bank.storage != self.hbm_window.bank_effective))
                 bank_change_safe = (all_windows_idle & self.hbm_runtime.all_drained &
                     (self.hbm_runtime.error.status == 0) & ~self.hbm_window.bank_fault)
                 if hbm_bist:
-                    bank_change_safe = bank_change_safe & ~self.hbm_bist.owner
+                    bank_change_safe = bank_change_safe & ~self.hbm_bist.owner_sys
                 self.sync += If(bank_change,
                     If(bank_change_safe,
                         self.hbm_window.bank_effective.eq(self.hbm_window.bank.storage),
@@ -393,8 +562,10 @@ class BaseSoC(SoCCore):
                     ),
                 )
                 external_fault = self.hbm_window.bank_fault
+                if hbm_axi_domain:
+                    external_fault = external_fault | Reduce("OR", cdc_fault_signals)
                 if hbm_bist:
-                    external_fault = external_fault | (self.hbm_bist.error_mask != 0)
+                    external_fault = external_fault | (self.hbm_bist.error_mask_sys != 0)
                 self.comb += self.hbm_runtime.external_fault.eq(external_fault)
 
         # PCIe -------------------------------------------------------------------------------------
@@ -492,6 +663,7 @@ def main():
     parser.add_target_argument("--hbm-primitive", action="store_true", help="Use bundled primitive HBM and processor calibration firmware.")
     parser.add_target_argument("--hbm-primitive-rtl", help="Override the bundled primitive/control RTL directory.")
     parser.add_target_argument("--hbm-bist", action="store_true", help="Add exclusive per-channel burst test masters and counters.")
+    parser.add_target_argument("--hbm-axi-domain", action="store_true", help="Experimental independent 250 MHz HBM AXI clock domain (requires primitive BIST).")
     parser.add_target_argument("--hbm-channels", default="0,1,2,3",         help="HBM channels to map (comma/range list or all).")
     parser.add_target_argument("--hbm-main-channel", default=0, type=int,   help="Mapped HBM channel used as main RAM.")
     parser.add_target_argument("--hbm-base",       default=USPHBM2_DEFAULT_BASE,
@@ -525,6 +697,7 @@ def main():
         hbm_primitive         = args.hbm_primitive,
         hbm_primitive_rtl     = args.hbm_primitive_rtl,
         hbm_bist              = args.hbm_bist,
+        hbm_axi_domain        = args.hbm_axi_domain,
         **parser.soc_argdict
     )
     builder = Builder(soc, **parser.builder_argdict)

@@ -155,6 +155,27 @@ produce useful RapidWright analysis. The prior local 17-gate simulation/hardware
 campaign is separate from the portable build checks; its historical receipts
 are not reused to certify a new checkout.
 
+## Experimental separate AXI domain
+
+This branch adds `--hbm-axi-domain` to the rebuild launcher and board target.
+Use LiteX commit `636f9bce2689596d25ebfba850ce023f31cb8c4b` and pass
+`--core-commit 636f9bce2689596d25ebfba850ce023f31cb8c4b` to the launcher alongside
+that flag and the normal tool/output arguments. Both source checkouts must be
+clean. The flag is also required when resuming a generated attempt.
+
+This first migration keeps SYS and native AXI at 250 MHz on separate MMCM
+outputs, with HBM at 900 MHz and its reference at 200 MHz. CPU, CSRs and
+management remain in SYS. Native BIST/AXI/drain run in AXI; CPU requests,
+commands and coherent status cross explicitly. CPU FIFO Gray pointers receive
+individual 4 ns datapath and bus-skew bounds, checked against the routed design.
+The launcher also checks the fourth clock/reset pair and firmware waits for
+the cross-domain release acknowledgment. The flag is optional; the existing
+shared-SYS build remains the default.
+
+This option does not select the intended later AXI500/HBM1000 design. Native
+timing closure, calibration and processor transactions must qualify each new
+image. Simulation alone does not establish those hardware results.
+
 ## Processor calibration after loading
 
 This firmware intentionally waits in SRAM for host mailbox commands; loading

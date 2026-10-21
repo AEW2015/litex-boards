@@ -57,6 +57,8 @@ def build(output_dir, csr_json=None, profile_path=None):
         if addresses != {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008, "HBM_WINDOW_BASE": 0xf0003800, "HBM_RUNTIME_BASE": 0xf0004000}:
             raise ValueError("Unqualified CPU CSR map")
     header = ["/* Generated from the source-bound, reviewed cold-init profile. */"]
+    if layout is not None and layout.get("constants", {}).get("hbm_axi_clock_domain"):
+        header.append("#define HBM_SEPARATE_AXI_DOMAIN 1")
     header.extend(f"#define {key} 0x{value:08x}u" for key, value in addresses.items())
     header.extend([f"#define BOOT_HBM_MHZ {p['hbm_mhz']}u", f"#define CLOCK_PROFILE_COUNT {len(profiles)}u", "static const clock_profile clock_profiles[] = {"])
     for mhz, profile in sorted(profiles.items(), key=lambda row: int(row[0])):

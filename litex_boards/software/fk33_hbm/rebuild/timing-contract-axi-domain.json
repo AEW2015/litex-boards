@@ -1,0 +1,176 @@
+{
+  "schema": "fk33-timing-contract-v1",
+  "design": "sqrl_fk33_separate_axi_250",
+  "device": "xcvu33p-fsvh2104-2L-e",
+  "scope": "Static native constraint/STA audit. No implementation guarantee, CDC-clean certification, or physical HBM clock measurement.",
+  "clocks": {
+    "clk200_p": {
+      "period_ns": 5.0,
+      "role": "primary board input"
+    },
+    "main_clkout0": {
+      "period_ns": 4.0,
+      "role": "SYS CPU and management, MMCM output0"
+    },
+    "main_clkout1": {
+      "period_ns": 5.0,
+      "role": "HBM reference, MMCM output1"
+    },
+    "main_clkout2": {
+      "period_ns": 10.0,
+      "role": "APB, MMCM output2"
+    },
+    "jtag_tck": {
+      "maximum_period_ns": 66.666667,
+      "role": "BSCANE2 INTERNAL_TCK, cable envelope15MHz; user transport1MHz"
+    },
+    "main_clkout3": {
+      "period_ns": 4.0,
+      "role": "Separate native HBM AXI, MMCM output3"
+    }
+  },
+  "clock_relationships": {
+    "related": [
+      "clk200_p",
+      "main_clkout0",
+      "main_clkout1",
+      "main_clkout2",
+      "main_clkout3"
+    ],
+    "asynchronous_groups": [
+      [
+        "jtag_tck"
+      ],
+      [
+        "clk200_p",
+        "main_clkout0",
+        "main_clkout1",
+        "main_clkout2",
+        "main_clkout3"
+      ]
+    ],
+    "fabric_hbm_operating_clock": null,
+    "hbm_note": "800/900MHz are internal HBM PLL software profiles, not additional FPGA fabric clocks."
+  },
+  "accepted_xdc_timing_commands": [
+    "create_clock -name clk200_p -period 5.0 [get_ports clk200_p]",
+    "set_false_path -quiet -to [get_cells -hierarchical -filter {mr_ff == TRUE}]",
+    "set_false_path -quiet -to [get_pins -filter {REF_PIN_NAME == PRE} -of_objects [get_cells -hierarchical -filter {ars_ff1 == TRUE || ars_ff2 == TRUE}]]",
+    "set_max_delay 2 -quiet -from [get_pins -filter {REF_PIN_NAME == C} -of_objects [get_cells -hierarchical -filter {ars_ff1 == TRUE}]] -to [get_pins -filter {REF_PIN_NAME == D} -of_objects [get_cells -hierarchical -filter {ars_ff2 == TRUE}]]"
+  ],
+  "accepted_tcl_async_command": "set_clock_groups -asynchronous -group [get_clocks jtag_tck] -group [get_clocks -filter {NAME != jtag_tck}]",
+  "known_rejected_legacy_exception": "set_clock_groups -group [get_clocks -of [get_nets sys_clk]] -group [get_clocks -of [get_nets main_clkin_signal]] -asynchronous",
+  "exception_review": {
+    "mr_ff": "Inherited Migen MultiReg first-stage cut; native CDC inventory and synchronizer topology review still required.",
+    "ars_ff": "Inherited async-reset synchronizer PRE cuts and2ns interstage bound. Not permission to waive arbitrary resets.",
+    "legacy_sys_parent": "Synchronous source and generated clock; A9 TIMING47. Actual path is SYS reset request to first CLK200 reset-delay FDCE/D, not MMCM/RST. Removal strengthens STA; no automatic substitute exception."
+  },
+  "check_timing_zero": [
+    "no_clock",
+    "constant_clock",
+    "pulse_width_clock",
+    "unconstrained_internal_endpoints",
+    "no_input_delay",
+    "multiple_clock",
+    "generated_clocks",
+    "loops",
+    "partial_input_delay",
+    "partial_output_delay",
+    "latch_loops"
+  ],
+  "allowed_missing_output_delays": [
+    "user_led0",
+    "user_led1",
+    "user_led2",
+    "user_led3",
+    "user_led4",
+    "user_led5",
+    "user_led6"
+  ],
+  "known_unconstrained_boundaries": {
+    "led_outputs": "Seven untimed visual indicator ports; no synchronous external receiver.",
+    "bscan_tdi": "A9 has16max/min endpoints from BSCANE2/INTERNAL_TDI with infinite slack. Must inventory as external TAP boundary, not claim universal constrained timing. Cable/TAP input/output timing closure is a separate requirement."
+  },
+  "require_route_sta": {
+    "minimum_setup_slack_ns": 0.0,
+    "minimum_hold_slack_ns": 0.0,
+    "minimum_pulse_width_slack_ns": 0.0,
+    "failing_endpoints": 0,
+    "recovery_and_removal": "Must be present and passing in native detailed timing, not false-pathed broadly."
+  },
+  "prohibited": [
+    "Async-group SYS/APB or MMCM-related functional data clocks",
+    "Fabric900MHz/800MHz invented clock",
+    "Blanket reset or BIST falsepath",
+    "Automatic multicycle/maxdelay relaxation",
+    "Placement edits without measured endpoint/net evidence",
+    "Async-group SYS and the separate AXI output of the same MMCM"
+  ],
+  "rapidwright_policy": "Read-only DCP/EDIF analysis may rank physical fanout, PIPs, regions and congestion. Any edits create isolated candidate with fresh native place/route, source-bound simulations and gates; never guarantees closure.",
+  "primary_sources": [
+    {
+      "title": "UG903 2025.2 Automatically Derived Clocks",
+      "url": "https://docs.amd.com/r/2025.2-English/ug903-vivado-using-constraints/Automatically-Derived-Clocks"
+    },
+    {
+      "title": "UG903 2025.2 Asynchronous Clocks",
+      "url": "https://docs.amd.com/r/2025.2-English/ug903-vivado-using-constraints/Asynchronous-Clocks"
+    },
+    {
+      "title": "UG906 2025.2 Check Timing Section",
+      "url": "https://docs.amd.com/r/2025.2-English/ug906-vivado-design-analysis/Check-Timing-Section"
+    },
+    {
+      "title": "UG906 Async Reset Synchronizer",
+      "url": "https://docs.amd.com/r/en-US/ug906-vivado-design-analysis/Asynchronous-Reset-Synchronizer"
+    },
+    {
+      "title": "UG903 Gray bus timing constraints",
+      "url": "https://docs.amd.com/r/2025.2-English/ug903-vivado-using-constraints/Constraining-Asynchronous-Signals"
+    },
+    {
+      "title": "UG903 Exception priority",
+      "url": "https://docs.amd.com/r/2025.2-English/ug903-vivado-using-constraints/Exceptions-Priority"
+    },
+    {
+      "title": "UG906 Bus skew report summary",
+      "url": "https://docs.amd.com/r/2025.2-English/ug906-vivado-design-analysis/Bus-Skew-Report-Summary-Section"
+    }
+  ],
+  "separate_axi_domain": true,
+  "mmcm_parameters": {
+    "CLKFBOUT_MULT_F": 5,
+    "DIVCLK_DIVIDE": 1,
+    "CLKOUT0_DIVIDE_F": 4,
+    "CLKOUT1_DIVIDE": 5,
+    "CLKOUT2_DIVIDE": 10,
+    "CLKOUT3_DIVIDE": 4
+  },
+  "mmcm_output_count": 4,
+  "required_timed_clock_pairs": [
+    [
+      "main_clkout0",
+      "main_clkout2"
+    ],
+    [
+      "main_clkout2",
+      "main_clkout0"
+    ],
+    [
+      "main_clkout0",
+      "main_clkout3"
+    ],
+    [
+      "main_clkout3",
+      "main_clkout0"
+    ]
+  ],
+  "gray_pointer_policy": {
+    "groups": 320,
+    "bits_per_group": 3,
+    "maximum_datapath_ns": 4.0,
+    "maximum_bus_skew_ns": 4.0,
+    "first_stage_generic_false_path": false,
+    "native_per_bit_verification_required": true
+  }
+}
