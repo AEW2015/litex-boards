@@ -12,6 +12,10 @@
 
 [> Intro
 --------
+For the FK33 direct-primitive HBM replacement, processor calibration firmware,
+and build with required Python RapidWright analysis, see the
+[FK33 HBM rebuild instructions](litex_boards/software/fk33_hbm/README.md).
+
 <figure>
 <p align="center">
 <img src="https://user-images.githubusercontent.com/1450143/88511626-73792100-cfe5-11ea-8d3e-dbeea6314e15.JPG">

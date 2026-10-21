@@ -1,0 +1,20 @@
+# Exact dependency revisions used by the tested FK33 RTL.
+colorama==0.4.6
+packaging==26.3
+pyserial==3.5
+requests==2.34.2
+certifi==2026.10.18
+charset-normalizer==3.5.2
+idna==3.20
+urllib3==2.8.0
+PyYAML==6.0.3
+-e git+https://github.com/AEW2015/litex.git@0308e0e709a9c703684e5e9f18c01f256207f9a2#egg=litex
+migen @ git+https://git.m-labs.hk/M-Labs/migen.git@4c2ae8dfeea37f235b52acb8166f12acaaae4f7c
+litepcie @ git+https://github.com/enjoy-digital/litepcie.git@586d7a454222d719d04c9d1012eef3f189fd863e
+liteiclink @ git+https://github.com/enjoy-digital/liteiclink.git@cb6cd0cf52a38cf303fc5fa02dfcceef1b7e67cf
+litedram @ git+https://github.com/enjoy-digital/litedram.git@01443bd19ecb74d72bd45f9a4cc81371903e36f6
+liteeth @ git+https://github.com/enjoy-digital/liteeth.git@e29a08874863d192828174c2fc6c9e0842c7b48e
+# Archives contain the generated CPU RTL; no recursive upstream Scala/test submodules are needed.
+pythondata-cpu-vexriscv @ https://github.com/litex-hub/pythondata-cpu-vexriscv/archive/642ecfed1c84460555d6d803d660cc60cfc1ecb6.zip
+pythondata-software-compiler_rt @ https://github.com/litex-hub/pythondata-software-compiler_rt/archive/6eb76609c9627bf26635e57c63fb22cda7115887.zip
+pythondata-software-picolibc @ https://github.com/litex-hub/pythondata-software-picolibc/archive/6a13ccce7c575b32c102dd9dc52178505b81fe39.zip
