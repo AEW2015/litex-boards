@@ -552,6 +552,10 @@ class BaseSoC(SoCCore):
                     (self.hbm_window.bank.storage != self.hbm_window.bank_effective))
                 bank_change_safe = (all_windows_idle & self.hbm_runtime.all_drained &
                     (self.hbm_runtime.error.status == 0) & ~self.hbm_window.bank_fault)
+                if hbm_axi_domain:
+                    # A requested STOP must be acknowledged without native faults.
+                    bank_change_safe = bank_change_safe & (
+                        ~self.hbm_runtime.quiesce_request | self.hbm_runtime.quiesced)
                 if hbm_bist:
                     bank_change_safe = bank_change_safe & ~self.hbm_bist.owner_sys
                 self.sync += If(bank_change,
