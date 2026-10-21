@@ -73,6 +73,74 @@ class _CRG(LiteXModule):
 
 # BaseSoC ------------------------------------------------------------------------------------------
 
+class HBMCPUWindowPipeline(LiteXModule):
+    """BIST-aware narrow AXI-Lite window boundary with idle accounting."""
+    def __init__(self, cpu, native, bist=False, name="hbm_cpu_window"):
+        self.idle = Signal(name=f"{name}_idle")
+        converted = axi.AXILiteInterface(data_width=32, address_width=32)
+        self.converted = converted
+        self.native = native
+        self.comb += [
+            cpu.aw.connect(converted.aw), cpu.w.connect(converted.w),
+            cpu.ar.connect(converted.ar),
+        ]
+        request_buffered = axi.AXILiteInterface(data_width=32, address_width=32)
+        self.request_buffered = request_buffered
+        offset_input = request_buffered if bist else converted
+        request_buffers = {}
+        self.request_buffers = request_buffers
+        if bist:
+            for channel in ("aw", "w", "ar"):
+                request = getattr(converted, channel)
+                buffer = stream.Buffer(request.description, pipe_valid=True, pipe_ready=True)
+                request_buffers[channel] = buffer
+                self.submodules += buffer
+                self.comb += [request.connect(buffer.sink),
+                    buffer.source.connect(getattr(request_buffered, channel))]
+            write_buffer = stream.Buffer(offset_input.b.description,
+                pipe_valid=True, pipe_ready=True)
+            self.submodules += write_buffer
+            self.write_buffer = write_buffer
+            self.comb += [offset_input.b.connect(write_buffer.sink),
+                write_buffer.source.connect(cpu.b)]
+        else:
+            write_buffer = None
+            self.comb += converted.b.connect(cpu.b)
+
+        read_buffer = stream.Buffer(offset_input.r.description,
+            pipe_valid=True, pipe_ready=True)
+        self.read_buffer = read_buffer
+        self.submodules += read_buffer
+        self.comb += [offset_input.r.connect(read_buffer.sink),
+            read_buffer.source.connect(cpu.r)]
+        self.submodules += axi.AXILiteOffset(offset_input, native, offset=0)
+
+        if bist:
+            write_pending = Signal(name=f"{name}_write_pending")
+            read_pending = Signal(name=f"{name}_read_pending")
+            self.write_pending = write_pending
+            self.read_pending = read_pending
+            write_request = ((converted.aw.valid & converted.aw.ready) |
+                (converted.w.valid & converted.w.ready))
+            read_request = converted.ar.valid & converted.ar.ready
+            write_retire = write_buffer.source.valid & write_buffer.source.ready
+            read_retire = read_buffer.source.valid & read_buffer.source.ready
+            self.sync += [
+                If(write_retire, write_pending.eq(0)
+                ).Elif(write_request, write_pending.eq(1)),
+                If(read_retire, read_pending.eq(0)
+                ).Elif(read_request, read_pending.eq(1)),
+            ]
+            visible_request = (converted.aw.valid | converted.w.valid | converted.ar.valid |
+                request_buffers["aw"].source.valid | request_buffers["w"].source.valid |
+                request_buffers["ar"].source.valid)
+            visible_response = (write_buffer.sink.valid | write_buffer.source.valid |
+                read_buffer.sink.valid | read_buffer.source.valid)
+            self.comb += self.idle.eq(~(write_pending | read_pending |
+                visible_request | visible_response))
+        else:
+            self.comb += self.idle.eq(1)
+
 class BaseSoC(SoCCore):
     def __init__(self, sys_clk_freq=125e6,
         with_led_chaser       = True,
@@ -191,7 +259,8 @@ class BaseSoC(SoCCore):
                 self.hbm_window.bank = CSRStorage(3, name="bank")
                 self.hbm_window.bank_effective = Signal(3, name="hbm_window_bank_effective")
                 self.hbm_window.bank_fault = Signal(name="hbm_window_bank_fault")
-                self.hbm_runtime = HBMRuntimeQuiesce(platform, registered_request=hbm_bist)
+                self.hbm_runtime = HBMRuntimeQuiesce(platform,
+                    registered_request=hbm_bist, registered_completions=hbm_bist)
                 all_windows_idle = Signal(name="hbm_all_windows_idle")
                 if hbm_bist:
                     from litex.soc.cores.ram.xilinx_usp_hbm2_bist import HBMBurstBIST
@@ -205,6 +274,7 @@ class BaseSoC(SoCCore):
                 if hbm_bist:
                     host_quiesce = host_quiesce | self.hbm_bist.owner
                 admission_gates = []
+                window_idle_signals = []
                 for channel in range(4):
                     host   = wishbone.Interface(data_width=32, adr_width=30)
                     gated  = wishbone.Interface(data_width=32, adr_width=30)
@@ -215,16 +285,10 @@ class BaseSoC(SoCCore):
                     admission_gates.append(admission)
                     self.submodules += admission
                     self.submodules += axi.Wishbone2AXILite(gated, narrow)
-                    converted = axi.AXILiteInterface(data_width=32, address_width=32)
-                    for name in ("aw", "w", "ar"):
-                        self.comb += getattr(narrow, name).connect(getattr(converted, name))
-                    self.comb += converted.b.connect(narrow.b)
-                    read_buffer = stream.Buffer(converted.r.description,
-                        pipe_valid=True, pipe_ready=True)
-                    self.submodules += read_buffer
-                    self.comb += converted.r.connect(read_buffer.sink)
-                    self.comb += read_buffer.source.connect(narrow.r)
-                    self.submodules += axi.AXILiteOffset(converted, native, offset=0)
+                    window_pipeline = HBMCPUWindowPipeline(narrow, native, bist=hbm_bist,
+                        name=f"hbm_window_{channel}")
+                    self.submodules += window_pipeline
+                    window_idle_signals.append(window_pipeline.idle)
                     ports = []
                     for bank in range(8):
                         # Route only 32-bit data across the bank switch. Width
@@ -263,7 +327,7 @@ class BaseSoC(SoCCore):
                         native_channel = 4*bank + channel
                         native_upstream = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
                         tracked_upstream = native_upstream
-                        port_idle = admission.idle
+                        port_idle = admission.idle & window_pipeline.idle
                         if hbm_bist:
                             tracked_upstream = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
                             engine_idle = self.hbm_bist.add_port(native_channel,
@@ -282,7 +346,9 @@ class BaseSoC(SoCCore):
                 self.add_constant("HBM_WINDOW_BANKS", 8)
                 self.add_constant("HBM_MAIN_CHANNEL", 0)
                 self.add_constant("HBM_HIGH_BASE", hbm_high_base)
-                self.comb += all_windows_idle.eq(Reduce("AND", [gate.idle for gate in admission_gates]))
+                self.comb += all_windows_idle.eq(Reduce("AND",
+                    [admission_gates[index].idle & window_idle_signals[index]
+                        for index in range(4)]))
                 bank_change = (self.hbm_window.bank.wr_stb &
                     (self.hbm_window.bank.storage != self.hbm_window.bank_effective))
                 bank_change_safe = (all_windows_idle & self.hbm_runtime.all_drained &
@@ -340,7 +406,7 @@ class BaseSoC(SoCCore):
         if csr_origin is None:
             self.logger.error("CSR main-bus origin is not defined.")
             raise SoCError()
-        self.add_csr_bridge(name="csr", origin=csr_origin, with_register=True)
+        self.add_csr_bridge(name="csr", origin=csr_origin, with_register=True, read_latency=2)
         self.bus.finalize()
         if hasattr(self, "ctrl") and self.bus.timeout is not None:
             if hasattr(self.ctrl, "bus_error") and hasattr(self.bus._interconnect, "timeout"):
@@ -365,7 +431,8 @@ class BaseSoC(SoCCore):
         self.csr_bankarray = csr_bus.CSRBankArray(self,
             address_map=self.csr.address_map, data_width=self.csr.data_width,
             address_width=self.csr.address_width, alignment=self.csr.alignment,
-            paging=self.csr.paging, ordering=self.csr.ordering)
+            paging=self.csr.paging, ordering=self.csr.ordering,
+            read_pipeline=hasattr(self, "hbm_bist"))
         self.csr_interconnect = csr_bus.InterconnectShared(
             list(self.csr.masters.values()), self.csr_bankarray.get_buses() + [self.hbm.control_bus])
         for name, registers, address, bank in self.csr_bankarray.banks:
