@@ -12,6 +12,7 @@
 # litex_term crossover
 
 import os
+import math
 
 from migen import *
 
@@ -51,6 +52,28 @@ def ensure_hbm_xci(url, hbm_xci=os.path.join("ip", "hbm", "hbm_0.xci")):
 
 # CRG ----------------------------------------------------------------------------------------------
 
+class _HBMResetRequest(LiteXModule):
+    """Bound one SYS request before the MMCM's independent-input reset delay."""
+    def __init__(self, request, sys_clk_freq):
+        if not math.isfinite(sys_clk_freq) or sys_clk_freq <= 0:
+            raise ValueError("Reset request requires a finite positive SYS frequency")
+        self.history_cycles = math.ceil(sys_clk_freq / 100e6) + 1
+        self.maximum_apb_pulse_cycles = math.ceil(self.history_cycles * 100e6 / sys_clk_freq)
+        if self.maximum_apb_pulse_cycles > 3:
+            raise ValueError("SYS reset pulse cannot clear before the eight CLK200 delay stages")
+        self.seen = Signal()
+        self.history = Signal(self.history_cycles)
+        self.output = Signal()
+        # A held/repeated request cannot reload the history before SYS reset.
+        # More than one APB period covers capture at every phase. Bound the
+        # APB pulse to30ns, below the eight CLK200 stages' earliest35ns stop.
+        self.sync += [
+            self.history.eq(Cat(request & ~self.seen, self.history[:self.history_cycles - 1])),
+            If(request, self.seen.eq(1)),
+        ]
+        self.sync.apb += self.output.eq(self.history != 0)
+
+
 class _CRG(LiteXModule):
     def __init__(self, platform, sys_clk_freq, with_hbm, hbm_ref_clk_freq=100e6,
             strict_timing=False):
@@ -63,7 +86,11 @@ class _CRG(LiteXModule):
         # # #
 
         self.pll = pll = USPMMCM(speedgrade=-2)
-        self.comb += pll.reset.eq(self.rst)
+        if strict_timing:
+            self.reset_request = _HBMResetRequest(self.rst, sys_clk_freq)
+            self.comb += pll.reset.eq(self.reset_request.output)
+        else:
+            self.comb += pll.reset.eq(self.rst)
         pll.register_clkin(platform.request("clk200"), 200e6)
         pll.create_clkout(self.cd_sys, sys_clk_freq)
         if not strict_timing:
