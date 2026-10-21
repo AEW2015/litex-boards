@@ -90,7 +90,8 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False):
         python_version=sys.version, packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions()}))
     sys.argv = args
     runpy.run_module('litex_boards.targets.sqrl_fk33', run_name='__main__')
-    paths = {Path(__file__).resolve()}
+    # runpy removes the target's temporary __main__ module before this snapshot.
+    paths = {Path(__file__).resolve(), BOARDS/'litex_boards/targets/sqrl_fk33.py'}
     for module in list(sys.modules.values()):
         name = getattr(module, '__file__', None)
         if name and name.endswith('.py') and Path(name).is_file():
