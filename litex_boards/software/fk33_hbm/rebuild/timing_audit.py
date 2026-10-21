@@ -182,7 +182,7 @@ def audit(attempt, contract_path=None, stage="final"):
             # Native positions are assigned as each loop iteration creates an
             # exception; do not identify their scope by a guessed position.
             rows = [line for line in text.splitlines() if re.match(r"^\s*\d+\s+", line)]
-            gray_rows = [line for line in rows if "max=4" in line]
+            gray_rows = [line for line in rows if "max_dpo=4" in line]
             need(len(gray_rows) == 320, "Expected 320 native Gray max-delay exceptions")
             need(len(rows) == 325, "Unexpected native exception count: " + str(len(rows)))
             # datapath_only intentionally removes hold analysis on these
