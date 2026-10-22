@@ -20,7 +20,8 @@ def expected_groups():
 def output_paths(evidence):
     evidence = Path(evidence)
     return [evidence / name for name in ("implemented-gray-buses.txt",
-        "implemented-gray-paths.rpt", "implemented-gray-bus-skew.rpt")]
+        "implemented-gray-paths.rpt", "implemented-gray-bus-skew.rpt",
+        "implemented-clock-roots.txt", "implemented-clock-roots.rpt")]
 
 
 def query_tcl(evidence):
@@ -36,6 +37,26 @@ proc hbm_gray_attr {cell name} {
     if {$pos < 0} {return ""}
     return [get_property [lindex $props $pos] $cell]
 }
+set root_out [open {@@EVIDENCE@@/implemented-clock-roots.txt} w]
+set root_nets {}
+foreach {domain buffer expected_clock} {SYS BUFG main_clkout0 AXI BUFG_3 main_clkout3} {
+    set pin [hbm_gray_one [get_pins -quiet ${buffer}/O] "$domain clock output"]
+    set cell [hbm_gray_one [get_cells -of_objects $pin] "$domain clock buffer"]
+    set ref [get_property REF_NAME $cell]
+    if {$ref ni {BUFG BUFGCE}} {error "Unexpected $domain global buffer $ref"}
+    set net [hbm_gray_one [get_nets -of_objects $pin] "$domain direct clock net"]
+    set clock [hbm_gray_one [get_clocks -of_objects $pin] "$domain native clock"]
+    set period [get_property PERIOD $clock]
+    if {$clock ne $expected_clock || abs($period - 4.0) > 0.0001} {error "Unexpected $domain clock/period"}
+    set requested [get_property USER_CLOCK_ROOT $net]
+    set actual [get_property CLOCK_ROOT $net]
+    if {$requested ne "X4Y1" || $actual ne "X4Y1"} {error "$domain clock roots differ: requested=$requested actual=$actual"}
+    lappend root_nets $net
+    puts $root_out "CLOCK_ROOT $domain PIN=$pin CELL=$cell REF=$ref NET=$net CLOCK=$clock PERIOD_NS=$period USER_CLOCK_ROOT=$requested CLOCK_ROOT=$actual"
+}
+if {[llength [lsort -unique $root_nets]] != 2} {error "Native SYS/AXI clock nets are not distinct"}
+close $root_out
+report_clock_utilization -clock_roots_only -file {@@EVIDENCE@@/implemented-clock-roots.rpt}
 set gray_sources [get_cells -hier -filter {HBM_GRAY_SRC =~ hbm_cpu_pc*}]
 set gray_destinations [get_cells -hier -filter {HBM_GRAY_DST =~ hbm_cpu_pc*}]
 if {[llength $gray_sources] != 960 || [llength $gray_destinations] != 960} {
@@ -133,9 +154,41 @@ def _skew_summary_rows(text):
     return rows
 
 
+def _parse_clock_roots(inventory, report):
+    """Validate the final native physical root inventory, not source intent."""
+    expected = {"SYS": ("BUFG", "main_clkout0"), "AXI": ("BUFG_3", "main_clkout3")}
+    required = {"PIN", "CELL", "REF", "NET", "CLOCK", "PERIOD_NS", "USER_CLOCK_ROOT", "CLOCK_ROOT"}
+    rows, domains, nets = [], set(), set()
+    for line in inventory.read_text().splitlines():
+        fields = line.split()
+        if len(fields) != len(required) + 2 or fields[0] != "CLOCK_ROOT" or fields[1] not in expected:
+            raise ValueError("Malformed native clock-root row: " + line)
+        domain = fields[1]
+        row = dict(item.split("=", 1) for item in fields[2:])
+        if set(row) != required or domain in domains:
+            raise ValueError("Duplicate/unexpected native clock-root fields: " + domain)
+        buffer, clock = expected[domain]
+        period = float(row["PERIOD_NS"])
+        if (row["PIN"], row["CELL"], row["CLOCK"]) != (buffer + "/O", buffer, clock):
+            raise ValueError("Native clock-root topology mismatch: " + domain)
+        if row["REF"] not in ("BUFG", "BUFGCE") or not math.isfinite(period) or abs(period - 4) > .0001:
+            raise ValueError("Native clock buffer/period mismatch: " + domain)
+        if row["USER_CLOCK_ROOT"] != "X4Y1" or row["CLOCK_ROOT"] != "X4Y1":
+            raise ValueError("Native clock root differs from X4Y1: " + domain)
+        if not row["NET"] or row["NET"] in nets:
+            raise ValueError("Native clock nets must be distinct")
+        domains.add(domain)
+        nets.add(row["NET"])
+        rows.append(dict(domain=domain, **row))
+    if domains != set(expected) or not report.read_text().strip():
+        raise ValueError("Native clock-root inventory/report incomplete")
+    return {"status": "PASS", "required_region": "X4Y1", "rows": rows}
+
+
 def parse(evidence):
     """Validate native output; missing/unrecognized report formats are errors."""
-    buses, paths, skew = output_paths(evidence)
+    buses, paths, skew, root_inventory, root_report = output_paths(evidence)
+    clock_roots = _parse_clock_roots(root_inventory, root_report)
     expected = expected_groups()
     rows = []
     source_pins, destination_pins, keys = set(), set(), set()
@@ -183,6 +236,7 @@ def parse(evidence):
     if violations or re.search(r"(?i)\bVIOLATED\b", skew_text):
         raise ValueError("Native bus-skew violations: " + str(violations))
     return {"status": "PASS", "groups": 320, "bits": 960,
+        "clock_roots": clock_roots,
         "max_delay_ns": 4, "worst_max_delay_slack_ns": min(float(row["SLACK_NS"]) for row in rows),
         "bus_skew_constraints": 320, "bus_skew_violations": violations,
         "worst_bus_skew_slack_ns": min(float(row[-1]) for row in skew_rows), "rows": rows}

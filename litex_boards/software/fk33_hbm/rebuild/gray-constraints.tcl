@@ -1,5 +1,29 @@
 # Separate SYS250/AXI250 FIFO pointers. Keep functional clocks related.
 # Bound each individual Gray vector, never an aggregate of unrelated FIFOs.
+# Keep the two related 250 MHz global clocks rooted in the same region.
+# This opt-in physical constraint preserves all functional timing checks.
+proc hbm_clock_root_one {objects label} {
+    if {[llength $objects] != 1} {error "$label expected one object: $objects"}
+    return [lindex $objects 0]
+}
+set hbm_clock_root_region [hbm_clock_root_one [get_clock_regions -quiet X4Y1] region]
+set hbm_clock_root_nets {}
+foreach {buffer expected_clock} {BUFG main_clkout0 BUFG_3 main_clkout3} {
+    set pin [hbm_clock_root_one [get_pins -quiet ${buffer}/O] output_pin]
+    set cell [hbm_clock_root_one [get_cells -of_objects $pin] buffer_cell]
+    if {[get_property REF_NAME $cell] ni {BUFG BUFGCE}} {error "Unexpected global clock buffer $cell"}
+    set net [hbm_clock_root_one [get_nets -of_objects $pin] direct_output_net]
+    set clock [hbm_clock_root_one [get_clocks -of_objects $pin] native_clock]
+    if {$clock ne $expected_clock || abs([get_property PERIOD $clock] - 4.0) > 0.0001} {
+        error "Unexpected clock or period on $pin: $clock"
+    }
+    lappend hbm_clock_root_nets $net
+    set_property USER_CLOCK_ROOT $hbm_clock_root_region $net
+    if {[get_property USER_CLOCK_ROOT $net] ne "X4Y1"} {error "Clock-root assignment did not stick on $net"}
+}
+if {[llength [lsort -unique $hbm_clock_root_nets]] != 2} {error "SYS and AXI clock nets must remain distinct"}
+puts "HBM_CLOCK_ROOTS_REQUESTED region=X4Y1 clocks=main_clkout0,main_clkout3"
+
 # A hierarchical property scan takes seconds on this device. Cache its result
 # once per attribute instead of repeating the scan for every three-bit bus.
 set hbm_gray_sources [dict create]

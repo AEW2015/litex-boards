@@ -68,14 +68,22 @@ def audit(attempt, contract_path=None, stage="final"):
              "JTAG clock constraint does not cover15MHz cable envelope")
         need(jtag[0].endswith("[get_pins BSCANE2/INTERNAL_TCK]"), "JTAG source must be BSCAN TCK, not DRCK")
         accepted = [jtag[0], c["accepted_tcl_async_command"]]
+        outside_gray = tcl.replace("\r\n", "\n")
         if c.get("separate_axi_domain"):
             gray = read(Path(__file__).with_name("gray-constraints.tcl")).replace("\r\n", "\n").strip()
             normalized_tcl = tcl.replace("\r\n", "\n")
             need(normalized_tcl.count(gray) == 1, "Generated Gray constraints differ from source or are duplicated")
+            need(c.get("clock_root_policy") == {"region": "X4Y1", "period_ns": 4,
+                 "buffers": {"SYS": {"pin": "BUFG/O", "clock": "main_clkout0"},
+                             "AXI": {"pin": "BUFG_3/O", "clock": "main_clkout3"}},
+                 "native_actual_root_required": True}, "Clock-root policy differs from contract")
+            outside_gray = normalized_tcl.replace(gray, "", 1)
             need(normalized_tcl.index(jtag[0]) < normalized_tcl.index(gray) <
                  normalized_tcl.index("place_design -directive"), "Gray constraints must follow clock creation and precede placement")
             accepted += [norm(line) for line in gray.splitlines() if TIMING_COMMAND.match(line.strip())]
             need("report_bus_skew -file sqrl_fk33_bus_skew.rpt" in tcl, "Missing routed Gray bus-skew report")
+        need(not re.search(r"\bUSER_CLOCK_ROOT\b", outside_gray + "\n" + xdc, re.I),
+             "USER_CLOCK_ROOT occurs outside the canonical opt-in constraints")
         need(Counter(tc) == Counter(accepted), "Unexpected Tcl timing exception/clock command")
         return dict(xdc_timing_commands=commands, tcl_timing_commands=tc,
                     legacy_sys_parent_group_present=False, broadening=False)

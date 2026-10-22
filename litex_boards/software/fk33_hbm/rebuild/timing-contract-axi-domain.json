@@ -172,5 +172,20 @@
     "maximum_bus_skew_ns": 4.0,
     "first_stage_generic_false_path": false,
     "native_per_bit_verification_required": true
+  },
+  "clock_root_policy": {
+    "region": "X4Y1",
+    "period_ns": 4,
+    "buffers": {
+      "SYS": {
+        "pin": "BUFG/O",
+        "clock": "main_clkout0"
+      },
+      "AXI": {
+        "pin": "BUFG_3/O",
+        "clock": "main_clkout3"
+      }
+    },
+    "native_actual_root_required": true
   }
 }
