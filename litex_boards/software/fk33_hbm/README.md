@@ -6,6 +6,22 @@ RapidWright analysis is a **required post-route stage** of the build command.
 It analyzes the routed checkpoint; it does not change placement, routing or
 timing exceptions. Vivado remains the timing authority.
 
+## Normal-build clock policy
+
+Normal FK33 builds follow AMD DS923 controller limits. For this -2L device,
+the AXI ceiling is 400 MHz at the low-voltage operating point or 450 MHz at
+0.85 V. Until the board's operating voltage is verified, use 400 MHz as the
+conservative performance target. HBM is limited to 900 MHz / 1800 MT/s;
+retain the 200 MHz HBM reference and 100 MHz APB clock.
+See [AMD's HBM controller limits](https://docs.amd.com/r/en-US/ds923-virtex-ultrascale-plus/High-Bandwidth-Memory-Controller).
+
+The implemented recipe below still uses 250 MHz SYS/AXI. A faster rated AXI
+profile needs its own clock-tree integration, timing closure and hardware
+qualification; this policy does not make 400/450 MHz an implemented option.
+The normal primitive target rejects AXI500 and has no 1000 MHz HBM profile. Earlier
+AXI500 source work is retained on `work/hbm-experimental-overclock` in both
+repositories. An explicit overclock option is deferred to later work.
+
 ## Reference configuration
 
 | Setting | Value |
@@ -158,8 +174,8 @@ are not reused to certify a new checkout.
 ## Experimental separate AXI domain
 
 This branch adds `--hbm-axi-domain` to the rebuild launcher and board target.
-Use LiteX commit `636f9bce2689596d25ebfba850ce023f31cb8c4b` and pass
-`--core-commit 636f9bce2689596d25ebfba850ce023f31cb8c4b` to the launcher alongside
+Use LiteX commit `3dbe0d540a5ea8b2ea0c33e91aecd45f1c9c0c28` and pass
+`--core-commit 3dbe0d540a5ea8b2ea0c33e91aecd45f1c9c0c28` to the launcher alongside
 that flag and the normal tool/output arguments. Both source checkouts must be
 clean. The flag is also required when resuming a generated attempt.
 
@@ -172,7 +188,7 @@ The launcher also checks the fourth clock/reset pair and firmware waits for
 the cross-domain release acknowledgment. The flag is optional; the existing
 shared-SYS build remains the default.
 
-This option does not select the intended later AXI500/HBM1000 design. Native
+This option keeps the normal AMD-rated clock policy above. Native
 timing closure, calibration and processor transactions must qualify each new
 image. Simulation alone does not establish those hardware results.
 
