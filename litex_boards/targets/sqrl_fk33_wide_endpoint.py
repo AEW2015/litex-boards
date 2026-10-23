@@ -8,9 +8,33 @@ import json
 from pathlib import Path
 
 from migen import *
+from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.soc.cores.clock import USPMMCM
 from litex_boards.platforms.sqrl_fk33 import Platform
 from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint import HBMWideEndpoint
+
+
+class ProtectedResetRelease(Module):
+    """Target-local standard two-FDPE release with preserved BUFG boundary."""
+    def __init__(self, cd, async_reset):
+        assert getattr(cd,'rst_buf',None) == 'bufg'
+        name = 'endpoint_reset_' + cd.name
+        protected = {('DONT_TOUCH','TRUE'),('KEEP','TRUE')}
+        meta = Signal(name=name+'_meta',attr=protected.copy())
+        release = Signal(name=name+'_prebuf',attr=protected.copy())
+        cd.rst.attr.update(protected)
+        self.specials += [
+            Instance('FDPE',name=name+'_stage1',attr={'async_reg','ars_ff1',('DONT_TOUCH','TRUE')},
+                p_INIT=1,i_PRE=async_reset,i_CE=1,i_C=cd.clk,i_D=0,o_Q=meta),
+            Instance('FDPE',name=name+'_stage2',attr={'async_reg','ars_ff2',('DONT_TOUCH','TRUE')},
+                p_INIT=1,i_PRE=async_reset,i_CE=1,i_C=cd.clk,i_D=meta,o_Q=release),
+            Instance('BUFG',name=name+'_buffer',attr={('DONT_TOUCH','TRUE')},i_I=release,o_O=cd.rst)]
+
+
+class ProtectedResetLowerer:
+    @staticmethod
+    def lower(dr):
+        return ProtectedResetRelease(dr.cd,dr.async_reset)
 
 
 class EndpointCRG(Module):
@@ -130,12 +154,40 @@ class ApplicationExerciser(Module):
                 NextValue(transaction,transaction+1), NextState('IDLE')).Else(NextValue(read_index,read_index+1))))
 
 
+class RegisteredApplicationShell(Module):
+    """Real SYS launch/config FFs; closes after each complete LEN1..16 sweep."""
+    def __init__(self, application, endpoint):
+        self.enable = Signal()
+        self.seed = Signal(32, reset=0x94660001)
+        self.strobe = Signal(64, reset=2**64-1)
+        self.native_len = Signal(4)
+        self.quiesce = Signal()
+        self.pauses = Signal(8)
+        self.running = Signal(reset=1)
+        sequence = Signal(6)
+        next_sequence = Signal(6)
+        seen_completed = Signal(32)
+        close_age = Signal(3)
+        self.comb += [next_sequence.eq(sequence+1),
+            self.enable.eq(self.running & (application.completed == seen_completed)),
+            self.quiesce.eq(~self.running & ~application.busy)]
+        masks = Array(Constant(mask,64) for mask in
+            (2**64-1,0,0x5555aaaa00ff0ff0,0xffffffff00000000))
+        self.sync.sys += [
+            If(application.completed != seen_completed,
+                seen_completed.eq(application.completed), sequence.eq(next_sequence),
+                self.native_len.eq(next_sequence[:4]), self.strobe.eq(masks[next_sequence[4:6]]),
+                self.seed.eq(Cat(self.seed[31] ^ self.seed[21] ^ self.seed[1] ^ self.seed[0],self.seed[:31])),
+                If(self.native_len == 15, self.running.eq(0),close_age.eq(0))),
+            If(~self.running,
+                If(close_age != 7,close_age.eq(close_age+1)),
+                If((close_age >= 3) & endpoint.quiesced,
+                    self.running.eq(1),self.pauses.eq(self.pauses+1)))
+        ]
+
+
 class WideEndpointPrototype(Module):
     def __init__(self, platform):
-        self.enable = Signal(name='app_enable')
-        self.seed = Signal(32, name='app_seed')
-        self.strobe = Signal(64, name='app_strobe')
-        self.native_len = Signal(4, name='app_len')
         self.status = Signal(8, name='observed_status')
         self.checksum = Signal(32, name='observed_checksum')
         self.completed = Signal(32, name='observed_completed')
@@ -143,15 +195,18 @@ class WideEndpointPrototype(Module):
         self.submodules.endpoint = endpoint = HBMWideEndpoint(
             app_domain='sys', native_domain='axi', gray_bus_prefix='hbm_endpoint_pc00')
         self.submodules.peer = peer = RegisteredNativePeer(endpoint.native)
-        self.submodules.application = application = ApplicationExerciser(endpoint, self.enable, self.seed, self.strobe, self.native_len)
-        self.comb += endpoint.quiesce.eq(~self.enable & ~application.busy)
+        enable,seed,strobe,native_len = Signal(),Signal(32),Signal(64),Signal(4)
+        self.submodules.application = application = ApplicationExerciser(endpoint,enable,seed,strobe,native_len)
+        self.submodules.shell = shell = RegisteredApplicationShell(application,endpoint)
+        self.comb += [enable.eq(shell.enable),seed.eq(shell.seed),strobe.eq(shell.strobe),
+            native_len.eq(shell.native_len),endpoint.quiesce.eq(shell.quiesce)]
         # Peer diagnostics cross through real synchronizer flops; no false-path
         # timing exception is emitted by this target/flow.
         from migen.genlib.cdc import MultiReg
         peer_error = Signal()
         self.specials += MultiReg(peer.protocol_error, peer_error, 'sys')
         self.sync.sys += [self.status.eq(Cat(application.busy, application.errors,
-            endpoint.protocol_error, peer_error, endpoint.drained, endpoint.quiesced, application.completed[:2])),
+            endpoint.protocol_error, peer_error, endpoint.drained, endpoint.quiesced, shell.running, shell.pauses[0])),
             self.checksum.eq(application.checksum), self.completed.eq(application.completed)]
 
 
@@ -160,19 +215,28 @@ def generate(output_dir):
     output = Path(output_dir).resolve(); output.mkdir(parents=True, exist_ok=False)
     platform = Platform(); prototype = WideEndpointPrototype(platform)
     config = prototype.crg.pll.compute_config()
-    ios={prototype.crg.clk200.p, prototype.crg.clk200.n, prototype.enable, prototype.seed,
-        prototype.strobe, prototype.native_len, prototype.status, prototype.checksum, prototype.completed}
-    converted=platform.get_verilog(prototype.get_fragment(), ios=ios, name='fk33_wide_endpoint')
+    ios={prototype.crg.clk200.p, prototype.crg.clk200.n, prototype.status, prototype.checksum, prototype.completed}
+    converted=platform.get_verilog(prototype.get_fragment(), ios=ios, name='fk33_wide_endpoint',
+        special_overrides={AsyncResetSynchronizer:ProtectedResetLowerer})
     (output/'fk33_wide_endpoint.v').write_text(converted.main_source, encoding='utf-8')
     for name,data in converted.data_files.items(): (output/name).write_text(data, encoding='utf-8')
     names={key:converted.ns.get_name(signal) for key,signal in {
         'clk200_p':prototype.crg.clk200.p,'clk200_n':prototype.crg.clk200.n,
-        'enable':prototype.enable,'seed':prototype.seed,'strobe':prototype.strobe,'native_len':prototype.native_len,
         'status':prototype.status,'checksum':prototype.checksum,'completed':prototype.completed}.items()}
-    result={'scope':'Fabric-only single-address registered peer; NOT HBM or a programming image',
+    clock_io=[]
+    from litex.build.generic_platform import IOStandard
+    for port,pins,others,resource in platform.resolve_signals(converted.ns)[0]:
+        if resource[0] == 'clk200':
+            standards=[item.name for item in others if isinstance(item,IOStandard)]
+            assert len(pins)==1 and len(standards)==1
+            clock_io.append({'port':port,'package_pin':pins[0],'iostandard':standards[0]})
+    assert len(clock_io)==2
+    result={'clock_io':clock_io,'scope':'Fabric-only single-address registered peer; NOT HBM or a programming image',
         'part':platform.device,'top':'fk33_wide_endpoint','ports':names,
         'mmcm':config,'platform_sources':[str(row[0]) for row in platform.sources],
-        'gray_groups':10,'gray_bits_per_group':3,'input_delay_ns':1.0,'output_delay_ns':1.0,
+        'gray_groups':10,'gray_bits_per_group':3,'external_application_inputs':0,'registered_diagnostic_outputs':72,
+        'launch_contract':'Internal SYS registered config, all LEN1..16, four strobes, varying seed; quiesced pause each sweep',
+        'output_delay_ns':1.0,
         'clock_domain_contract':{'sys_MHz':250,'axi_MHz':500,'hbm_ref_MHz':200,'apb_MHz':100,
             'common_MMCM_lock_reset':True,'independent_hot_reset_supported':False,'reset_buf':'bufg'}}
     (output/'target-description.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
