@@ -137,6 +137,8 @@ def audit(attempt, contract_path=None, stage="final"):
         if c.get("separate_axi_domain"):
             need(csr["constants"].get("hbm_axi_clk_freq") == int(axi_mhz * 1e6),
                  "AXI frequency metadata differs from timing contract")
+            need(csr["constants"].get("hbm_experimental_overclock") == int(axi_mhz == 500),
+                 "Experimental AXI500 overclock must be identified in metadata")
         return dict(mmcm=values, sys_mhz=250, axi_mhz=axi_mhz,
                     separate_axi_domain=c.get("separate_axi_domain", False),
                     hbm_ref_mhz=200, apb_mhz=100,
