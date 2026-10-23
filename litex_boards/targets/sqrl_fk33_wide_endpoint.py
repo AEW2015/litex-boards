@@ -11,7 +11,7 @@ from migen import *
 from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.soc.cores.clock import USPMMCM
 from litex_boards.platforms.sqrl_fk33 import Platform
-from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint import HBMWideEndpoint
+from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint import HBMWideEndpoint, HBMSynchronousControlRegister
 
 
 class ProtectedResetRelease(Module):
@@ -78,21 +78,31 @@ class RegisteredNativePeer(Module):
         aw_fire, w_fire = bus.aw.valid & bus.aw.ready, bus.w.valid & bus.w.ready
         b_fire = bus.b.valid & bus.b.ready
         ar_fire, r_fire = bus.ar.valid & bus.ar.ready, bus.r.valid & bus.r.ready
+        # Preserve the original statement priority: transaction retirement
+        # overrides AW/W acceptance and B creation on a coincident edge.
+        set_b = aw_seen & w_done & ~b_valid
+        last_w = w_fire & bus.w.last
+        for name,q,d,ce in (
+            ('peer_aw_seen',aw_seen,Mux(b_fire,0,1),b_fire | aw_fire),
+            ('peer_aw_ready',aw_ready,Mux(b_fire,1,0),b_fire | aw_fire),
+            ('peer_w_ready',w_ready,Mux(b_fire,1,0),b_fire | last_w),
+            ('peer_w_done',w_done,Mux(b_fire,0,1),b_fire | last_w),
+            ('peer_b_valid',b_valid,Mux(b_fire,0,1),b_fire | set_b),
+            ('peer_w_count',w_count,Mux(b_fire,0,w_count+1),b_fire | w_fire)):
+            setattr(self.submodules,name,HBMSynchronousControlRegister(q,d,ce,domain='axi',name=name))
         writes = [If(bus.w.strb[byte], storage[w_count[:4]][8*byte:8*(byte+1)].eq(bus.w.data[8*byte:8*(byte+1)])) for byte in range(32)]
         self.sync.axi += [
             If(aw_fire,
-                aw_ready.eq(0), aw_seen.eq(1), aw_addr.eq(bus.aw.addr),
+                aw_addr.eq(bus.aw.addr),
                 aw_id.eq(bus.aw.id), aw_len.eq(bus.aw.len),
                 If((bus.aw.size != 5) | (bus.aw.burst != 1), self.protocol_error.eq(1))),
             If(w_fire,
                 If(w_count == 0, w_id.eq(bus.w.id))
                 .Elif(bus.w.id != w_id, self.protocol_error.eq(1)),
-                *writes, w_count.eq(w_count + 1),
-                If(bus.w.last, w_done.eq(1), w_ready.eq(0))),
+                *writes),
             If(aw_seen & w_done & ~b_valid,
-                b_valid.eq(1), b_id.eq(aw_id),
+                b_id.eq(aw_id),
                 If((w_id != aw_id) | (w_count != aw_len + 1), self.protocol_error.eq(1))),
-            If(b_fire, b_valid.eq(0), aw_seen.eq(0), w_done.eq(0), w_count.eq(0), aw_ready.eq(1), w_ready.eq(1)),
             If(ar_fire,
                 ar_ready.eq(0), read_pending.eq(1), read_index.eq(0),
                 read_len.eq(bus.ar.len), read_id.eq(bus.ar.id),
