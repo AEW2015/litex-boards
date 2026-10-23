@@ -70,23 +70,13 @@ def audit(attempt, contract_path=None, stage="final"):
         accepted = [jtag[0], c["accepted_tcl_async_command"]]
         outside_gray = tcl.replace("\r\n", "\n")
         if c.get("separate_axi_domain"):
-            axi_period = c["clocks"]["main_clkout3"]["period_ns"]
-            need(axi_period in (2, 4), "Unsupported separate AXI clock period")
-            gray_name = "gray-constraints-axi500.tcl" if axi_period == 2 else "gray-constraints.tcl"
-            need(c.get("gray_constraints_file", "gray-constraints.tcl") == gray_name,
-                 "Gray constraint profile differs from AXI clock")
-            gray = read(Path(__file__).with_name(gray_name)).replace("\r\n", "\n").strip()
+            gray = read(Path(__file__).with_name("gray-constraints.tcl")).replace("\r\n", "\n").strip()
             normalized_tcl = tcl.replace("\r\n", "\n")
             need(normalized_tcl.count(gray) == 1, "Generated Gray constraints differ from source or are duplicated")
-            root_policy = {"region": "X4Y1",
+            need(c.get("clock_root_policy") == {"region": "X4Y1", "period_ns": 4,
                  "buffers": {"SYS": {"pin": "BUFG/O", "clock": "main_clkout0"},
                              "AXI": {"pin": "BUFG_3/O", "clock": "main_clkout3"}},
-                 "native_actual_root_required": True}
-            root_policy.update({"periods_ns": {"SYS": 4, "AXI": 2}} if axi_period == 2 else {"period_ns": 4})
-            need(c.get("clock_root_policy") == root_policy, "Clock-root policy differs from contract")
-            need(c["gray_pointer_policy"]["maximum_datapath_ns"] == min(4, axi_period) and
-                 c["gray_pointer_policy"]["maximum_bus_skew_ns"] == min(4, axi_period),
-                 "Gray bounds must cover the faster functional clock")
+                 "native_actual_root_required": True}, "Clock-root policy differs from contract")
             outside_gray = normalized_tcl.replace(gray, "", 1)
             need(normalized_tcl.index(jtag[0]) < normalized_tcl.index(gray) <
                  normalized_tcl.index("place_design -directive"), "Gray constraints must follow clock creation and precede placement")
@@ -133,11 +123,7 @@ def audit(attempt, contract_path=None, stage="final"):
             values[key] = wanted
         for index in range(c.get("mmcm_output_count", 3)):
             need(re.search(r"\.CLKOUT"+str(index)+r"\s*\(main_clkout"+str(index)+r"\)",v), "Clock output mapping changed")
-        axi_mhz = 1000 / c["clocks"]["main_clkout3"]["period_ns"] if c.get("separate_axi_domain") else 250
-        if c.get("separate_axi_domain"):
-            need(csr["constants"].get("hbm_axi_clk_freq") == int(axi_mhz * 1e6),
-                 "AXI frequency metadata differs from timing contract")
-        return dict(mmcm=values, sys_mhz=250, axi_mhz=axi_mhz,
+        return dict(mmcm=values, sys_mhz=250, axi_mhz=250,
                     separate_axi_domain=c.get("separate_axi_domain", False),
                     hbm_ref_mhz=200, apb_mhz=100,
                     hbm_internal_pll_profiles_are_not_fabric_clocks=True)
@@ -204,9 +190,7 @@ def audit(attempt, contract_path=None, stage="final"):
             # Native positions are assigned as each loop iteration creates an
             # exception; do not identify their scope by a guessed position.
             rows = [line for line in text.splitlines() if re.match(r"^\s*\d+\s+", line)]
-            bound = c["gray_pointer_policy"]["maximum_datapath_ns"]
-            gray_rows = [line for line in rows if re.search(r"\bmax_dpo=" +
-                format(bound, "g") + r"(?:\.0+)?(?:\s|$)", line)]
+            gray_rows = [line for line in rows if "max_dpo=4" in line]
             need(len(gray_rows) == 320, "Expected 320 native Gray max-delay exceptions")
             need(len(rows) == 325, "Unexpected native exception count: " + str(len(rows)))
             # datapath_only intentionally removes hold analysis on these

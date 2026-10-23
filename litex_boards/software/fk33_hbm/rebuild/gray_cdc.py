@@ -24,15 +24,8 @@ def output_paths(evidence):
         "implemented-clock-roots.txt", "implemented-clock-roots.rpt")]
 
 
-def _axi_period_ns(axi_clk_freq):
-    if axi_clk_freq not in (250e6, 500e6):
-        raise ValueError("Native Gray proof requires AXI250 or AXI500")
-    return 1e9 / axi_clk_freq
-
-
-def query_tcl(evidence, axi_clk_freq=250e6):
+def query_tcl(evidence):
     """Return standalone query body; caller owns opening/closing checkpoint."""
-    axi_period = _axi_period_ns(axi_clk_freq)
     template = r'''
 proc hbm_gray_one {objects label} {
     if {[llength $objects] != 1} {error "$label expected one object: $objects"}
@@ -126,13 +119,6 @@ close $gray_detail
 report_bus_skew -max_paths 1 -nworst 1 -significant_digits 3 -warn_on_violation -file {@@EVIDENCE@@/implemented-gray-bus-skew.rpt}
 puts HBM_GRAY_NATIVE_QUERY_COMPLETE
 '''
-    if axi_period == 2:
-        # Keep the established default query byte-identical; only the faster
-        # domain's period and its minimum-period Gray bounds differ.
-        template = template.replace("abs($period - 4.0)",
-            'abs($period - [expr {$domain eq "AXI" ? 2.0 : 4.0}])')
-        template = template.replace("abs($requirement - 4.0)", "abs($requirement - 2.0)")
-        template = template.replace("active4ns", "active2ns")
     return template.replace("@@EVIDENCE@@", Path(evidence).as_posix())
 
 
@@ -168,9 +154,8 @@ def _skew_summary_rows(text):
     return rows
 
 
-def _parse_clock_roots(inventory, report, axi_clk_freq=250e6):
+def _parse_clock_roots(inventory, report):
     """Validate the final native physical root inventory, not source intent."""
-    axi_period = _axi_period_ns(axi_clk_freq)
     expected = {"SYS": ("BUFG", "main_clkout0"), "AXI": ("BUFG_3", "main_clkout3")}
     required = {"PIN", "CELL", "REF", "NET", "CLOCK", "PERIOD_NS", "USER_CLOCK_ROOT", "CLOCK_ROOT"}
     rows, domains, nets = [], set(), set()
@@ -186,7 +171,7 @@ def _parse_clock_roots(inventory, report, axi_clk_freq=250e6):
         period = float(row["PERIOD_NS"])
         if (row["PIN"], row["CELL"], row["CLOCK"]) != (buffer + "/O", buffer, clock):
             raise ValueError("Native clock-root topology mismatch: " + domain)
-        if row["REF"] not in ("BUFG", "BUFGCE") or not math.isfinite(period) or abs(period - (axi_period if domain == "AXI" else 4)) > .0001:
+        if row["REF"] not in ("BUFG", "BUFGCE") or not math.isfinite(period) or abs(period - 4) > .0001:
             raise ValueError("Native clock buffer/period mismatch: " + domain)
         if row["USER_CLOCK_ROOT"] != "X4Y1" or row["CLOCK_ROOT"] != "X4Y1":
             raise ValueError("Native clock root differs from X4Y1: " + domain)
@@ -200,11 +185,10 @@ def _parse_clock_roots(inventory, report, axi_clk_freq=250e6):
     return {"status": "PASS", "required_region": "X4Y1", "rows": rows}
 
 
-def parse(evidence, axi_clk_freq=250e6):
+def parse(evidence):
     """Validate native output; missing/unrecognized report formats are errors."""
-    bound = min(4, _axi_period_ns(axi_clk_freq))
     buses, paths, skew, root_inventory, root_report = output_paths(evidence)
-    clock_roots = _parse_clock_roots(root_inventory, root_report, axi_clk_freq)
+    clock_roots = _parse_clock_roots(root_inventory, root_report)
     expected = expected_groups()
     rows = []
     source_pins, destination_pins, keys = set(), set(), set()
@@ -227,7 +211,7 @@ def parse(evidence, axi_clk_freq=250e6):
         if (row["DIRECT"], row["ASYNC"], row["MR_FF"], row["MAX_DELAY"]) != ("1", "TRUE", "FALSE", "TRUE"):
             raise ValueError("Native Gray topology/exception failed: " + name)
         requirement, slack = float(row["REQUIREMENT_NS"]), float(row["SLACK_NS"])
-        if not (math.isfinite(requirement) and abs(requirement - bound) <= .001 and math.isfinite(slack) and 0 <= slack <= 100):
+        if not (math.isfinite(requirement) and abs(requirement - 4) <= .001 and math.isfinite(slack) and 0 <= slack <= 100):
             raise ValueError("Native Gray max-delay timing failed: " + name)
         if row["SRC"] in source_pins or row["DST"] in destination_pins:
             raise ValueError("A native Gray pin was reused across buses")
@@ -246,13 +230,13 @@ def parse(evidence, axi_clk_freq=250e6):
     violations = 0
     for identifier, _, corner, requirement, actual, slack in skew_rows:
         requirement, actual, slack = map(float, (requirement, actual, slack))
-        if not all(map(math.isfinite, (requirement, actual, slack))) or abs(requirement - bound) > .001 or actual < 0 or abs(requirement - actual - slack) > .003:
+        if not all(map(math.isfinite, (requirement, actual, slack))) or abs(requirement - 4) > .001 or actual < 0 or abs(requirement - actual - slack) > .003:
             raise ValueError("Invalid native bus-skew row: " + identifier)
         violations += slack < 0
     if violations or re.search(r"(?i)\bVIOLATED\b", skew_text):
         raise ValueError("Native bus-skew violations: " + str(violations))
     return {"status": "PASS", "groups": 320, "bits": 960,
         "clock_roots": clock_roots,
-        "max_delay_ns": bound, "worst_max_delay_slack_ns": min(float(row["SLACK_NS"]) for row in rows),
+        "max_delay_ns": 4, "worst_max_delay_slack_ns": min(float(row["SLACK_NS"]) for row in rows),
         "bus_skew_constraints": 320, "bus_skew_violations": violations,
         "worst_bus_skew_slack_ns": min(float(row[-1]) for row in skew_rows), "rows": rows}

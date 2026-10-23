@@ -79,7 +79,7 @@ class _HBMResetRequest(LiteXModule):
 
 class _CRG(LiteXModule):
     def __init__(self, platform, sys_clk_freq, with_hbm, hbm_ref_clk_freq=100e6,
-            strict_timing=False, hbm_axi_domain=False, hbm_axi_clk_freq=250e6):
+            strict_timing=False, hbm_axi_domain=False):
         self.rst    = Signal()
         self.cd_sys = ClockDomain()
         if with_hbm:
@@ -107,7 +107,7 @@ class _CRG(LiteXModule):
             if hbm_axi_domain:
                 # Preserve SYS/ref/APB CLKOUT0/1/2 assignments. This output is
                 # independently reset-synchronized by USPMMCM.create_clkout.
-                pll.create_clkout(self.cd_axi, hbm_axi_clk_freq)
+                pll.create_clkout(self.cd_axi, 250e6)
 
 # BaseSoC ------------------------------------------------------------------------------------------
 
@@ -303,15 +303,9 @@ class BaseSoC(SoCCore):
         hbm_primitive_rtl     = None,
         hbm_bist              = False,
         hbm_axi_domain        = False,
-        hbm_axi_clk_freq      = 250e6,
         **kwargs):
         self.hbm_primitive = hbm_primitive or hbm_primitive_rtl is not None
         self.hbm_axi_domain = bool(hbm_axi_domain)
-        if hbm_axi_clk_freq not in (250e6, 500e6):
-            raise ValueError("HBM AXI clock frequency must be 250 MHz or 500 MHz")
-        if not hbm_axi_domain and hbm_axi_clk_freq != 250e6:
-            raise ValueError("Selecting the HBM AXI clock frequency requires a separate AXI domain")
-        self.hbm_axi_clk_freq = hbm_axi_clk_freq
         if hbm_axi_domain and not (self.hbm_primitive and hbm_bist):
             raise ValueError("Separate HBM AXI domain requires primitive HBM and BIST")
         if hbm_bist and not self.hbm_primitive:
@@ -367,8 +361,7 @@ class BaseSoC(SoCCore):
         # CRG --------------------------------------------------------------------------------------
         self.crg = _CRG(platform, sys_clk_freq, with_hbm,
             hbm_ref_clk_freq=200e6 if self.hbm_primitive else 100e6,
-            strict_timing=self.hbm_primitive, hbm_axi_domain=hbm_axi_domain,
-            hbm_axi_clk_freq=hbm_axi_clk_freq)
+            strict_timing=self.hbm_primitive, hbm_axi_domain=hbm_axi_domain)
         if self.hbm_primitive:
             platform.toolchain.pre_placement_commands += [
                 "create_clock -name jtag_tck -period 66.666667 [get_pins BSCANE2/INTERNAL_TCK]",
@@ -380,9 +373,8 @@ class BaseSoC(SoCCore):
                 "report_clock_interaction -file {build_name}_clock_interaction.rpt",
             ]
             if hbm_axi_domain:
-                gray_filename = "gray-constraints-axi500.tcl" if hbm_axi_clk_freq == 500e6 else "gray-constraints.tcl"
                 gray_constraints = (Path(__file__).resolve().parents[1] / "software" /
-                    "fk33_hbm" / "rebuild" / gray_filename).read_text()
+                    "fk33_hbm" / "rebuild" / "gray-constraints.tcl").read_text()
                 # Vivado command templates expand braces with str.format.
                 platform.toolchain.pre_placement_commands.append(
                     gray_constraints.replace("{", "{{").replace("}", "}}"))
@@ -412,8 +404,7 @@ class BaseSoC(SoCCore):
                     hbm_strip_origin = hbm_strip_origin)
             else:
                 from litex.soc.cores.ram.xilinx_usp_hbm2 import PrimitiveHBM2
-                hbm_core = PrimitiveHBM2(platform, rtl_dir=hbm_primitive_rtl,
-                    axi_clk_freq=hbm_axi_clk_freq)
+                hbm_core = PrimitiveHBM2(platform, rtl_dir=hbm_primitive_rtl)
                 self.hbm = hbm_core if hbm_axi_domain else ClockDomainsRenamer({"axi": "sys"})(hbm_core)
                 axi_domain = "axi" if hbm_axi_domain else "sys"
                 # Four RV32 windows select eight groups of four native ports.
@@ -553,7 +544,7 @@ class BaseSoC(SoCCore):
                 self.add_constant("HBM_HIGH_BASE", hbm_high_base)
                 if hbm_axi_domain:
                     self.add_constant("HBM_AXI_CLOCK_DOMAIN", 1)
-                    self.add_constant("HBM_AXI_CLK_FREQ", int(hbm_axi_clk_freq))
+                    self.add_constant("HBM_AXI_CLK_FREQ", 250000000)
                 self.comb += all_windows_idle.eq(Reduce("AND",
                     [admission_gates[index].idle & window_idle_signals[index]
                         for index in range(4)] + cdc_idle_signals))
@@ -676,8 +667,7 @@ def main():
     parser.add_target_argument("--hbm-primitive", action="store_true", help="Use bundled primitive HBM and processor calibration firmware.")
     parser.add_target_argument("--hbm-primitive-rtl", help="Override the bundled primitive/control RTL directory.")
     parser.add_target_argument("--hbm-bist", action="store_true", help="Add exclusive per-channel burst test masters and counters.")
-    parser.add_target_argument("--hbm-axi-domain", action="store_true", help="Experimental independent HBM AXI clock domain (requires primitive BIST).")
-    parser.add_target_argument("--hbm-axi-clk-freq", default=250e6, type=float, choices=[250e6, 500e6], help="Independent HBM AXI clock frequency (requires --hbm-axi-domain for 500 MHz).")
+    parser.add_target_argument("--hbm-axi-domain", action="store_true", help="Experimental independent 250 MHz HBM AXI clock domain (requires primitive BIST).")
     parser.add_target_argument("--hbm-channels", default="0,1,2,3",         help="HBM channels to map (comma/range list or all).")
     parser.add_target_argument("--hbm-main-channel", default=0, type=int,   help="Mapped HBM channel used as main RAM.")
     parser.add_target_argument("--hbm-base",       default=USPHBM2_DEFAULT_BASE,
@@ -712,7 +702,6 @@ def main():
         hbm_primitive_rtl     = args.hbm_primitive_rtl,
         hbm_bist              = args.hbm_bist,
         hbm_axi_domain        = args.hbm_axi_domain,
-        hbm_axi_clk_freq      = args.hbm_axi_clk_freq,
         **parser.soc_argdict
     )
     builder = Builder(soc, **parser.builder_argdict)
