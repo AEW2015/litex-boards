@@ -196,17 +196,154 @@ class RegisteredApplicationShell(Module):
         ]
 
 
+class QueuedNativePeer(Module):
+    """Ordered four-command AXI3 peer; 2KiB RAM with reset byte-valid fencing.
+
+    AW and whole-burst W ingress are independent. The commit engine pairs them
+    in order and checks WID/LAST. Latency/stalls are identical for window1/4 tests.
+    """
+    def __init__(self,bus,*,response_latency=12,read_latency=12,stall_period=0):
+        from litex.soc.interconnect import stream
+        if not (0<=response_latency<=255 and 0<=read_latency<=255):raise ValueError('Latency must fit8bits')
+        if stall_period not in (0,4,8,16):raise ValueError('Stall period must be0/4/8/16')
+        self.protocol_error=Signal();self.write_outstanding=Signal(3);self.read_outstanding=Signal(3)
+        self.w_bursts_pending=Signal(3)
+        self.submodules.awq=awq=ClockDomainsRenamer('axi')(stream.SyncFIFO([('addr',33),('len',4),('id',6)],4,buffered=True))
+        self.submodules.wq=wq=ClockDomainsRenamer('axi')(stream.SyncFIFO([('data',256),('strb',32),('id',6)],64,buffered=True))
+        self.submodules.arq=arq=ClockDomainsRenamer('axi')(stream.SyncFIFO([('addr',33),('len',4),('id',6)],4,buffered=True))
+        accept=Signal(reset=1)
+        if stall_period:
+            phase=Signal(max=stall_period);self.sync.axi+=phase.eq(phase+1)
+            self.comb+=accept.eq(phase!=0)
+        self.comb += [
+            bus.aw.ready.eq(awq.sink.ready & (self.write_outstanding<4) & accept),
+            awq.sink.valid.eq(bus.aw.valid & (self.write_outstanding<4) & accept),
+            awq.sink.addr.eq(bus.aw.addr),awq.sink.len.eq(bus.aw.len),awq.sink.id.eq(bus.aw.id),
+            bus.w.ready.eq(wq.sink.ready & (self.w_bursts_pending<4) & accept),
+            wq.sink.valid.eq(bus.w.valid & (self.w_bursts_pending<4) & accept),
+            wq.sink.data.eq(bus.w.data),wq.sink.strb.eq(bus.w.strb),wq.sink.id.eq(bus.w.id),wq.sink.last.eq(bus.w.last),
+            bus.ar.ready.eq(arq.sink.ready & (self.read_outstanding<4) & accept),
+            arq.sink.valid.eq(bus.ar.valid & (self.read_outstanding<4) & accept),
+            arq.sink.addr.eq(bus.ar.addr),arq.sink.len.eq(bus.ar.len),arq.sink.id.eq(bus.ar.id)]
+        aw_fire=bus.aw.valid & bus.aw.ready;w_fire=bus.w.valid & bus.w.ready;ar_fire=bus.ar.valid & bus.ar.ready
+        b_fire=bus.b.valid & bus.b.ready;r_fire=bus.r.valid & bus.r.ready
+        memory=Memory(256,64);self.specials+=memory
+        self.write_port=wp=memory.get_port(write_capable=True,we_granularity=8,clock_domain='axi')
+        self.read_port=rp=memory.get_port(async_read=True,clock_domain='axi');self.specials += [wp,rp]
+        self.byte_valid=valid=Array(Signal(32,name='peer4_byte_valid_%02d'%i) for i in range(64))
+        active=Signal();left=Signal(5);address=Signal(6);write_id=Signal(6)
+        bhead,btail=Signal(2),Signal(2);bcount=Signal(3)
+        bvalid=Array(Signal(name='peer4_bslot_valid_%d'%i) for i in range(4))
+        bdelay=Array(Signal(8,name='peer4_bslot_delay_%d'%i) for i in range(4))
+        bid=Array(Signal(6,name='peer4_bslot_id_%d'%i) for i in range(4))
+        self.comb += [bus.b.valid.eq((bcount!=0) & bvalid[bhead] & (bdelay[bhead]==0)),bus.b.id.eq(bid[bhead]),bus.b.resp.eq(0)]
+        start_w=awq.source.valid & ~active
+        commit=active & wq.source.valid & ((left!=1) | (bcount<4))
+        finish_w=commit & (left==1)
+        self.comb += [awq.source.ready.eq(~active),wq.source.ready.eq(active & ((left!=1) | (bcount<4))),
+            wp.adr.eq(address),wp.dat_w.eq(wq.source.data),wp.we.eq(Mux(commit,wq.source.strb,0))]
+        self.sync.axi += [
+            If(start_w,address.eq(awq.source.addr[5:11]),write_id.eq(awq.source.id)),
+            If(commit,address.eq(address+1),
+                If((wq.source.id!=write_id) | (wq.source.last!=(left==1)),self.protocol_error.eq(1)),
+                *[If(wq.source.strb[byte],valid[address][byte].eq(1)) for byte in range(32)]),
+            If(aw_fire,If((bus.aw.size!=5)|(bus.aw.burst!=1)|(bus.aw.addr[:5]!=0)|(bus.aw.addr[11:]!=0)|
+                ((bus.aw.addr[5:11]+bus.aw.len+1)>64),self.protocol_error.eq(1))),
+            If(ar_fire,If((bus.ar.size!=5)|(bus.ar.burst!=1)|(bus.ar.addr[:5]!=0)|(bus.ar.addr[11:]!=0)|
+                ((bus.ar.addr[5:11]+bus.ar.len+1)>64),self.protocol_error.eq(1)))]
+        for slot in range(4):
+            self.sync.axi += [
+                If(bvalid[slot] & (bdelay[slot]!=0),bdelay[slot].eq(bdelay[slot]-1)),
+                If(b_fire & (bhead==slot),bvalid[slot].eq(0)),
+                If(finish_w & (btail==slot),bvalid[slot].eq(1),bdelay[slot].eq(response_latency),bid[slot].eq(write_id))]
+        read_active=Signal();read_left=Signal(5);read_address=Signal(6);read_id=Signal(6);delay=Signal(8)
+        issued_last=Signal();rvalid=Signal();rlast=Signal();rdata=Signal(256,name='peer4_registered_read_source',attr={('DONT_TOUCH','TRUE')})
+        start_r=arq.source.valid & ~read_active
+        load_r=read_active & ~issued_last & (delay==0) & (~rvalid | bus.r.ready) & accept
+        finish_r=r_fire & rlast
+        self.comb += [arq.source.ready.eq(~read_active),rp.adr.eq(read_address),bus.r.valid.eq(rvalid),bus.r.last.eq(rlast),
+            bus.r.data.eq(rdata),bus.r.id.eq(read_id),bus.r.resp.eq(0)]
+        mask=Cat(*[Replicate(valid[read_address][byte],8) for byte in range(32)])
+        self.sync.axi += [If(start_r,read_address.eq(arq.source.addr[5:11]),read_id.eq(arq.source.id),delay.eq(read_latency)),
+            If(read_active & (delay!=0),delay.eq(delay-1)),
+            If(load_r,rdata.eq(rp.dat_r & mask),rlast.eq(read_left==1),read_address.eq(read_address+1))]
+        controls=(
+            ('peer_window_aw_count',self.write_outstanding,self.write_outstanding+Mux(aw_fire,1,-1),aw_fire ^ b_fire),
+            ('peer_window_w_count',self.w_bursts_pending,self.w_bursts_pending+Mux(w_fire & bus.w.last,1,-1),(w_fire & bus.w.last)^b_fire),
+            ('peer_window_ar_count',self.read_outstanding,self.read_outstanding+Mux(ar_fire,1,-1),ar_fire ^ finish_r),
+            ('peer_window_write_active',active,Mux(start_w,1,0),start_w | finish_w),
+            ('peer_window_write_left',left,Mux(start_w,awq.source.len+1,left-1),start_w | commit),
+            ('peer_window_bhead',bhead,bhead+1,b_fire),('peer_window_btail',btail,btail+1,finish_w),
+            ('peer_window_bcount',bcount,bcount+Mux(finish_w,1,-1),finish_w ^ b_fire),
+            ('peer_window_read_active',read_active,Mux(start_r,1,0),start_r | finish_r),
+            ('peer_window_read_left',read_left,Mux(start_r,arq.source.len+1,read_left-1),start_r | load_r),
+            ('peer_window_read_issued_last',issued_last,Mux(start_r,0,1),start_r | (load_r & (read_left==1))),
+            ('peer_window_rvalid',rvalid,Mux(load_r,1,0),load_r | r_fire))
+        for name,q,d,ce in controls:setattr(self.submodules,name,HBMSynchronousControlRegister(q,d,ce,domain='axi',name=name))
+
+
+class WindowApplicationExerciser(Module):
+    """Four ordered commands per frame; overlapping AW/W/B and AR/R streams."""
+    def __init__(self,endpoint,enable,seed,strobe,native_len):
+        self.errors=Signal();self.completed=Signal(32);self.checksum=Signal(32);self.busy=Signal()
+        self.max_write_credits=Signal(3);self.max_read_credits=Signal(3)
+        frame=Signal(32);captured_seed=Signal(32);captured_strobe=Signal(64);length=Signal(4);identity=Signal(6)
+        aw_count=Signal(3);w_command=Signal(3);w_word=Signal(3);b_count=Signal(3);ar_count=Signal(3);r_command=Signal(2);r_word=Signal(3)
+        expected=Array(Signal(512,name='window_expected_%02d'%i) for i in range(32))
+        final_word=length[1:4];w_slot=Cat(w_word,w_command[:2]);r_slot=Cat(r_word,r_command)
+        payload=Cat(*[(frame ^ captured_seed ^ (w_command<<16) ^ w_word ^ Constant((0x94660000+lane*0x10203)&0xffffffff,32)) for lane in range(16)])
+        odd_write=~length[0] & (w_word==final_word);odd_read=~length[0] & (r_word==final_word)
+        byte_mask=captured_strobe & Mux(odd_write,Constant(0xffffffff,64),Constant(2**64-1,64))
+        write_mask=Cat(*[Replicate(byte_mask[byte],8) for byte in range(64)])
+        read_mask=Mux(odd_read,Constant(2**256-1,512),Constant(2**512-1,512))
+        self.comb += [endpoint.aw.addr.eq(aw_count[:2]<<9),endpoint.aw.len.eq(length),endpoint.aw.id.eq(identity),
+            endpoint.w.data.eq(payload),endpoint.w.strb.eq(captured_strobe),endpoint.w.last.eq(w_word==final_word),
+            endpoint.ar.addr.eq(ar_count[:2]<<9),endpoint.ar.len.eq(length),endpoint.ar.id.eq(identity)]
+        self.submodules.fsm=fsm=FSM(reset_state='IDLE')
+        fsm.act('IDLE',If(enable,NextValue(captured_seed,seed),NextValue(captured_strobe,strobe),NextValue(length,native_len),
+            NextValue(identity,frame[:6]),NextValue(aw_count,0),NextValue(w_command,0),NextValue(w_word,0),NextValue(b_count,0),
+            NextValue(ar_count,0),NextValue(r_command,0),NextValue(r_word,0),NextState('WRITE')))
+        fsm.act('WRITE',self.busy.eq(1),endpoint.aw.valid.eq(aw_count<4),endpoint.w.valid.eq((w_command<aw_count)&(w_command<4)),endpoint.b.ready.eq(1),
+            If(endpoint.aw.valid & endpoint.aw.ready,NextValue(aw_count,aw_count+1)),
+            If(endpoint.w.valid & endpoint.w.ready,
+                NextValue(expected[w_slot],(payload & write_mask)|(expected[w_slot] & ~write_mask)),
+                If(w_word==final_word,NextValue(w_word,0),NextValue(w_command,w_command+1)).Else(NextValue(w_word,w_word+1))),
+            If(endpoint.b.valid,If((endpoint.b.id!=identity)|(endpoint.b.resp!=0),NextValue(self.errors,1)),
+                NextValue(b_count,b_count+1),If(b_count==3,NextState('READ'))))
+        fold=Constant(0,32)
+        for lane in range(16):
+            word=(endpoint.r.data & read_mask)[32*lane:32*(lane+1)]
+            fold=fold ^ (word if lane==0 else Cat(word[32-lane:32],word[:32-lane]))
+        fsm.act('READ',self.busy.eq(1),endpoint.ar.valid.eq(ar_count<4),endpoint.r.ready.eq(1),
+            If(endpoint.ar.valid & endpoint.ar.ready,NextValue(ar_count,ar_count+1)),
+            If(endpoint.r.valid,
+                If(((endpoint.r.data & read_mask)!=(expected[r_slot] & read_mask))|
+                    (endpoint.r.keep!=Mux(odd_read,Constant(0xffffffff,64),Constant(2**64-1,64)))|
+                    (endpoint.r.id[:6]!=identity)|(~odd_read & (endpoint.r.id[6:]!=identity))|
+                    (endpoint.r.resp!=0)|(endpoint.r.first!=(r_word==0))|(endpoint.r.last!=(r_word==final_word)),NextValue(self.errors,1)),
+                NextValue(self.checksum,(Cat(self.checksum[25:32],self.checksum[:25])+fold)[:32]),
+                If(r_word==final_word,NextValue(r_word,0),If(r_command==3,NextValue(self.completed,self.completed+1),NextValue(frame,frame+1),NextState('IDLE'))
+                    .Else(NextValue(r_command,r_command+1))).Else(NextValue(r_word,r_word+1))))
+        write_credits=getattr(endpoint,"write_credits",endpoint.write_pending)
+        read_credits=getattr(endpoint,"read_credits",endpoint.read_pending)
+        self.sync.sys += [If(write_credits>self.max_write_credits,self.max_write_credits.eq(write_credits)),
+            If(read_credits>self.max_read_credits,self.max_read_credits.eq(read_credits))]
+
+
 class WideEndpointPrototype(Module):
-    def __init__(self, platform):
+    def __init__(self, platform, *, max_outstanding=1):
+        if max_outstanding not in (1,4):raise ValueError("Window must be1or4")
         self.status = Signal(8, name='observed_status')
         self.checksum = Signal(32, name='observed_checksum')
         self.completed = Signal(32, name='observed_completed')
         self.submodules.crg = EndpointCRG(platform)
+        options={} if max_outstanding==1 else {'max_outstanding':4}
         self.submodules.endpoint = endpoint = HBMWideEndpoint(
-            app_domain='sys', native_domain='axi', gray_bus_prefix='hbm_endpoint_pc00')
-        self.submodules.peer = peer = RegisteredNativePeer(endpoint.native)
+            app_domain='sys', native_domain='axi', gray_bus_prefix='hbm_endpoint_pc00',**options)
+        self.submodules.peer = peer = (RegisteredNativePeer(endpoint.native) if max_outstanding==1 else QueuedNativePeer(endpoint.native))
         enable,seed,strobe,native_len = Signal(),Signal(32),Signal(64),Signal(4)
-        self.submodules.application = application = ApplicationExerciser(endpoint,enable,seed,strobe,native_len)
+        App=ApplicationExerciser if max_outstanding==1 else WindowApplicationExerciser
+        self.submodules.application = application = App(endpoint,enable,seed,strobe,native_len)
         self.submodules.shell = shell = RegisteredApplicationShell(application,endpoint)
         self.comb += [enable.eq(shell.enable),seed.eq(shell.seed),strobe.eq(shell.strobe),
             native_len.eq(shell.native_len),endpoint.quiesce.eq(shell.quiesce)]
@@ -215,15 +352,17 @@ class WideEndpointPrototype(Module):
         from migen.genlib.cdc import MultiReg
         peer_error = Signal()
         self.specials += MultiReg(peer.protocol_error, peer_error, 'sys')
+        observed_window=([shell.running,shell.pauses[0]] if max_outstanding==1 else
+            [application.max_write_credits==4,application.max_read_credits==4])
         self.sync.sys += [self.status.eq(Cat(application.busy, application.errors,
-            endpoint.protocol_error, peer_error, endpoint.drained, endpoint.quiesced, shell.running, shell.pauses[0])),
+            endpoint.protocol_error, peer_error, endpoint.drained, endpoint.quiesced, *observed_window)),
             self.checksum.eq(application.checksum), self.completed.eq(application.completed)]
 
 
-def generate(output_dir):
+def generate(output_dir, *, max_outstanding=1):
     """Generate source only; caller records imports, snapshots and CAD inputs."""
     output = Path(output_dir).resolve(); output.mkdir(parents=True, exist_ok=False)
-    platform = Platform(); prototype = WideEndpointPrototype(platform)
+    platform = Platform(); prototype = WideEndpointPrototype(platform,max_outstanding=max_outstanding)
     config = prototype.crg.pll.compute_config()
     ios={prototype.crg.clk200.p, prototype.crg.clk200.n, prototype.status, prototype.checksum, prototype.completed}
     converted=platform.get_verilog(prototype.get_fragment(), ios=ios, name='fk33_wide_endpoint',
@@ -241,7 +380,11 @@ def generate(output_dir):
             assert len(pins)==1 and len(standards)==1
             clock_io.append({'port':port,'package_pin':pins[0],'iostandard':standards[0]})
     assert len(clock_io)==2
-    result={'clock_io':clock_io,'scope':'Fabric-only single-address registered peer; NOT HBM or a programming image',
+    result={'max_outstanding':max_outstanding,'peer_capacity_commands':1 if max_outstanding==1 else 4,
+        'peer_memory_words':16 if max_outstanding==1 else 64,'peer_memory_data_width':256,
+        'peer_byte_valid_bits':0 if max_outstanding==1 else 2048,'peer_W_ingress_beats':0 if max_outstanding==1 else 64,
+        'peer_response_latency_cycles':0 if max_outstanding==1 else 12,'peer_read_latency_cycles':0 if max_outstanding==1 else 12,
+        'clock_io':clock_io,'scope':('Fabric-only single-address registered peer' if max_outstanding==1 else 'Fabric-only four-address queued registered peer')+'; NOT HBM or a programming image',
         'part':platform.device,'top':'fk33_wide_endpoint','ports':names,
         'mmcm':config,'platform_sources':[str(row[0]) for row in platform.sources],
         'gray_groups':10,'gray_bits_per_group':3,'external_application_inputs':0,'registered_diagnostic_outputs':72,
