@@ -135,8 +135,11 @@ def audit(attempt, contract_path=None, stage="final"):
             need(re.search(r"^#define SYS_CLK_FREQ 200000000u$", header, re.M),
                  "Firmware SYS frequency differs from the rated profile")
             for name, wanted in (("SYS_TIMEOUT", 640052), ("TEMPERATURE_MAX_AGE", 3000000000)):
-                hits = re.findall(r"\." + name + r"\s*\(\s*\d+'d(\d+)\s*\)", v)
-                need(hits == [str(wanted)], "Control wall-clock parameter mismatch: " + name)
+                hits = re.findall(r"\." + name + r"\s*\(\s*(\d+)'([dh])([0-9a-fA-F]+)\s*\)", v)
+                values = [int(value, 16 if radix == "h" else 10) for _, radix, value in hits]
+                need(values == [wanted] and all(0 <= value < (1 << int(width))
+                     for (width, _, _), value in zip(hits, values)),
+                     "Control wall-clock parameter mismatch: " + name)
         expected = c.get("mmcm_parameters", {
             "CLKFBOUT_MULT_F":5, "DIVCLK_DIVIDE":1, "CLKOUT0_DIVIDE_F":4,
             "CLKOUT1_DIVIDE":5, "CLKOUT2_DIVIDE":10})
