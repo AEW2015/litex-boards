@@ -61,7 +61,16 @@ def executable(value):
     return path
 
 
-def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False):
+def contract_path(axi_domain=False, axi_clk_freq=250e6):
+    if axi_clk_freq not in (250e6, 500e6) or (not axi_domain and axi_clk_freq != 250e6):
+        raise ValueError('AXI500 requires the separate AXI domain; supported rates are 250/500 MHz')
+    name = ('timing-contract-axi500.json' if axi_clk_freq == 500e6 else
+            'timing-contract-axi-domain.json' if axi_domain else 'timing-contract.json')
+    return HERE/name
+
+
+def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=250e6):
+    contract_path(axi_domain, axi_clk_freq)
     # Execute the checked-out board target rather than an unrelated installed copy.
     sys.path.insert(0, str(BOARDS))
     import litex
@@ -84,9 +93,12 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False):
         '--vivado-report-level', 'signoff']
     if axi_domain:
         args.append('--hbm-axi-domain')
+    if axi_clk_freq != 250e6:
+        args += ['--hbm-axi-clk-freq', str(int(axi_clk_freq))]
     save(attempt/'generation-command.json', dict(python=sys.executable, args=args,
         core=str(core), core_commit=pinned, requested_core_commit=core_commit,
         boards=str(BOARDS), boards_commit=boards_commit, hbm_axi_domain=axi_domain,
+        hbm_axi_clk_freq=int(axi_clk_freq),
         python_version=sys.version, packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions()}))
     sys.argv = args
     runpy.run_module('litex_boards.targets.sqrl_fk33', run_name='__main__')
@@ -112,11 +124,9 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False):
     save(attempt/'generated-hashes.json', [binding(p) for p in sorted((attempt/'output').rglob('*')) if p.is_file()])
 
 
-def audit(attempt, stage, axi_domain=False):
+def audit(attempt, stage, axi_domain=False, axi_clk_freq=250e6):
     from timing_audit import audit as run_audit
-    options = {'stage': stage}
-    if axi_domain:
-        options['contract_path'] = HERE/'timing-contract-axi-domain.json'
+    options = {'stage': stage, 'contract_path': contract_path(axi_domain, axi_clk_freq)}
     result = run_audit(attempt, **options)
     save(attempt/f'timing-audit-{stage}.json', result)
     if result['status'] != 'PASS':
@@ -155,7 +165,7 @@ def implement(attempt, vivado):
         save(attempt/'implementation-result.json', result)
 
 
-def inspect(attempt, vivado, axi_domain=False):
+def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6):
     from netlist_inspection import query_tcl, parse_reset_chains, output_paths
     evidence = attempt/'inspection'
     evidence.mkdir(exist_ok=False)
@@ -169,7 +179,7 @@ def inspect(attempt, vivado, axi_domain=False):
     if axi_domain:
         import gray_cdc
         inspection_tcl = inspection_tcl.replace('puts HBM_NETLIST_INSPECTION_COMPLETE',
-            gray_cdc.query_tcl(evidence) + '\nputs HBM_NETLIST_INSPECTION_COMPLETE')
+            gray_cdc.query_tcl(evidence, axi_clk_freq=axi_clk_freq) + '\nputs HBM_NETLIST_INSPECTION_COMPLETE')
     query.write_text(inspection_tcl, encoding='utf-8')
     command([vivado, '-mode', 'batch', '-source', query, '-log', evidence/'vivado.log',
         '-journal', evidence/'vivado.jou'], evidence, evidence/'netlist-inspection-console.log')
@@ -187,7 +197,7 @@ def inspect(attempt, vivado, axi_domain=False):
     result = dict(status='PASS', checkpoint=binding(dcp), reset_chains=chains,
         outputs=[binding(p) for p in output_paths(evidence, axi_domain=axi_domain)], datarate_mt_s=1800)
     if axi_domain:
-        result['gray_cdc'] = gray_cdc.parse(evidence)
+        result['gray_cdc'] = gray_cdc.parse(evidence, axi_clk_freq=axi_clk_freq)
         result['outputs'] += [binding(p) for p in gray_cdc.output_paths(evidence)]
     save(evidence/'result.json', result)
     return result
@@ -226,13 +236,18 @@ def main():
         help='Required LiteX core HEAD (default: the reviewed baseline commit)')
     parser.add_argument('--hbm-axi-domain', action='store_true',
         help='Build the separate AXI clock domain and use its timing/reset contracts')
+    parser.add_argument('--hbm-axi-clk-freq', type=float, choices=(250e6, 500e6), default=250e6,
+        help='AXI clock frequency; 500 MHz requires --hbm-axi-domain (default: 250 MHz)')
     parser.add_argument('--generate-only', action='store_true', help='Generate RTL/firmware and audit source constraints; no CAD or build PASS')
     parser.add_argument('--resume', action='store_true', help='Implement an unchanged GENERATED output; never retry a failed native build')
     args = parser.parse_args()
+    if args.hbm_axi_clk_freq != 250e6 and not args.hbm_axi_domain:
+        parser.error('--hbm-axi-clk-freq=500e6 requires --hbm-axi-domain')
     attempt = args.output_dir.resolve()
     result = dict(status='FAIL', attempt=str(attempt), started_utc=datetime.now(timezone.utc).isoformat(),
         hardware_tested=False, published=False,
-        hbm_axi_domain=args.hbm_axi_domain, requested_core_commit=args.core_commit,
+        hbm_axi_domain=args.hbm_axi_domain, hbm_axi_clk_freq=int(args.hbm_axi_clk_freq),
+        requested_core_commit=args.core_commit,
         scope='Portable build/timing/netlist/RapidWright checks. Local historical simulations and hardware campaign are separate evidence.')
     if args.generate_only and args.resume:
         parser.error('--generate-only and --resume are mutually exclusive')
@@ -247,6 +262,8 @@ def main():
         recorded_core_commit = generation.get('requested_core_commit', generation.get('core_commit'))
         if recorded_axi_domain != args.hbm_axi_domain:
             parser.error('--resume HBM AXI-domain profile does not match generation-command.json')
+        if generation.get('hbm_axi_clk_freq', 250000000) != args.hbm_axi_clk_freq:
+            parser.error('--resume AXI frequency does not match generation-command.json')
         if recorded_core_commit != args.core_commit:
             parser.error('--resume core commit does not match generation-command.json; pass the original --core-commit')
     else:
@@ -279,8 +296,10 @@ def main():
                 '--core-commit', args.core_commit]
             if args.hbm_axi_domain:
                 child_args.append('--hbm-axi-domain')
+            if args.hbm_axi_clk_freq != 250e6:
+                child_args += ['--hbm-axi-clk-freq', str(int(args.hbm_axi_clk_freq))]
             command(child_args, BOARDS, attempt/'generation.log')
-        audit(attempt, 'source', axi_domain=args.hbm_axi_domain)
+        audit(attempt, 'source', axi_domain=args.hbm_axi_domain, axi_clk_freq=args.hbm_axi_clk_freq)
         if args.generate_only:
             result['status'] = 'GENERATED'
         else:
@@ -297,9 +316,11 @@ def main():
                     or len(physical.get('native_timing_paths', [])) != 400):
                 raise ValueError('RapidWright receipt lacks required routed pin/channel/path evidence')
             result['rapidwright'] = binding(attempt/'rapidwright/result.json')
-            result['timing'] = audit(attempt, 'final', axi_domain=args.hbm_axi_domain)['checks']['routed_sta']['detail']
+            result['timing'] = audit(attempt, 'final', axi_domain=args.hbm_axi_domain,
+                axi_clk_freq=args.hbm_axi_clk_freq)['checks']['routed_sta']['detail']
             result['diagnostics'] = diagnostics(attempt)
-            result['inspection'] = inspect(attempt, vivado, axi_domain=args.hbm_axi_domain)
+            result['inspection'] = inspect(attempt, vivado, axi_domain=args.hbm_axi_domain,
+                axi_clk_freq=args.hbm_axi_clk_freq)
             unchanged(load(attempt/'input-hashes.json'))
             result.update(status='BUILD_PASS', bitstream=binding(attempt/'output/gateware/sqrl_fk33.bit'))
             result['artifacts'] = [binding(attempt/path) for path in (
@@ -323,7 +344,9 @@ if __name__ == '__main__':
         child.add_argument('--generate-child', required=True, type=Path)
         child.add_argument('--core-commit', default=CORE_COMMIT)
         child.add_argument('--hbm-axi-domain', action='store_true')
+        child.add_argument('--hbm-axi-clk-freq', type=float, choices=(250e6, 500e6), default=250e6)
         child_args = child.parse_args()
-        generate(child_args.generate_child.resolve(), child_args.core_commit, child_args.hbm_axi_domain)
+        generate(child_args.generate_child.resolve(), child_args.core_commit,
+            child_args.hbm_axi_domain, child_args.hbm_axi_clk_freq)
     else:
         raise SystemExit(main())
