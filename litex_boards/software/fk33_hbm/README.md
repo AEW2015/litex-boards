@@ -15,9 +15,9 @@ conservative performance target. HBM is limited to 900 MHz / 1800 MT/s;
 retain the 200 MHz HBM reference and 100 MHz APB clock.
 See [AMD's HBM controller limits](https://docs.amd.com/r/en-US/ds923-virtex-ultrascale-plus/High-Bandwidth-Memory-Controller).
 
-The implemented recipe below still uses 250 MHz SYS/AXI. A faster rated AXI
-profile needs its own clock-tree integration, timing closure and hardware
-qualification; this policy does not make 400/450 MHz an implemented option.
+The reference recipe below uses 250 MHz SYS/AXI. The new rated AXI400
+candidate selects SYS200 and is described below; it needs fresh timing closure
+and hardware qualification. There is no implemented AXI450 profile.
 The normal primitive target rejects AXI500 and has no 1000 MHz HBM profile. Earlier
 AXI500 source work is retained on `work/hbm-experimental-overclock` in both
 repositories. An explicit overclock option is deferred to later work.
@@ -174,8 +174,8 @@ are not reused to certify a new checkout.
 ## Experimental separate AXI domain
 
 This branch adds `--hbm-axi-domain` to the rebuild launcher and board target.
-Use LiteX commit `3dbe0d540a5ea8b2ea0c33e91aecd45f1c9c0c28` and pass
-`--core-commit 3dbe0d540a5ea8b2ea0c33e91aecd45f1c9c0c28` to the launcher alongside
+Use LiteX commit `906eb27990c68e8b30f661201eea22b18ef7c1ee` and pass
+`--core-commit 906eb27990c68e8b30f661201eea22b18ef7c1ee` to the launcher alongside
 that flag and the normal tool/output arguments. Both source checkouts must be
 clean. The flag is also required when resuming a generated attempt.
 
@@ -191,6 +191,30 @@ shared-SYS build remains the default.
 This option keeps the normal AMD-rated clock policy above. Native
 timing closure, calibration and processor transactions must qualify each new
 image. Simulation alone does not establish those hardware results.
+
+## Rated SYS200 / AXI400 candidate
+
+With the matching core commit above installed and both checkouts clean, add
+these arguments to the rebuild launcher command:
+
+```text
+--hbm-axi-domain --hbm-axi-clk-freq 400e6 --core-commit 906eb27990c68e8b30f661201eea22b18ef7c1ee
+```
+
+The launcher selects SYS200 / AXI400 / HBM900 / REF200 / APB100. The direct
+board-target CLI also requires `--sys-clk-freq=200e6`. The standard MMCM
+planner selects VCO1600 with output divisors 8/8/16/4, preserving output and
+reset numbering and a 2:1 SYS/AXI ratio. All functional clocks remain related.
+Per-vector Gray max-delay and skew bounds are 2.5 ns, and native inspection
+checks SYS5 ns / AXI2.5 ns and the requested/actual clock roots. No normal
+clock-limit, setup, hold, pulse-width, DRC or RapidWright gate is waived.
+
+Firmware delays/deadlines and the mailbox SYS frequency come from the CSR
+clock metadata. The core preserves the control watchdog duration and 15-second
+temperature age at SYS200. HBM PLL/PHY/MC tables and destructive 800/900 MHz
+profiles are unchanged. This is a separate candidate, not qualification of a
+new programming image; require its source-bound native and hardware results.
+Resume with the same AXI-rate arguments. AXI250 remains the launcher's default.
 
 ## Processor calibration after loading
 

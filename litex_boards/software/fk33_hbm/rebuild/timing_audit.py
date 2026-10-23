@@ -70,13 +70,24 @@ def audit(attempt, contract_path=None, stage="final"):
         accepted = [jtag[0], c["accepted_tcl_async_command"]]
         outside_gray = tcl.replace("\r\n", "\n")
         if c.get("separate_axi_domain"):
-            gray = read(Path(__file__).with_name("gray-constraints.tcl")).replace("\r\n", "\n").strip()
+            periods = (c["clocks"]["main_clkout0"]["period_ns"], c["clocks"]["main_clkout3"]["period_ns"])
+            need(periods in ((4, 4), (5, 2.5)), "Unsupported rated SYS/AXI profile")
+            rated400 = periods == (5, 2.5)
+            gray_name = "gray-constraints-axi400.tcl" if rated400 else "gray-constraints.tcl"
+            need(c.get("gray_constraints_file", "gray-constraints.tcl") == gray_name,
+                 "Gray constraint profile differs from SYS/AXI clocks")
+            gray = read(Path(__file__).with_name(gray_name)).replace("\r\n", "\n").strip()
             normalized_tcl = tcl.replace("\r\n", "\n")
             need(normalized_tcl.count(gray) == 1, "Generated Gray constraints differ from source or are duplicated")
-            need(c.get("clock_root_policy") == {"region": "X4Y1", "period_ns": 4,
+            policy = {"region": "X4Y1",
                  "buffers": {"SYS": {"pin": "BUFG/O", "clock": "main_clkout0"},
                              "AXI": {"pin": "BUFG_3/O", "clock": "main_clkout3"}},
-                 "native_actual_root_required": True}, "Clock-root policy differs from contract")
+                 "native_actual_root_required": True}
+            policy.update({"periods_ns": {"SYS": 5, "AXI": 2.5}} if rated400 else {"period_ns": 4})
+            need(c.get("clock_root_policy") == policy, "Clock-root policy differs from contract")
+            need(c["gray_pointer_policy"]["maximum_datapath_ns"] == min(periods) and
+                 c["gray_pointer_policy"]["maximum_bus_skew_ns"] == min(periods),
+                 "Gray bounds must cover the faster functional clock")
             outside_gray = normalized_tcl.replace(gray, "", 1)
             need(normalized_tcl.index(jtag[0]) < normalized_tcl.index(gray) <
                  normalized_tcl.index("place_design -directive"), "Gray constraints must follow clock creation and precede placement")
@@ -112,7 +123,20 @@ def audit(attempt, contract_path=None, stage="final"):
     def topology():
         v = read(g / "sqrl_fk33.v")
         csr = json.loads(read(a / "output/csr.json"))
-        need(csr["constants"]["config_clock_frequency"] == 250000000, "SYS frequency changed")
+        sys_mhz = 1000 / c["clocks"]["main_clkout0"]["period_ns"]
+        axi_mhz = 1000 / c["clocks"]["main_clkout3"]["period_ns"] if c.get("separate_axi_domain") else sys_mhz
+        need((sys_mhz, axi_mhz) in ((250, 250), (200, 400)), "Unsupported rated SYS/AXI profile")
+        need(csr["constants"]["config_clock_frequency"] == int(sys_mhz * 1e6), "SYS frequency differs from contract")
+        if c.get("separate_axi_domain"):
+            need(csr["constants"].get("hbm_axi_clk_freq") == int(axi_mhz * 1e6), "AXI frequency metadata differs from contract")
+            need(csr["constants"].get("hbm_experimental_overclock") == 0, "Normal profile must not select overclocking")
+        if (sys_mhz, axi_mhz) == (200, 400):
+            header = read(a / "output/software/fk33_hbm/profile.h")
+            need(re.search(r"^#define SYS_CLK_FREQ 200000000u$", header, re.M),
+                 "Firmware SYS frequency differs from the rated profile")
+            for name, wanted in (("SYS_TIMEOUT", 640052), ("TEMPERATURE_MAX_AGE", 3000000000)):
+                hits = re.findall(r"\." + name + r"\s*\(\s*\d+'d(\d+)\s*\)", v)
+                need(hits == [str(wanted)], "Control wall-clock parameter mismatch: " + name)
         expected = c.get("mmcm_parameters", {
             "CLKFBOUT_MULT_F":5, "DIVCLK_DIVIDE":1, "CLKOUT0_DIVIDE_F":4,
             "CLKOUT1_DIVIDE":5, "CLKOUT2_DIVIDE":10})
@@ -123,7 +147,7 @@ def audit(attempt, contract_path=None, stage="final"):
             values[key] = wanted
         for index in range(c.get("mmcm_output_count", 3)):
             need(re.search(r"\.CLKOUT"+str(index)+r"\s*\(main_clkout"+str(index)+r"\)",v), "Clock output mapping changed")
-        return dict(mmcm=values, sys_mhz=250, axi_mhz=250,
+        return dict(mmcm=values, sys_mhz=sys_mhz, axi_mhz=axi_mhz,
                     separate_axi_domain=c.get("separate_axi_domain", False),
                     hbm_ref_mhz=200, apb_mhz=100,
                     hbm_internal_pll_profiles_are_not_fabric_clocks=True)
@@ -190,7 +214,9 @@ def audit(attempt, contract_path=None, stage="final"):
             # Native positions are assigned as each loop iteration creates an
             # exception; do not identify their scope by a guessed position.
             rows = [line for line in text.splitlines() if re.match(r"^\s*\d+\s+", line)]
-            gray_rows = [line for line in rows if "max_dpo=4" in line]
+            bound = c["gray_pointer_policy"]["maximum_datapath_ns"]
+            pattern = r"\bmax_dpo=" + re.escape(format(bound, "g")) + r"(?:\.0+)?(?:\s|$)"
+            gray_rows = [line for line in rows if re.search(pattern, line)]
             need(len(gray_rows) == 320, "Expected 320 native Gray max-delay exceptions")
             need(len(rows) == 325, "Unexpected native exception count: " + str(len(rows)))
             # datapath_only intentionally removes hold analysis on these

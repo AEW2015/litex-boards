@@ -56,7 +56,14 @@ def build(output_dir, csr_json=None, profile_path=None):
                      "HBM_RUNTIME_BASE": layout["csr_bases"]["hbm_runtime"]}
         if addresses != {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008, "HBM_WINDOW_BASE": 0xf0003800, "HBM_RUNTIME_BASE": 0xf0004000}:
             raise ValueError("Unqualified CPU CSR map")
-    header = ["/* Generated from the source-bound, reviewed cold-init profile. */"]
+    constants = layout.get("constants", {}) if layout is not None else {}
+    sys_clk_freq = constants.get("config_clock_frequency", 250000000)
+    axi_clk_freq = constants.get("hbm_axi_clk_freq", 250000000)
+    if ((sys_clk_freq, axi_clk_freq) not in ((250000000, 250000000), (200000000, 400000000)) or
+            (axi_clk_freq == 400000000 and not constants.get("hbm_axi_clock_domain"))):
+        raise ValueError("Firmware requires SYS250/AXI250 or separate SYS200/AXI400")
+    header = ["/* Generated from the source-bound, reviewed cold-init profile. */",
+              f"#define SYS_CLK_FREQ {int(sys_clk_freq)}u"]
     if layout is not None and layout.get("constants", {}).get("hbm_axi_clock_domain"):
         header.append("#define HBM_SEPARATE_AXI_DOMAIN 1")
     header.extend(f"#define {key} 0x{value:08x}u" for key, value in addresses.items())

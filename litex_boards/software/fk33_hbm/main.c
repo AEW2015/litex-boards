@@ -35,7 +35,7 @@ static inline void wr(uint32_t address, uint32_t value) {
 }
 static uint32_t ticks(void) { wr(TIMER_BASE + 12, 1); return rd(TIMER_BASE + 16); }
 static void delay_us(uint32_t us) {
-    uint32_t start = ticks(), duration = us * 250u;
+    uint32_t start = ticks(), duration = us * (SYS_CLK_FREQ / 1000000u);
     while ((uint32_t)(start - ticks()) < duration) { }
 }
 static void delay_ms(uint32_t ms) { while (ms--) delay_us(1000); }
@@ -77,7 +77,7 @@ static uint32_t apb(uint32_t stack, uint32_t address, uint32_t value, uint32_t w
     mb->apb_value = value;
     do {
         status = rd(HBM_CONTROL_BASE + 20);
-        if ((uint32_t)(start - ticks()) >= 1250000u) fail(APB_TIMEOUT);
+        if ((uint32_t)(start - ticks()) >= SYS_CLK_FREQ / 200u) fail(APB_TIMEOUT);
     } while (status & 1);
     check_trip();
     wr(HBM_CONTROL_BASE + 16, 8); /* Clear retired sticky operation flags. */
@@ -88,7 +88,7 @@ static uint32_t apb(uint32_t stack, uint32_t address, uint32_t value, uint32_t w
         status = rd(HBM_CONTROL_BASE + 20);
         if (status & 8) fail(APB_TIMEOUT);
         if (status & 4) fail(APB_ERROR);
-        if ((uint32_t)(start - ticks()) >= 1250000u) fail(APB_TIMEOUT);
+        if ((uint32_t)(start - ticks()) >= SYS_CLK_FREQ / 200u) fail(APB_TIMEOUT);
         if ((status & 3) == 2) break;
     }
     mb->heartbeat++;
@@ -133,7 +133,7 @@ static void quiesce(void) {
         mb->drained_mask = rd(HBM_RUNTIME_BASE + 4);
         if (mb->runtime_error || (mb->runtime_status & 4)) fail(DRAIN_ERROR);
         if ((mb->runtime_status & 3) == 3 && mb->drained_mask == 0xffffffffu) return;
-        if ((uint32_t)(start - ticks()) >= 25000000u) fail(DRAIN_TIMEOUT);
+        if ((uint32_t)(start - ticks()) >= SYS_CLK_FREQ / 10u) fail(DRAIN_TIMEOUT);
         check_trip();
     }
 }
@@ -151,7 +151,7 @@ static void resume(void) {
         mb->drained_mask = rd(HBM_RUNTIME_BASE + 4);
         if (mb->runtime_error || (mb->runtime_status & 4)) fail(DRAIN_ERROR);
         if (mb->runtime_status == 2 && mb->drained_mask == 0xffffffffu) return;
-        if ((uint32_t)(start - ticks()) >= 25000000u) fail(DRAIN_TIMEOUT);
+        if ((uint32_t)(start - ticks()) >= SYS_CLK_FREQ / 10u) fail(DRAIN_TIMEOUT);
         check_trip();
     }
 #else
@@ -363,7 +363,7 @@ int main(void) {
     wr(TIMER_BASE + 8, 0); wr(TIMER_BASE, 0xffffffffu);
     wr(TIMER_BASE + 4, 0xffffffffu); wr(TIMER_BASE + 28, 0); wr(TIMER_BASE + 8, 1);
     for (uint32_t i = 0; i < 128; i++) ((volatile uint32_t *)mb)[i] = 0;
-    mb->magic = 0x464b4842; mb->version = 3; mb->hbm_mhz = BOOT_HBM_MHZ; mb->sys_hz = 250000000;
+    mb->magic = 0x464b4842; mb->version = 3; mb->hbm_mhz = BOOT_HBM_MHZ; mb->sys_hz = SYS_CLK_FREQ;
     active_profile = find_profile(BOOT_HBM_MHZ);
     if (!active_profile) fail(BAD_ABI);
     mb->target_mhz = BOOT_HBM_MHZ;
