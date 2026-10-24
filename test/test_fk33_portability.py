@@ -6,22 +6,27 @@ processes with different temp bases to exercise actual mounted filesystems.
 Native subprocess tests use the current OS; they do not emulate another OS.
 The fake compiler explicitly tests orchestration, not firmware correctness.
 """
-import importlib.util
-import json
 import os
-from pathlib import Path
-import platform
-import shutil
-import subprocess
-import struct
 import sys
+import json
+import shutil
+import struct
+import platform
 import tempfile
 import unittest
+import subprocess
+import importlib.util
+
+from pathlib import Path
 from unittest import mock
 
-ROOT = Path(__file__).resolve().parents[1]
+# Test inputs --------------------------------------------------------------------------------------
+
+ROOT     = Path(__file__).resolve().parents[1]
 SOFTWARE = ROOT / 'litex_boards/software/fk33_hbm'
 
+
+# Helpers ------------------------------------------------------------------------------------------
 
 def load_script(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -30,10 +35,12 @@ def load_script(name, path):
     return module
 
 
-BUILD = load_script('fk33_portable_build', SOFTWARE / 'rebuild/build.py')
+BUILD    = load_script('fk33_portable_build', SOFTWARE / 'rebuild/build.py')
 FIRMWARE = load_script('fk33_portable_firmware', SOFTWARE / 'build.py')
-RW = load_script('fk33_portable_rw', SOFTWARE / 'rebuild/rapidwright_assist.py')
+RW       = load_script('fk33_portable_rw', SOFTWARE / 'rebuild/rapidwright_assist.py')
 
+
+# Portability tests --------------------------------------------------------------------------------
 
 class PortabilityTests(unittest.TestCase):
     def setUp(self):
@@ -52,17 +59,26 @@ class PortabilityTests(unittest.TestCase):
         if os.name == 'nt':
             executable = self.base / (name + '.cmd')
             # %~dp0 keeps non-ASCII directories out of CMD source decoding.
-            executable.write_text('@echo off\r\n"%FK33_TEST_PYTHON%" "%~dp0' + script.name + '" %*\r\n', encoding='ascii')
+            executable.write_text(
+                '@echo off\r\n"%FK33_TEST_PYTHON%" "%~dp0' + script.name + '" %*\r\n',
+                encoding='ascii',
+            )
         else:
             import shlex
             executable = self.base / name
-            executable.write_text('#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' ' + shlex.quote(str(script)) + ' "$@"\n', encoding='utf-8')
+            executable.write_text(
+                '#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' ' + shlex.quote(str(script)) + ' "$@"\n',
+                encoding='utf-8',
+            )
             executable.chmod(0o755)
         return executable
 
     def test_native_command_argv_cwd_unicode_and_optional_java(self):
         script = self.base / 'argument recorder.py'
-        script.write_text("import json,os,sys;print(json.dumps({'args':sys.argv[1:],'cwd':os.getcwd(),'java':os.environ.get('JAVA_HOME')}))", encoding='utf-8')
+        script.write_text(
+            "import json,os,sys;print(json.dumps({'args':sys.argv[1:],'cwd':os.getcwd(),'java':os.environ.get('JAVA_HOME')}))",
+            encoding='utf-8',
+        )
         arguments = ['two words', 'café Ω', 'semi;dollar$bracket[]', 'quote"word', 'tail\\']
         for java in (None, str(self.base / 'optional java')):
             env = dict(os.environ)
@@ -105,7 +121,10 @@ class PortabilityTests(unittest.TestCase):
         # Explicit isolated failure injection, not evidence of another OS.
         with mock.patch.object(BUILD.subprocess, 'check_output', side_effect=FileNotFoundError('git')):
             self.assertIsNone(BUILD.git_commit(self.base))
-        with mock.patch.object(BUILD.subprocess, 'check_output', side_effect=subprocess.CalledProcessError(128, ['git'])):
+        with mock.patch.object(
+            BUILD.subprocess, 'check_output',
+            side_effect=subprocess.CalledProcessError(128, ['git']),
+        ):
             self.assertIsNone(BUILD.git_commit(self.base))
 
     def test_missing_git_real_path_is_only_missing_provenance(self):
@@ -118,7 +137,9 @@ class PortabilityTests(unittest.TestCase):
         try:
             os.chdir(self.base.parent)
             relative_directory = self.base.name
-            with mock.patch.dict(os.environ, {'PATH': relative_directory + os.pathsep + os.environ.get('PATH', '')}):
+            with mock.patch.dict(os.environ, {
+                'PATH': relative_directory + os.pathsep + os.environ.get('PATH', ''),
+            }):
                 selected = RW.command_path(wrapper.name)
                 self.assertEqual(Path(selected).resolve(), wrapper.resolve())
                 self.assertTrue(Path(selected).is_absolute())
@@ -180,12 +201,21 @@ class PortabilityTests(unittest.TestCase):
     def test_source_names_have_no_casefold_collisions(self):
         # Real tracked package layout, independent of host case sensitivity.
         try:
-            tracked = subprocess.check_output(['git', '-C', str(ROOT), 'ls-files', '-z', '--', 'litex_boards'], stderr=subprocess.DEVNULL)
-            relatives = [name.decode('utf-8', errors='surrogateescape') for name in tracked.split(b'\0') if name]
+            tracked = subprocess.check_output(
+                ['git', '-C', str(ROOT), 'ls-files', '-z', '--', 'litex_boards'],
+                stderr=subprocess.DEVNULL,
+            )
+            relatives = [
+                name.decode('utf-8', errors='surrogateescape')
+                for name in tracked.split(b'\0') if name
+            ]
             self.assertTrue(relatives)
             inventory = 'git tracked names'
         except (OSError, subprocess.CalledProcessError):
-            relatives = [path.relative_to(ROOT).as_posix() for path in (ROOT / 'litex_boards').rglob('*') if '__pycache__' not in path.parts]
+            relatives = [
+                path.relative_to(ROOT).as_posix()
+                for path in (ROOT / 'litex_boards').rglob('*') if '__pycache__' not in path.parts
+            ]
             inventory = 'physical scan fallback; Git unavailable, tracked aliases not verified'
         print(json.dumps({'case_collision_inventory': inventory}, ensure_ascii=True))
         names = {}
@@ -216,15 +246,21 @@ class PortabilityTests(unittest.TestCase):
             self.assertEqual(alternate.read_bytes(), b'case lookup')
         print(json.dumps({
             'portability_host': {
-                'python': platform.python_version(), 'os': platform.system(),
-                'release': platform.release(), 'architecture': platform.machine(),
+                'python': platform.python_version(),
+                'os': platform.system(),
+                'release': platform.release(),
+                'architecture': platform.machine(),
                 'pointer_bits': struct.calcsize('P') * 8,
                 'filesystem_encoding': sys.getfilesystemencoding(),
                 'selected_temp_base': tempfile.gettempdir(),
                 'actual_test_directory': str(self.base.resolve()),
                 'temp_environment': {key: os.environ.get(key) for key in ('TMPDIR', 'TEMP', 'TMP')},
-                'capabilities': {'case_sensitive_lookup': case_sensitive,
-                    'unicode_binary_io': True, 'rename': True, 'replace_existing': True},
+                'capabilities': {
+                    'case_sensitive_lookup': case_sensitive,
+                    'unicode_binary_io': True,
+                    'rename': True,
+                    'replace_existing': True,
+                },
             }}, ensure_ascii=True, sort_keys=True))
 
     def test_firmware_arbitrary_wrapper_orchestration_not_real_compiler(self):
@@ -241,13 +277,27 @@ elif sys.argv[1]=='--version': print('fake compiler for host orchestration')
 else: pathlib.Path(sys.argv[sys.argv.index('-o')+1]).write_bytes(b'fake ELF')
 '''.replace('COMPANION', repr(companion.name))
         compiler = self.wrapper('no gcc prefix at all', compiler_body)
-        profiles = {'800': {'pll_words': [0xa402, 0x6300, 0x1212], 'refresh_period_cycles': 3120}, '900': {'pll_words': [0xa482, 0x9600, 0x1414], 'refresh_period_cycles': 3510}}
-        profile = dict(reference_mhz=200, hbm_mhz=900, stacks=2, regions_per_stack=8, region_stride=0x20000, destructive_clock_profiles=profiles, selectors=[0]*4)
-        for name, count in (('ms_pre',11),('pll',16),('ms_post',3),('phy',9),('mc',42)):
+        profiles = {
+            '800': {'pll_words': [0xa402, 0x6300, 0x1212], 'refresh_period_cycles': 3120},
+            '900': {'pll_words': [0xa482, 0x9600, 0x1414], 'refresh_period_cycles': 3510},
+        }
+        profile = dict(
+            reference_mhz=200,
+            hbm_mhz=900,
+            stacks=2,
+            regions_per_stack=8,
+            region_stride=0x20000,
+            destructive_clock_profiles=profiles,
+            selectors=[0]*4,
+        )
+        for name, count in (('ms_pre', 11), ('pll', 16), ('ms_post', 3), ('phy', 9), ('mc', 42)):
             profile[name] = [{'address': 0, 'value': 0} for _ in range(count)]
         for i, value in enumerate(profiles['900']['pll_words']):
             profile['pll'][i]['value'] = value
-        for name in ('calibration_status_mask','calibration_status_expected','calibration_result_mask','calibration_result_expected'):
+        for name in (
+            'calibration_status_mask', 'calibration_status_expected',
+            'calibration_result_mask', 'calibration_result_expected',
+        ):
             profile[name] = 0
         path = self.base / 'profile.json'
         path.write_text('\ufeff' + json.dumps(profile), encoding='utf-8')

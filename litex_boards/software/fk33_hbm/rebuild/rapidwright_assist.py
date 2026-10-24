@@ -4,24 +4,29 @@ Vivado remains the setup/hold/DRC authority. This stage exports readable EDIF,
 then uses Python RapidWright to relate routed fanout/locality to native paths.
 It never writes a DCP, changes constraints, routes a design or accesses hardware.
 """
-import argparse
-import hashlib
-import importlib.metadata
-import json
 import os
-from pathlib import Path
 import re
-import shutil
-import subprocess
 import sys
+import json
 import time
+import shutil
+import hashlib
+import argparse
 import traceback
+import subprocess
+import importlib.metadata
+
+from pathlib import Path
+
+# Configuration ------------------------------------------------------------------------------------
 
 JAVA_HOME = os.environ.get('JAVA_HOME', '')
 RW_PYTHON = Path(sys.executable)
-VIVADO = Path(os.environ.get('FK33_VIVADO', 'vivado'))
-SCHEMA = 'fk33-rapidwright-assist-v1'
+VIVADO    = Path(os.environ.get('FK33_VIVADO', 'vivado'))
+SCHEMA    = 'fk33-rapidwright-assist-v1'
 
+
+# Helpers ------------------------------------------------------------------------------------------
 
 def command_path(value):
     # Resolve found PATH entries too: PATH itself can contain relative folders.
@@ -161,6 +166,8 @@ def placement(cell):
             'bel': str(cell.getBELName()) if site_inst else None}
 
 
+# RapidWright analysis -----------------------------------------------------------------------------
+
 def worker(args):
     # This process must be started with the dedicated RapidWright Python/JVM.
     out = Path(args.output)
@@ -249,7 +256,8 @@ def worker(args):
     except Exception:
         result.update(status='FAIL', error=traceback.format_exc())
     result['inputs_unchanged'] = unchanged(inputs)
-    if not result['inputs_unchanged']:result['status'] = 'FAIL'
+    if not result['inputs_unchanged']:
+        result['status'] = 'FAIL'
     write(out/'physical-analysis.json', result)
     print('FK33_RAPIDWRIGHT_ANALYSIS_' + result['status'], flush=True)
     return 0 if result['status'] == 'PASS' else 1
@@ -257,15 +265,23 @@ def worker(args):
 
 def run_process(command, cwd, log, env=None):
     with Path(log).open('wb') as handle:
-        process = subprocess.run(command,cwd=cwd,env=env,stdout=handle,stderr=subprocess.STDOUT,
-                                 creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-    return {'returncode': process.returncode, 'command': list(map(str,command)), 'stdout_stderr_log': bind(log)}
+        process = subprocess.run(
+            command, cwd=cwd, env=env, stdout=handle, stderr=subprocess.STDOUT,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+        )
+    return {
+        'returncode': process.returncode,
+        'command': list(map(str, command)),
+        'stdout_stderr_log': bind(log),
+    }
 
+
+# Native export and analysis -----------------------------------------------------------------------
 
 def assist(args):
     attempt = Path(args.attempt).resolve()
     out = Path(args.output).resolve() if args.output else attempt/'rapidwright-assist/runs'/str(time.time_ns())
-    out.mkdir(parents=True,exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     destination = out/'result.json'
     if destination.exists():
         raise ValueError('Existing assistance result preserved; choose a fresh --output directory')
@@ -281,81 +297,121 @@ def assist(args):
         completed = json.loads(implementation.read_text(encoding='utf-8-sig'))
         if completed.get('returncode') != 0 or completed.get('status') != 'IMPLEMENTED' or not completed.get('sources_unchanged'):
             raise ValueError('Implementation must be completed with unchanged captured sources')
-        bindings = [bind(dcp),bind(implementation),bind(attempt/'input-hashes.json'),bind(__file__)]
+        bindings = [bind(dcp), bind(implementation), bind(attempt/'input-hashes.json'), bind(__file__)]
         edf = Path(args.readable_edif).resolve() if args.readable_edif else out/'readable.edf'
         timing = Path(args.timing_report).resolve() if args.timing_report else out/'native-paths.rpt'
         if args.readable_edif:
-            if not args.edif_receipt:raise ValueError('Reused EDIF requires its export receipt')
-            receipt_path=Path(args.edif_receipt).resolve();receipt=json.loads(receipt_path.read_text(encoding='utf-8-sig'))
-            if receipt['returncode']!=0 or not receipt['inputs_unchanged'] or receipt['output']['sha256']!=sha(edf) or not any(row['sha256']==sha(dcp) for row in receipt['inputs']):
+            if not args.edif_receipt:
+                raise ValueError('Reused EDIF requires its export receipt')
+            receipt_path = Path(args.edif_receipt).resolve()
+            receipt = json.loads(receipt_path.read_text(encoding='utf-8-sig'))
+            if (receipt['returncode'] != 0 or not receipt['inputs_unchanged']
+                    or receipt['output']['sha256'] != sha(edf)
+                    or not any(row['sha256'] == sha(dcp) for row in receipt['inputs'])):
                 raise ValueError('EDIF export receipt does not bind this checkpoint/output')
-            bindings.extend([bind(edf),bind(receipt_path)])
-            result['export']={'reused':True,'receipt':bind(receipt_path)}
+            bindings.extend([bind(edf), bind(receipt_path)])
+            result['export'] = {'reused': True, 'receipt': bind(receipt_path)}
         else:
-            query=out/'export-readable-edif.tcl'
-            query.write_text(export_tcl(dcp,edf,timing,out/'native-summary.rpt'),encoding='utf-8')
+            query = out/'export-readable-edif.tcl'
+            query.write_text(export_tcl(dcp, edf, timing, out/'native-summary.rpt'), encoding='utf-8')
             bindings.append(bind(query))
-            export=run_process([str(VIVADO),'-mode','batch','-source',str(query),'-log','export.log','-journal','export.jou'],out,out/'export-console.log')
-            text=Path(export['stdout_stderr_log']['path']).read_text(encoding='utf-8', errors='replace')
-            if export['returncode'] or 'FK33_RAPIDWRIGHT_EXPORT_COMPLETE' not in text or re.search(r'(?im)^\s*ERROR:',text):
+            export = run_process(
+                [str(VIVADO), '-mode', 'batch', '-source', str(query),
+                 '-log', 'export.log', '-journal', 'export.jou'],
+                out, out/'export-console.log',
+            )
+            text = Path(export['stdout_stderr_log']['path']).read_text(encoding='utf-8', errors='replace')
+            if (export['returncode'] or 'FK33_RAPIDWRIGHT_EXPORT_COMPLETE' not in text
+                    or re.search(r'(?im)^\s*ERROR:', text)):
                 raise ValueError('Native read-only EDIF/timing export failed')
-            export.update(reused=False,query=bind(query),edif=bind(edf),timing=bind(timing),summary=bind(out/'native-summary.rpt'))
+            export.update(
+                reused=False, query=bind(query), edif=bind(edf),
+                timing=bind(timing), summary=bind(out/'native-summary.rpt'),
+            )
             export_receipt = {'returncode': export['returncode'],
                 'inputs': [bind(dcp), bind(query), bind(__file__)],
                 'inputs_unchanged': unchanged(bindings), 'output': bind(edf),
                 'scope': 'Native read-only checkpoint open, EDIF export and timing reports; no checkpoint writes.'}
             write(out/'edif-export-receipt.json', export_receipt)
             export['receipt'] = bind(out/'edif-export-receipt.json')
-            result['export']=export
+            result['export'] = export
             bindings.append(bind(edf))
-        if timing.is_file():bindings.append(bind(timing))
-        else:raise FileNotFoundError('Native timing report required for physical/path assistance')
-        env=os.environ.copy();env.update(JAVA_TOOL_OPTIONS='-Xmx4g',PYTHONDONTWRITEBYTECODE='1')
+        if timing.is_file():
+            bindings.append(bind(timing))
+        else:
+            raise FileNotFoundError('Native timing report required for physical/path assistance')
+        env = os.environ.copy()
+        env.update(JAVA_TOOL_OPTIONS='-Xmx4g', PYTHONDONTWRITEBYTECODE='1')
         if JAVA_HOME:
             env['JAVA_HOME'] = JAVA_HOME
-        command=[str(RW_PYTHON),'-B',str(Path(__file__).resolve()),'--worker','--dcp',str(dcp),'--readable-edif',str(edf),'--timing-report',str(timing),'--output',str(out)]
-        process=run_process(command,out,out/'rapidwright-console.log',env)
-        analysis=json.loads((out/'physical-analysis.json').read_text(encoding='utf-8-sig'))
-        if process['returncode'] or analysis['status']!='PASS' or not analysis['inputs_unchanged']:
+        command = [
+            str(RW_PYTHON), '-B', str(Path(__file__).resolve()), '--worker',
+            '--dcp', str(dcp), '--readable-edif', str(edf),
+            '--timing-report', str(timing), '--output', str(out),
+        ]
+        process = run_process(command, out, out/'rapidwright-console.log', env)
+        analysis = json.loads((out/'physical-analysis.json').read_text(encoding='utf-8-sig'))
+        if process['returncode'] or analysis['status'] != 'PASS' or not analysis['inputs_unchanged']:
             raise ValueError('RapidWright analysis process failed')
-        result.update(status='PASS',input_bindings=bindings,process=process,
-                      physical_analysis=bind(out/'physical-analysis.json'),
-                      timing_assistance=analysis['physical_analysis'],
-                      environment=analysis['environment'],libraries=analysis['libraries'])
-        result['native_timing_qualification']='Required separately; this stage does not compute or certify setup/hold/pulse closure.'
+        result.update(
+            status='PASS', input_bindings=bindings, process=process,
+            physical_analysis=bind(out/'physical-analysis.json'),
+            timing_assistance=analysis['physical_analysis'],
+            environment=analysis['environment'], libraries=analysis['libraries'],
+        )
+        result['native_timing_qualification'] = 'Required separately; this stage does not compute or certify setup/hold/pulse closure.'
     except FileNotFoundError:
-        result.update(status='INCOMPLETE',error=traceback.format_exc())
+        result.update(status='INCOMPLETE', error=traceback.format_exc())
     except Exception:
-        result.update(status='FAIL',error=traceback.format_exc())
-    result.update(finished=time.time(),inputs_unchanged=unchanged(bindings),input_bindings=bindings)
-    if not result['inputs_unchanged']:result['status']='FAIL'
-    write(destination,result)
-    print(json.dumps({'status':result['status'],'attempt':str(attempt),'result':str(destination),'error':result.get('error')}),flush=True)
-    return {'PASS':0,'FAIL':1,'INCOMPLETE':2}[result['status']]
+        result.update(status='FAIL', error=traceback.format_exc())
+    result.update(finished=time.time(), inputs_unchanged=unchanged(bindings), input_bindings=bindings)
+    if not result['inputs_unchanged']:
+        result['status'] = 'FAIL'
+    write(destination, result)
+    print(json.dumps({
+        'status': result['status'], 'attempt': str(attempt),
+        'result': str(destination), 'error': result.get('error'),
+    }), flush=True)
+    return {'PASS': 0, 'FAIL': 1, 'INCOMPLETE': 2}[result['status']]
 
+
+# Run ----------------------------------------------------------------------------------------------
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__)
     global JAVA_HOME, RW_PYTHON, VIVADO
+    parser = argparse.ArgumentParser(description=__doc__)
+
+    # Tools.
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
-    parser.add_argument('--python', default=sys.executable, help='Python with RapidWright installed')
-    parser.add_argument('--vivado', default=os.environ.get('FK33_VIVADO', 'vivado'))
-    parser.add_argument('--attempt');parser.add_argument('--output');parser.add_argument('--readable-edif')
-    parser.add_argument('--edif-receipt');parser.add_argument('--timing-report')
-    parser.add_argument('--worker',action='store_true');parser.add_argument('--dcp')
-    parser.add_argument('--checkpoint-stage',choices=('routed','placed'),default='routed',
-                        help='Worker only: placed permits missing physical pin inventory and never qualifies routed assistance')
-    args=parser.parse_args()
+    parser.add_argument('--python',    default=sys.executable, help='Python with RapidWright installed')
+    parser.add_argument('--vivado',    default=os.environ.get('FK33_VIVADO', 'vivado'))
+
+    # Inputs and outputs.
+    parser.add_argument('--attempt')
+    parser.add_argument('--output')
+    parser.add_argument('--readable-edif')
+    parser.add_argument('--edif-receipt')
+    parser.add_argument('--timing-report')
+
+    # Analysis worker.
+    parser.add_argument('--worker',           action='store_true')
+    parser.add_argument('--dcp')
+    parser.add_argument('--checkpoint-stage', choices=('routed', 'placed'), default='routed',
+        help='Worker only: placed permits missing physical pin inventory and never qualifies routed assistance')
+    args = parser.parse_args()
     JAVA_HOME = str(Path(args.java_home).expanduser().resolve()) if args.java_home else ''
     if JAVA_HOME:
         os.environ['JAVA_HOME'] = JAVA_HOME
     RW_PYTHON = command_path(args.python)
     VIVADO = command_path(args.vivado)
     if args.worker:
-        if not all((args.output,args.dcp,args.readable_edif)):parser.error('worker requires output,dcp,readable-edif')
+        if not all((args.output, args.dcp, args.readable_edif)):
+            parser.error('worker requires output,dcp,readable-edif')
         return worker(args)
-    if not args.attempt:parser.error('--attempt is required')
+    if not args.attempt:
+        parser.error('--attempt is required')
     return assist(args)
 
 
-if __name__=='__main__':raise SystemExit(main())
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -1,17 +1,22 @@
 """Build the freestanding FK33 destructive-clock processor demonstration."""
-import argparse
-import hashlib
-import json
 import os
-from pathlib import Path
+import json
 import shutil
 import struct
+import hashlib
+import argparse
 import subprocess
 
+from pathlib import Path
+
+
+# Helpers ------------------------------------------------------------------------------------------
 
 def _sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
+
+# Firmware build -----------------------------------------------------------------------------------
 
 def build(output_dir, csr_json=None, profile_path=None):
     """Return ELF/BIN paths and little-endian ``rom_words`` for init_rom()."""
@@ -90,7 +95,14 @@ def build(output_dir, csr_json=None, profile_path=None):
             return str((Path(compiler).parent / candidate).resolve())
         return shutil.which(selected_tool) or selected_tool
     elf, binary = output / "fk33_hbm.elf", output / "fk33_hbm.bin"
-    command = [str(compiler), "-march=rv32i_zicsr", "-mabi=ilp32", "-Os", "-g", "-ffreestanding", "-fno-builtin", "-fno-pic", "-mno-relax", "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror", "-nostdlib", "-nostartfiles", "-I", str(output), "-T", str(source / "linker.ld"), "-Wl,--gc-sections", f"-Wl,-Map,{output / 'fk33_hbm.map'}", str(source / "start.S"), str(source / "main.c"), "-lgcc", "-o", str(elf)]
+    command = [
+        str(compiler), "-march=rv32i_zicsr", "-mabi=ilp32", "-Os", "-g",
+        "-ffreestanding", "-fno-builtin", "-fno-pic", "-mno-relax",
+        "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror",
+        "-nostdlib", "-nostartfiles", "-I", str(output), "-T", str(source / "linker.ld"),
+        "-Wl,--gc-sections", f"-Wl,-Map,{output / 'fk33_hbm.map'}",
+        str(source / "start.S"), str(source / "main.c"), "-lgcc", "-o", str(elf),
+    ]
     result = subprocess.run(command, text=True, errors='replace', capture_output=True)
     (output / "compile.log").write_text(f"Compiler exit status: {result.returncode}\n" + result.stdout + result.stderr, encoding="utf-8")
     result.check_returncode()
@@ -118,6 +130,8 @@ def build(output_dir, csr_json=None, profile_path=None):
     (output / "firmware-build.json").write_text(json.dumps({k: v for k, v in metadata.items() if k != "rom_words"}, indent=2) + "\n", encoding="utf-8")
     return metadata
 
+
+# Run ----------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

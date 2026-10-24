@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 """Build the FK33 primitive HBM example and require native/RapidWright checks."""
-import argparse
-from datetime import datetime, timezone
-import hashlib
-import importlib.metadata
-import json
 import os
-from pathlib import Path
 import re
+import sys
+import json
+import time
 import runpy
 import shutil
+import hashlib
+import argparse
 import subprocess
-import sys
-import time
+import importlib.metadata
 
-HERE = Path(__file__).resolve().parent
-BOARDS = HERE.parents[3]
+from pathlib import Path
+from datetime import datetime, timezone
+
+# Configuration ------------------------------------------------------------------------------------
+
+HERE        = Path(__file__).resolve().parent
+BOARDS      = HERE.parents[3]
 CORE_COMMIT = '0308e0e709a9c703684e5e9f18c01f256207f9a2'
 
+
+# Helpers ------------------------------------------------------------------------------------------
 
 def sha(path):
     digest = hashlib.sha256()
@@ -47,9 +52,11 @@ def unchanged(rows):
 
 def command(args, cwd, log, env=None):
     with Path(log).open('wb') as stream:
-        result = subprocess.run(list(map(str, args)), cwd=cwd, env=env,
+        result = subprocess.run(
+            list(map(str, args)), cwd=cwd, env=env,
             stdout=stream, stderr=subprocess.STDOUT,
-            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+        )
     if result.returncode:
         raise RuntimeError(f'Command exited {result.returncode}; inspect {log}')
 
@@ -61,6 +68,8 @@ def git_commit(path):
     except (OSError, subprocess.CalledProcessError):
         return None
 
+
+# Build stages -------------------------------------------------------------------------------------
 
 def generate(attempt):
     # Execute the checked-out board target rather than an unrelated installed copy.
@@ -197,14 +206,20 @@ def diagnostics(attempt):
         cdc_clean=not any(r['severity']=='Critical' for r in findings))
 
 
+# Run ----------------------------------------------------------------------------------------------
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+
+    # Output and tools.
     parser.add_argument('--output-dir', required=True, type=Path, help='Fresh directory; failed attempts are never overwritten')
-    parser.add_argument('--vivado', default=os.environ.get('FK33_VIVADO', 'vivado'))
+    parser.add_argument('--vivado',             default=os.environ.get('FK33_VIVADO', 'vivado'))
     parser.add_argument('--rapidwright-python', default=os.environ.get('FK33_RAPIDWRIGHT_PYTHON', sys.executable))
-    parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
+    parser.add_argument('--java-home',          default=os.environ.get('JAVA_HOME'))
+
+    # Build stages.
     parser.add_argument('--generate-only', action='store_true', help='Generate RTL/firmware and audit source constraints; no CAD or build PASS')
-    parser.add_argument('--resume', action='store_true', help='Implement an unchanged GENERATED output; never retry a failed native build')
+    parser.add_argument('--resume',        action='store_true', help='Implement an unchanged GENERATED output; never retry a failed native build')
     args = parser.parse_args()
     attempt = args.output_dir.resolve()
     result = dict(status='FAIL', attempt=str(attempt), started_utc=datetime.now(timezone.utc).isoformat(),
