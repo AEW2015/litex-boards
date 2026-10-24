@@ -131,6 +131,57 @@ pass `vivado` or its path to `--vivado`. Set `JAVA_HOME` only to override JVM di
 The scripts accept Linux paths; the original full hardware-qualified build was
 on Windows. Cross-OS/cross-machine reproduction has not yet been demonstrated.
 
+## Portability verification
+
+Run the independent host tests from the repository root:
+
+```sh
+python -m unittest discover -s test -p test_fk33_portability.py -v
+```
+
+These standard-library tests do not install or launch Vivado, GCC, Java or
+RapidWright. They exercise the actual launcher code with real subprocesses,
+arbitrary compiler-wrapper names, PATH and explicit tool paths, changed working
+directories, spaces/Unicode, UTF-8/BOM and LF/CRLF data, Tcl quoting, source-name
+case collisions, binary I/O, and rename/replace behavior. Compiler orchestration
+uses explicitly fake compiler outputs; it does not validate firmware compilation.
+Tests are separate from the build command and introduce no version/environment
+preflight gates. Missing optional Tcl or symlink privileges produce named skips.
+
+The `FK33 portability checks` GitHub Actions workflow runs the suite on x64
+Ubuntu 22.04/24.04 and Windows Server 2022/2025, with Python 3.10, 3.11 and 3.12.
+It uploads each test log, including failures and capability skips. Windows Server
+runners exercise the Windows scripts; they are not a claim of AMD-supported
+Vivado installations. No licensed tools or hardware run in these CI jobs.
+
+To exercise a particular writable filesystem or mounted share, point Python's
+temporary directory at an existing directory there and run a fresh process:
+
+```sh
+TMPDIR=/mnt/your_volume/fk33_test python -m unittest discover -s test -p test_fk33_portability.py -v
+```
+
+```powershell
+$env:TMPDIR = 'D:\fk33_test'
+python -m unittest discover -s test -p test_fk33_portability.py -v
+```
+
+The suite prints the actual OS, Python architecture/encoding, temporary path and
+observed case-sensitivity behavior. Wrapper tests also execute files from this
+directory, so a no-execute mount cannot pass those tests. Case-sensitive and
+case-insensitive behavior is tested without requiring either mode. Symlink
+availability is reported rather than presumed. A different filesystem needs
+its own run; passing on NTFS does not establish SMB, NFS, exFAT or ReFS coverage.
+
+The compatibility target is x86-64 Windows/Linux within the selected Vivado
+release's [AMD-supported OS list](https://docs.amd.com/r/2025.2-English/ug973-vivado-release-notes-install-license/Supported-Operating-Systems).
+Fast host tests cannot certify every supported OS release or a complete HBM
+bitstream build. Full qualification still requires the normal build on that
+OS/tool installation and review of its native timing and other outputs.
+AMD also documents [filename, path-length and cross-platform naming limits](https://docs.amd.com/r/2025.2-English/ug973-vivado-release-notes-install-license/Vivado-Naming-Conventions).
+Passing the Python Unicode/space tests establishes launcher handling, not
+support for those names throughout Vivado or the complete dependency chain.
+
 ## Outputs and failure diagnosis
 
 Under the selected output directory:

@@ -1,0 +1,65 @@
+name: FK33 portability checks
+
+on:
+  push:
+    branches:
+      - hbm-primitive-blackbox
+  pull_request:
+    branches:
+      - hbm-primitive-blackbox
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portability:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }} (x64)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          # Hosted-runtime portability coverage only; these labels do not declare AMD Vivado support.
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - windows-2022
+          - windows-2025
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Python ${{ matrix.python-version }} x64
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+
+      - name: Run standard-library portability test
+        shell: bash
+        run: |
+          set +e
+          python -m unittest discover -s test -p test_fk33_portability.py -v 2>&1 | tee fk33-portability-test.log
+          test_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$test_status" -ne 0 ]; then
+            exit "$test_status"
+          fi
+          if ! grep -Eq '^Ran [1-9][0-9]* tests? in ' fk33-portability-test.log; then
+            echo "No portability tests ran; refusing a vacuous pass." | tee -a fk33-portability-test.log
+            exit 1
+          fi
+
+      - name: Upload test log (not build or hardware qualification evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fk33-portability-test-log-${{ matrix.os }}-py${{ matrix.python-version }}-x64
+          path: fk33-portability-test.log
+          if-no-files-found: warn
+          retention-days: 14

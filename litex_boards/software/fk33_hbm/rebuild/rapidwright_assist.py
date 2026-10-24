@@ -24,8 +24,11 @@ SCHEMA = 'fk33-rapidwright-assist-v1'
 
 
 def command_path(value):
-    # Preserve PATH commands; explicit paths must survive child cwd changes.
-    return str(Path(value).expanduser().resolve()) if '/' in value or '\\' in value else value
+    # Resolve found PATH entries too: PATH itself can contain relative folders.
+    if '/' in value or '\\' in value:
+        return str(Path(value).expanduser().resolve())
+    found = shutil.which(value)
+    return str(Path(found).resolve()) if found else value
 
 
 def package_version(name):
@@ -76,7 +79,7 @@ def export_tcl(dcp, edf, timing, summary):
 def read_paths(path):
     if not path or not Path(path).is_file():
         return []
-    text = Path(path).read_text(errors='replace')
+    text = Path(path).read_text(encoding='utf-8', errors='replace')
     matches = re.finditer(r'Slack\s*\(([^)]+)\)\s*:\s*(-?[\d.]+)ns(.*?)(?=\nSlack\s*\(|\Z)', text, re.S)
     rows = []
     for match in matches:
@@ -275,7 +278,7 @@ def assist(args):
         dcp = attempt/'output/gateware/sqrl_fk33_route.dcp'
         if not implementation.is_file() or not dcp.is_file():
             raise FileNotFoundError('Completed implementation-result and routed checkpoint are required')
-        completed = json.loads(implementation.read_text())
+        completed = json.loads(implementation.read_text(encoding='utf-8-sig'))
         if completed.get('returncode') != 0 or completed.get('status') != 'IMPLEMENTED' or not completed.get('sources_unchanged'):
             raise ValueError('Implementation must be completed with unchanged captured sources')
         bindings = [bind(dcp),bind(implementation),bind(attempt/'input-hashes.json'),bind(__file__)]
@@ -283,7 +286,7 @@ def assist(args):
         timing = Path(args.timing_report).resolve() if args.timing_report else out/'native-paths.rpt'
         if args.readable_edif:
             if not args.edif_receipt:raise ValueError('Reused EDIF requires its export receipt')
-            receipt_path=Path(args.edif_receipt).resolve();receipt=json.loads(receipt_path.read_text())
+            receipt_path=Path(args.edif_receipt).resolve();receipt=json.loads(receipt_path.read_text(encoding='utf-8-sig'))
             if receipt['returncode']!=0 or not receipt['inputs_unchanged'] or receipt['output']['sha256']!=sha(edf) or not any(row['sha256']==sha(dcp) for row in receipt['inputs']):
                 raise ValueError('EDIF export receipt does not bind this checkpoint/output')
             bindings.extend([bind(edf),bind(receipt_path)])
@@ -293,7 +296,7 @@ def assist(args):
             query.write_text(export_tcl(dcp,edf,timing,out/'native-summary.rpt'),encoding='utf-8')
             bindings.append(bind(query))
             export=run_process([str(VIVADO),'-mode','batch','-source',str(query),'-log','export.log','-journal','export.jou'],out,out/'export-console.log')
-            text=Path(export['stdout_stderr_log']['path']).read_text(errors='replace')
+            text=Path(export['stdout_stderr_log']['path']).read_text(encoding='utf-8', errors='replace')
             if export['returncode'] or 'FK33_RAPIDWRIGHT_EXPORT_COMPLETE' not in text or re.search(r'(?im)^\s*ERROR:',text):
                 raise ValueError('Native read-only EDIF/timing export failed')
             export.update(reused=False,query=bind(query),edif=bind(edf),timing=bind(timing),summary=bind(out/'native-summary.rpt'))
@@ -312,7 +315,7 @@ def assist(args):
             env['JAVA_HOME'] = JAVA_HOME
         command=[str(RW_PYTHON),'-B',str(Path(__file__).resolve()),'--worker','--dcp',str(dcp),'--readable-edif',str(edf),'--timing-report',str(timing),'--output',str(out)]
         process=run_process(command,out,out/'rapidwright-console.log',env)
-        analysis=json.loads((out/'physical-analysis.json').read_text())
+        analysis=json.loads((out/'physical-analysis.json').read_text(encoding='utf-8-sig'))
         if process['returncode'] or analysis['status']!='PASS' or not analysis['inputs_unchanged']:
             raise ValueError('RapidWright analysis process failed')
         result.update(status='PASS',input_bindings=bindings,process=process,
@@ -346,8 +349,8 @@ def main():
     JAVA_HOME = str(Path(args.java_home).expanduser().resolve()) if args.java_home else ''
     if JAVA_HOME:
         os.environ['JAVA_HOME'] = JAVA_HOME
-    RW_PYTHON = shutil.which(command_path(args.python)) or command_path(args.python)
-    VIVADO = shutil.which(command_path(args.vivado)) or command_path(args.vivado)
+    RW_PYTHON = command_path(args.python)
+    VIVADO = command_path(args.vivado)
     if args.worker:
         if not all((args.output,args.dcp,args.readable_edif)):parser.error('worker requires output,dcp,readable-edif')
         return worker(args)
