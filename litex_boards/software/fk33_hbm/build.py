@@ -100,11 +100,11 @@ def build(output_dir, csr_json=None, profile_path=None):
         return shutil.which(selected_tool) or selected_tool
     elf, binary = output / "fk33_hbm.elf", output / "fk33_hbm.bin"
     command = [str(compiler), "-march=rv32i_zicsr", "-mabi=ilp32", "-Os", "-g", "-ffreestanding", "-fno-builtin", "-fno-pic", "-mno-relax", "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror", "-nostdlib", "-nostartfiles", "-I", str(output), "-T", str(source / "linker.ld"), "-Wl,--gc-sections", f"-Wl,-Map,{output / 'fk33_hbm.map'}", str(source / "start.S"), str(source / "main.c"), "-lgcc", "-o", str(elf)]
-    result = subprocess.run(command, text=True, capture_output=True)
+    result = subprocess.run(command, text=True, errors='replace', capture_output=True)
     (output / "compile.log").write_text(f"Compiler exit status: {result.returncode}\n" + result.stdout + result.stderr, encoding="utf-8")
     result.check_returncode()
     subprocess.run([tool("objcopy"), "-O", "binary", str(elf), str(binary)], check=True)
-    disasm = subprocess.run([tool("objdump"), "-d", str(elf)], check=True, text=True, capture_output=True)
+    disasm = subprocess.run([tool("objdump"), "-d", str(elf)], check=True, text=True, errors='replace', capture_output=True)
     (output / "fk33_hbm.dis").write_text(disasm.stdout, encoding="utf-8")
     data = binary.read_bytes()
     if not data or len(data) > 65536:
@@ -117,7 +117,7 @@ def build(output_dir, csr_json=None, profile_path=None):
                 "elf_sha256": _sha(elf), "bin_sha256": _sha(binary), "command": command,
                 "compiler_version": None}
     try:
-        version = subprocess.run([str(compiler), "--version"], text=True, capture_output=True)
+        version = subprocess.run([str(compiler), "--version"], text=True, errors='replace', capture_output=True)
         if version.returncode == 0 and version.stdout.splitlines():
             metadata["compiler_version"] = version.stdout.splitlines()[0]
         else:

@@ -153,7 +153,7 @@ def implement(attempt, vivado):
         for row in generated:
             if Path(row['path']) != tcl:
                 unchanged([row])
-        if re.search(r'(?m)^\s*(?:ERROR:|CRITICAL WARNING:)', (attempt/'vivado-console.log').read_text(errors='replace')):
+        if re.search(r'(?m)^\s*(?:ERROR:|CRITICAL WARNING:)', (attempt/'vivado-console.log').read_text(encoding='utf-8', errors='replace')):
             raise ValueError('Vivado console contains an ERROR or unreviewed CRITICAL WARNING')
         result.update(status='IMPLEMENTED', returncode=0, sources_unchanged=True)
     finally:
@@ -178,11 +178,11 @@ def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6):
     query.write_text(inspection_tcl, encoding='utf-8')
     command([vivado, '-mode', 'batch', '-source', query, '-log', evidence/'vivado.log',
         '-journal', evidence/'vivado.jou'], evidence, evidence/'netlist-inspection-console.log')
-    text = (evidence/'netlist-inspection-console.log').read_text(errors='replace')
+    text = (evidence/'netlist-inspection-console.log').read_text(encoding='utf-8', errors='replace')
     if 'HBM_NETLIST_INSPECTION_COMPLETE' not in text or re.search(r'(?m)^\s*(?:ERROR:|CRITICAL WARNING:)', text):
         raise ValueError('Native netlist inspection did not complete cleanly')
     chains = parse_reset_chains(evidence/'implemented-reset-chains.txt', axi_domain=axi_domain)
-    properties = (evidence/'implemented-hbm-properties.txt').read_text()
+    properties = (evidence/'implemented-hbm-properties.txt').read_text(encoding='utf-8', errors='replace')
     rates = re.findall(r'^DATARATE\s*=\s*(\d+)\s*$', properties, re.M)
     all_rates = re.findall(r'^DATARATE(?:_\d+)?\s*=\s*(\d+)\s*$', properties, re.M)
     if len(rates) != 32 or set(all_rates) != {'1800'}:
@@ -200,10 +200,10 @@ def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6):
 
 def diagnostics(attempt):
     g = attempt/'output/gateware'
-    drc = (g/'sqrl_fk33_drc.rpt').read_text()
+    drc = (g/'sqrl_fk33_drc.rpt').read_text(encoding='utf-8', errors='replace')
     if not re.search(r'Checks found:\s*0\b', drc):
         raise ValueError('DRC is not clean; inspect sqrl_fk33_drc.rpt')
-    route = (g/'sqrl_fk33_route_status.rpt').read_text()
+    route = (g/'sqrl_fk33_route_status.rpt').read_text(encoding='utf-8', errors='replace')
     counts = {}
     for key in ('routable nets', 'fully routed nets', 'nets with routing errors'):
         match = re.search(r'# of '+key+r'\.+\s*:\s*(\d+)', route)
@@ -212,7 +212,7 @@ def diagnostics(attempt):
         counts[key] = int(match[1])
     if counts['routable nets'] <= 0 or counts['fully routed nets'] != counts['routable nets'] or counts['nets with routing errors']:
         raise ValueError('Routing is incomplete or has errors')
-    cdc = (g/'sqrl_fk33_cdc.rpt').read_text()
+    cdc = (g/'sqrl_fk33_cdc.rpt').read_text(encoding='utf-8', errors='replace')
     findings = [dict(rule=m[1], severity=m[2], count=int(m[3])) for m in
         re.finditer(r'(?m)^(CDC-\d+)\s+(Critical|Warning|Info)\s+(\d+)\s+', cdc)]
     if not findings:
