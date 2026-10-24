@@ -8,13 +8,17 @@ from pathlib import Path
 import re
 
 
-def expected_groups():
-    return {f"hbm_cpu_pc{port:02d}_{channel}_{pointer}":
+def expected_groups(endpoint=False):
+    groups = {f"hbm_cpu_pc{port:02d}_{channel}_{pointer}":
         (("main_clkout0", "main_clkout3")
             if (channel in ("aw", "w", "ar")) == (pointer == "produce")
             else ("main_clkout3", "main_clkout0"))
         for port in range(32) for channel in ("aw", "w", "b", "ar", "r")
         for pointer in ("produce", "consume")}
+    if endpoint:
+        groups.update({name.replace("hbm_cpu_pc31_", "hbm_endpoint_pc31_"): clocks
+            for name, clocks in list(groups.items()) if name.startswith("hbm_cpu_pc31_")})
+    return groups
 
 
 def output_paths(evidence):
@@ -32,7 +36,7 @@ def _clock_periods_ns(axi_clk_freq):
     raise ValueError("Native Gray proof requires SYS250/AXI250 or SYS200/AXI400")
 
 
-def query_tcl(evidence, axi_clk_freq=250e6):
+def query_tcl(evidence, axi_clk_freq=250e6, endpoint=False):
     """Return standalone query body; caller owns opening/closing checkpoint."""
     sys_period, axi_period = _clock_periods_ns(axi_clk_freq)
     template = r'''
@@ -134,6 +138,17 @@ puts HBM_GRAY_NATIVE_QUERY_COMPLETE
             'abs($period - [expr {$domain eq "AXI" ? 2.5 : 5.0}])')
         template = template.replace("abs($requirement - 4.0)", "abs($requirement - 2.5)")
         template = template.replace("active4ns", "active2.5ns")
+    if endpoint:
+        if axi_clk_freq != 250e6:
+            raise ValueError("Endpoint native proof requires SYS250/AXI250")
+        template = template.replace("HBM_GRAY_SRC =~ hbm_cpu_pc*",
+            "HBM_GRAY_SRC =~ hbm_cpu_pc* || HBM_GRAY_SRC =~ hbm_endpoint_pc31_*")
+        template = template.replace("HBM_GRAY_DST =~ hbm_cpu_pc*",
+            "HBM_GRAY_DST =~ hbm_cpu_pc* || HBM_GRAY_DST =~ hbm_endpoint_pc31_*")
+        template = template.replace("960", "990").replace("320", "330")
+        template = template.replace(
+            "{^hbm_cpu_pc(0[0-9]|[12][0-9]|3[01])_(aw|w|b|ar|r)_(produce|consume)$} $group -> port channel pointer",
+            "{^hbm_(cpu_pc(?:0[0-9]|[12][0-9]|3[01])|endpoint_pc31)_(aw|w|b|ar|r)_(produce|consume)$} $group -> port channel pointer")
     return template.replace("@@EVIDENCE@@", Path(evidence).as_posix())
 
 
@@ -201,12 +216,16 @@ def _parse_clock_roots(inventory, report, axi_clk_freq=250e6):
     return {"status": "PASS", "required_region": "X4Y1", "rows": rows}
 
 
-def parse(evidence, axi_clk_freq=250e6):
+def parse(evidence, axi_clk_freq=250e6, endpoint=False):
     """Validate native output; missing/unrecognized report formats are errors."""
     bound = min(_clock_periods_ns(axi_clk_freq))
     buses, paths, skew, root_inventory, root_report = output_paths(evidence)
     clock_roots = _parse_clock_roots(root_inventory, root_report, axi_clk_freq)
-    expected = expected_groups()
+    if endpoint and axi_clk_freq != 250e6:
+        raise ValueError("Endpoint native proof requires SYS250/AXI250")
+    expected = expected_groups(endpoint)
+    group_count = len(expected)
+    bit_count = 3 * group_count
     rows = []
     source_pins, destination_pins, keys = set(), set(), set()
     required = {"BIT", "SRC", "DST", "SRC_CLOCK", "DST_CLOCK", "DIRECT", "ASYNC",
@@ -236,14 +255,14 @@ def parse(evidence, axi_clk_freq=250e6):
         destination_pins.add(row["DST"])
         rows.append(dict(name=name, **row))
     if keys != {(name, bit) for name in expected for bit in range(3)}:
-        raise ValueError("Native Gray inventory must contain all 320 buses / 960 bits")
+        raise ValueError(f"Native Gray inventory must contain all {group_count} buses / {bit_count} bits")
     detail = paths.read_text()
-    if len(re.findall(r"^GRAY_PATH ", detail, re.M)) != 960:
+    if len(re.findall(r"^GRAY_PATH ", detail, re.M)) != bit_count:
         raise ValueError("Native Gray detailed max-delay reports missing")
     skew_text = skew.read_text()
     skew_rows = _skew_summary_rows(skew_text)
-    if len(skew_rows) != 320 or len({row[0] for row in skew_rows}) != 320:
-        raise ValueError("Native bus-skew summary must contain 320 distinct constraints; found " + str(len(skew_rows)))
+    if len(skew_rows) != group_count or len({row[0] for row in skew_rows}) != group_count:
+        raise ValueError(f"Native bus-skew summary must contain {group_count} distinct constraints; found " + str(len(skew_rows)))
     violations = 0
     for identifier, _, corner, requirement, actual, slack in skew_rows:
         requirement, actual, slack = map(float, (requirement, actual, slack))
@@ -252,8 +271,8 @@ def parse(evidence, axi_clk_freq=250e6):
         violations += slack < 0
     if violations or re.search(r"(?i)\bVIOLATED\b", skew_text):
         raise ValueError("Native bus-skew violations: " + str(violations))
-    return {"status": "PASS", "groups": 320, "bits": 960,
+    return {"status": "PASS", "groups": group_count, "bits": bit_count,
         "clock_roots": clock_roots,
         "max_delay_ns": bound, "worst_max_delay_slack_ns": min(float(row["SLACK_NS"]) for row in rows),
-        "bus_skew_constraints": 320, "bus_skew_violations": violations,
+        "bus_skew_constraints": group_count, "bus_skew_violations": violations,
         "worst_bus_skew_slack_ns": min(float(row[-1]) for row in skew_rows), "rows": rows}

@@ -69,7 +69,11 @@ def git_commit(path):
         return None
 
 
-def contract_path(axi_domain=False, axi_clk_freq=250e6):
+def contract_path(axi_domain=False, axi_clk_freq=250e6, endpoint=False):
+    if endpoint:
+        if not axi_domain or axi_clk_freq != 250e6:
+            raise ValueError("HBM endpoint requires the separate 250 MHz AXI domain")
+        return HERE/"timing-contract-endpoint.json"
     if axi_clk_freq not in (250e6, 400e6) or (not axi_domain and axi_clk_freq != 250e6):
         raise ValueError('AXI400 requires the separate AXI domain; supported rates are 250/400 MHz')
     name = ('timing-contract-axi400.json' if axi_clk_freq == 400e6 else
@@ -79,15 +83,15 @@ def contract_path(axi_domain=False, axi_clk_freq=250e6):
 
 # Build stages -------------------------------------------------------------------------------------
 
-def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=250e6):
-    contract_path(axi_domain, axi_clk_freq)
+def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=250e6, endpoint=False):
+    contract_path(axi_domain, axi_clk_freq, endpoint)
     # Execute the checked-out board target rather than an unrelated installed copy.
     sys.path.insert(0, str(BOARDS))
     import litex
     core = Path(litex.__file__).resolve().parents[1]
     core_head = git_commit(core)
     boards_commit = git_commit(BOARDS)
-    args = ['sqrl_fk33', '--with-hbm', '--hbm-primitive', '--hbm-bist',
+    args = ['sqrl_fk33', '--with-hbm', '--hbm-primitive', '--hbm-endpoint' if endpoint else '--hbm-bist',
         '--sys-clk-freq', '200e6' if axi_clk_freq == 400e6 else '250e6', '--cpu-type', 'vexriscv', '--cpu-variant', 'minimal',
         '--build', '--no-compile-gateware', '--output-dir', str(attempt/'output'),
         '--vivado-max-threads', '8', '--vivado-place-directive', 'Explore',
@@ -102,7 +106,7 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=25
     save(attempt/'generation-command.json', dict(python=sys.executable, args=args,
         core=str(core), core_commit=core_head, requested_core_commit=core_commit,
         boards=str(BOARDS), boards_commit=boards_commit, hbm_axi_domain=axi_domain,
-        hbm_axi_clk_freq=int(axi_clk_freq), sys_clk_freq=200000000 if axi_clk_freq == 400e6 else 250000000,
+        hbm_axi_clk_freq=int(axi_clk_freq), hbm_endpoint=endpoint, sys_clk_freq=200000000 if axi_clk_freq == 400e6 else 250000000,
         python_version=sys.version, packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions()}))
     sys.argv = args
     runpy.run_module('litex_boards.targets.sqrl_fk33', run_name='__main__')
@@ -128,9 +132,9 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=25
     save(attempt/'generated-hashes.json', [binding(p) for p in sorted((attempt/'output').rglob('*')) if p.is_file()])
 
 
-def audit(attempt, stage, axi_domain=False, axi_clk_freq=250e6):
+def audit(attempt, stage, axi_domain=False, axi_clk_freq=250e6, endpoint=False):
     from timing_audit import audit as run_audit
-    options = {'stage': stage, 'contract_path': contract_path(axi_domain, axi_clk_freq)}
+    options = {'stage': stage, 'contract_path': contract_path(axi_domain, axi_clk_freq, endpoint)}
     result = run_audit(attempt, **options)
     save(attempt/f'timing-audit-{stage}.json', result)
     if result['status'] != 'PASS':
@@ -169,7 +173,7 @@ def implement(attempt, vivado):
         save(attempt/'implementation-result.json', result)
 
 
-def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6):
+def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6, endpoint=False):
     from netlist_inspection import query_tcl, parse_reset_chains, output_paths
     evidence = attempt/'inspection'
     evidence.mkdir(exist_ok=False)
@@ -179,11 +183,11 @@ def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6):
     for path in (dcp, evidence):
         if any(c in path.as_posix() for c in '{}\n\r'):
             raise ValueError('Unsupported Tcl path characters')
-    inspection_tcl = query_tcl(dcp, evidence, axi_domain=axi_domain)
+    inspection_tcl = query_tcl(dcp, evidence, axi_domain=axi_domain, endpoint=endpoint)
     if axi_domain:
         import gray_cdc
         inspection_tcl = inspection_tcl.replace('puts HBM_NETLIST_INSPECTION_COMPLETE',
-            gray_cdc.query_tcl(evidence, axi_clk_freq=axi_clk_freq) + '\nputs HBM_NETLIST_INSPECTION_COMPLETE')
+            gray_cdc.query_tcl(evidence, axi_clk_freq=axi_clk_freq, endpoint=endpoint) + '\nputs HBM_NETLIST_INSPECTION_COMPLETE')
     query.write_text(inspection_tcl, encoding='utf-8')
     command([vivado, '-mode', 'batch', '-source', query, '-log', evidence/'vivado.log',
         '-journal', evidence/'vivado.jou'], evidence, evidence/'netlist-inspection-console.log')
@@ -199,10 +203,13 @@ def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6):
     if sha(dcp) != before:
         raise ValueError('Read-only inspection changed the checkpoint')
     result = dict(status='PASS', checkpoint=binding(dcp), reset_chains=chains,
-        outputs=[binding(p) for p in output_paths(evidence, axi_domain=axi_domain)], datarate_mt_s=1800)
+        outputs=[binding(p) for p in output_paths(evidence, axi_domain=axi_domain, endpoint=endpoint)], datarate_mt_s=1800)
     if axi_domain:
-        result['gray_cdc'] = gray_cdc.parse(evidence, axi_clk_freq=axi_clk_freq)
+        result['gray_cdc'] = gray_cdc.parse(evidence, axi_clk_freq=axi_clk_freq, endpoint=endpoint)
         result['outputs'] += [binding(p) for p in gray_cdc.output_paths(evidence)]
+    if endpoint:
+        from netlist_inspection import parse_endpoint_controls
+        result['endpoint_controls'] = parse_endpoint_controls(evidence/'implemented-endpoint-controls.txt')
     save(evidence/'result.json', result)
     return result
 
@@ -249,16 +256,22 @@ def main():
     parser.add_argument('--hbm-axi-clk-freq', type=float, choices=(250e6, 400e6), default=250e6,
         help='AXI clock frequency; 400 MHz requires --hbm-axi-domain (default: 250 MHz)')
 
+    parser.add_argument('--hbm-endpoint', action='store_true',
+        help='Build the PC31 processor-controlled endpoint instead of BIST; requires separate AXI250')
+
     # Build stages.
     parser.add_argument('--generate-only', action='store_true', help='Generate RTL/firmware and audit source constraints; no CAD or build PASS')
     parser.add_argument('--resume',        action='store_true', help='Implement an unchanged GENERATED output; never retry a failed native build')
     args = parser.parse_args()
     if args.hbm_axi_clk_freq != 250e6 and not args.hbm_axi_domain:
         parser.error('--hbm-axi-clk-freq=400e6 requires --hbm-axi-domain')
+    if args.hbm_endpoint and (not args.hbm_axi_domain or args.hbm_axi_clk_freq != 250e6):
+        parser.error('--hbm-endpoint requires --hbm-axi-domain at 250 MHz')
     attempt = args.output_dir.resolve()
     result = dict(status='FAIL', attempt=str(attempt), started_utc=datetime.now(timezone.utc).isoformat(),
         hardware_tested=False, published=False,
         hbm_axi_domain=args.hbm_axi_domain, hbm_axi_clk_freq=int(args.hbm_axi_clk_freq),
+        hbm_endpoint=args.hbm_endpoint,
         sys_clk_freq=200000000 if args.hbm_axi_clk_freq == 400e6 else 250000000,
         requested_core_commit=args.core_commit,
         scope='Portable build/timing/netlist/RapidWright checks. Local historical simulations and hardware campaign are separate evidence.')
@@ -271,6 +284,8 @@ def main():
             generation = load(attempt/'generation-command.json')
         except (OSError, ValueError) as error:
             parser.error(f'--resume requires a readable generation-command.json: {error}')
+        if generation.get('hbm_endpoint', False) != args.hbm_endpoint:
+            parser.error('--resume endpoint profile does not match generation-command.json')
         recorded_axi_domain = generation.get('hbm_axi_domain', False)
         if recorded_axi_domain != args.hbm_axi_domain:
             parser.error('--resume HBM AXI-domain profile does not match generation-command.json')
@@ -298,10 +313,13 @@ def main():
                 '--core-commit', args.core_commit]
             if args.hbm_axi_domain:
                 child_args.append('--hbm-axi-domain')
+            if args.hbm_endpoint:
+                child_args.append('--hbm-endpoint')
             if args.hbm_axi_clk_freq != 250e6:
                 child_args += ['--hbm-axi-clk-freq', str(int(args.hbm_axi_clk_freq))]
             command(child_args, BOARDS, attempt/'generation.log')
-        audit(attempt, 'source', axi_domain=args.hbm_axi_domain, axi_clk_freq=args.hbm_axi_clk_freq)
+        audit(attempt, 'source', axi_domain=args.hbm_axi_domain, axi_clk_freq=args.hbm_axi_clk_freq,
+            endpoint=args.hbm_endpoint)
         if args.generate_only:
             result['status'] = 'GENERATED'
         else:
@@ -321,10 +339,10 @@ def main():
                 raise ValueError('RapidWright receipt lacks required routed pin/channel/path evidence')
             result['rapidwright'] = binding(attempt/'rapidwright/result.json')
             result['timing'] = audit(attempt, 'final', axi_domain=args.hbm_axi_domain,
-                axi_clk_freq=args.hbm_axi_clk_freq)['checks']['routed_sta']['detail']
+                axi_clk_freq=args.hbm_axi_clk_freq, endpoint=args.hbm_endpoint)['checks']['routed_sta']['detail']
             result['diagnostics'] = diagnostics(attempt)
             result['inspection'] = inspect(attempt, vivado, axi_domain=args.hbm_axi_domain,
-                axi_clk_freq=args.hbm_axi_clk_freq)
+                axi_clk_freq=args.hbm_axi_clk_freq, endpoint=args.hbm_endpoint)
             unchanged(load(attempt/'input-hashes.json'))
             result.update(status='BUILD_PASS', bitstream=binding(attempt/'output/gateware/sqrl_fk33.bit'))
             result['artifacts'] = [binding(attempt/path) for path in (
@@ -348,9 +366,10 @@ if __name__ == '__main__':
         child.add_argument('--generate-child', required=True, type=Path)
         child.add_argument('--core-commit', default=CORE_COMMIT)
         child.add_argument('--hbm-axi-domain', action='store_true')
+        child.add_argument('--hbm-endpoint', action='store_true')
         child.add_argument('--hbm-axi-clk-freq', type=float, choices=(250e6, 400e6), default=250e6)
         child_args = child.parse_args()
         generate(child_args.generate_child.resolve(), child_args.core_commit,
-            child_args.hbm_axi_domain, child_args.hbm_axi_clk_freq)
+            child_args.hbm_axi_domain, child_args.hbm_axi_clk_freq, child_args.hbm_endpoint)
     else:
         raise SystemExit(main())

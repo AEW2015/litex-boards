@@ -216,6 +216,46 @@ class HBMCPUWindowCDC(LiteXModule):
             (Cat(*pending) == 0) & ~master.aw.valid & ~master.w.valid &
             ~master.ar.valid & ~master.b.valid & ~master.r.valid)
 
+
+class HBMReservedPortError(LiteXModule):
+    """Complete accidental accesses to an application-owned port with DECERR."""
+    def __init__(self, port):
+        address_seen = Signal()
+        data_seen = Signal()
+        read_pending = Signal()
+        self.comb += [
+            port.aw.ready.eq(~address_seen),
+            port.w.ready.eq(~data_seen),
+            port.b.valid.eq(address_seen & data_seen), port.b.resp.eq(3),
+            port.ar.ready.eq(~read_pending),
+            port.r.valid.eq(read_pending), port.r.resp.eq(3), port.r.data.eq(0),
+        ]
+        self.sync += [
+            If(port.aw.valid & port.aw.ready, address_seen.eq(1)),
+            If(port.w.valid & port.w.ready, data_seen.eq(1)),
+            If(port.b.valid & port.b.ready, address_seen.eq(0), data_seen.eq(0)),
+            If(port.ar.valid & port.ar.ready, read_pending.eq(1)),
+            If(port.r.valid & port.r.ready, read_pending.eq(0)),
+        ]
+
+
+class HBMEndpointNativeWiring(LiteXModule):
+    """Wire the endpoint's ordered AXI3 subset to the existing HBM record."""
+    def __init__(self, endpoint, runtime):
+        if endpoint.version != "axi3" or runtime.version != "axi4":
+            raise ValueError("HBM endpoint wiring requires AXI3 and the existing AXI4-shaped record")
+        for port in (endpoint, runtime):
+            if (port.data_width, port.address_width, port.id_width) != (256, 33, 6):
+                raise ValueError("HBM endpoint wiring preserves AXI256/address33/ID6")
+        # The wrapper has no physical WID pin. The endpoint emits ordered W
+        # bursts under one ID lock; AWID supplies the controller's write ID.
+        self.comb += [
+            endpoint.aw.connect(runtime.aw),
+            endpoint.w.connect(runtime.w, omit={"id"}),
+            endpoint.ar.connect(runtime.ar),
+            runtime.b.connect(endpoint.b), runtime.r.connect(endpoint.r),
+        ]
+
 class HBMCPUWindowPipeline(LiteXModule):
     """BIST-aware narrow AXI-Lite window boundary with idle accounting."""
     def __init__(self, cpu, native, bist=False, name="hbm_cpu_window"):
@@ -302,6 +342,7 @@ class BaseSoC(SoCCore):
         hbm_primitive         = False,
         hbm_primitive_rtl     = None,
         hbm_bist              = False,
+        hbm_endpoint          = False,
         hbm_axi_domain        = False,
         hbm_axi_clk_freq      = 250e6,
         **kwargs):
@@ -312,10 +353,13 @@ class BaseSoC(SoCCore):
         if hbm_axi_clk_freq == 400e6 and (not hbm_axi_domain or sys_clk_freq != 200e6):
             raise ValueError("400 MHz HBM AXI requires a separate domain and 200 MHz SYS")
         self.hbm_axi_clk_freq = hbm_axi_clk_freq
-        if hbm_axi_domain and not (self.hbm_primitive and hbm_bist):
-            raise ValueError("Separate HBM AXI domain requires primitive HBM and BIST")
+        if hbm_axi_domain and not (self.hbm_primitive and (hbm_bist or hbm_endpoint)):
+            raise ValueError("Separate HBM AXI domain requires primitive HBM and BIST or endpoint")
         if hbm_bist and not self.hbm_primitive:
             raise ValueError("HBM burst testing requires the primitive HBM profile")
+        if hbm_endpoint and (not self.hbm_primitive or not hbm_axi_domain or
+                hbm_axi_clk_freq != 250e6 or hbm_bist):
+            raise ValueError("HBM endpoint requires primitive SYS250/AXI250 with a separate AXI domain and no BIST")
         if self.hbm_primitive:
             if not with_hbm:
                 raise ValueError("Primitive HBM requires --with-hbm")
@@ -387,6 +431,40 @@ class BaseSoC(SoCCore):
                 # Vivado command templates expand braces with str.format.
                 platform.toolchain.pre_placement_commands.append(
                     gray_constraints.replace("{", "{{").replace("}", "}}"))
+                if hbm_endpoint:
+                    endpoint_gray_constraints = """
+set endpoint_gray_sources [dict create]
+set endpoint_gray_destinations [dict create]
+foreach {attribute collection} {hbm_gray_src endpoint_gray_sources hbm_gray_dst endpoint_gray_destinations} {
+    foreach cell [get_cells -hierarchical -filter "$attribute =~ hbm_endpoint_pc31_*"] {
+        dict lappend $collection [get_property $attribute $cell] $cell
+    }
+}
+if {[dict size $endpoint_gray_sources] != 10 || [dict size $endpoint_gray_destinations] != 10} {
+    error "Expected ten endpoint Gray buses"
+}
+foreach channel {aw w b ar r} {
+    foreach direction {produce consume} {
+        set id hbm_endpoint_pc31_${channel}_${direction}
+        set src [dict get $endpoint_gray_sources $id]
+        set dst [dict get $endpoint_gray_destinations $id]
+        if {[llength $src] != 3 || [llength $dst] != 3} {error "Incomplete endpoint Gray vector $id"}
+        foreach cell $dst {
+            if {[string equal -nocase [get_property -quiet mr_ff $cell] true]} {
+                error "Endpoint Gray first stage retains generic false path: $id"
+            }
+        }
+        set src_c [get_pins -of_objects $src -filter {REF_PIN_NAME == C}]
+        set dst_d [get_pins -of_objects $dst -filter {REF_PIN_NAME == D}]
+        if {[llength $src_c] != 3 || [llength $dst_d] != 3} {error "Missing endpoint Gray pins: $id"}
+        set_max_delay -datapath_only 4.0 -from $src_c -to $dst_d
+        set_bus_skew 4.0 -from $src_c -to $dst_d
+    }
+}
+puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
+"""
+                    platform.toolchain.pre_placement_commands.append(
+                        endpoint_gray_constraints.replace("{", "{{").replace("}", "}}"))
                 platform.toolchain.additional_commands.append(
                     "report_bus_skew -file {build_name}_bus_skew.rpt")
 
@@ -430,10 +508,12 @@ class BaseSoC(SoCCore):
                 self.hbm_window.bank_effective = Signal(3, name="hbm_window_bank_effective")
                 self.hbm_window.bank_fault = Signal(name="hbm_window_bank_fault")
                 all_windows_idle = Signal(name="hbm_all_windows_idle")
+                all_host_idle = Signal(name="hbm_all_host_idle") if hbm_endpoint else all_windows_idle
                 self.hbm_runtime = HBMRuntimeQuiesce(platform,
-                    registered_request=hbm_bist, registered_completions=hbm_bist,
+                    registered_request=hbm_bist or hbm_endpoint,
+                    registered_completions=hbm_bist or hbm_endpoint,
                     clock_domain=axi_domain,
-                    sys_host_idle=all_windows_idle if hbm_axi_domain else None)
+                    sys_host_idle=all_host_idle if hbm_axi_domain else None)
                 host_idle_axi = Signal(name="hbm_host_admission_closed_and_idle_axi")
                 observed_idle_axi = Signal(name="hbm_host_observed_idle_axi")
                 if hbm_bist:
@@ -446,6 +526,23 @@ class BaseSoC(SoCCore):
                         clock_domain=axi_domain)
                     self.add_constant("HBM_BIST_CHANNELS", 32)
                 host_quiesce = self.hbm_runtime.quiesce_request
+                if hbm_endpoint:
+                    from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint import HBMWideEndpoint
+                    from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint_csr import HBMEndpointCSR
+                    self.hbm_transport = HBMWideEndpoint(app_domain="sys", native_domain="axi",
+                        gray_bus_prefix="hbm_endpoint_pc31", max_outstanding=4)
+                    # Ownership FIFO RAM is transport state, not CSR memory.
+                    self.hbm_transport.autocsr_exclude = {"window"}
+                    self.hbm_endpoint = HBMEndpointCSR(self.hbm_transport)
+                    self.comb += [
+                        self.hbm_endpoint.admission_enable.eq(self.hbm.memory_ready),
+                        self.hbm_endpoint.stop.eq(host_quiesce),
+                        self.hbm_transport.quiesce.eq(self.hbm_endpoint.endpoint_quiesce),
+                        all_host_idle.eq(all_windows_idle & self.hbm_endpoint.drained &
+                            (~host_quiesce | self.hbm_endpoint.quiesced)),
+                    ]
+                    self.add_constant("HBM_ENDPOINT_PORT", 31)
+                    self.add_constant("HBM_ENDPOINT_MAX_OUTSTANDING", 4)
                 if hbm_bist:
                     host_quiesce = host_quiesce | self.hbm_bist.owner_sys
                     if hbm_axi_domain:
@@ -455,16 +552,17 @@ class BaseSoC(SoCCore):
                     # This level only rises after SYS admission has closed and
                     # every accepted request AND returned response has retired.
                     self.hbm_host_barrier = HBMHostDrainBarrier(host_quiesce,
-                        all_windows_idle, self.hbm_bist.command_token_sys,
+                        all_host_idle, self.hbm_bist.command_token_sys if hbm_bist else 0,
                         self.hbm_runtime.request_generation_sys)
                     self.comb += [
                         host_idle_axi.eq(self.hbm_host_barrier.idle_native),
                         observed_idle_axi.eq(self.hbm_host_barrier.observed_idle_native),
-                        self.hbm_bist.host_barrier_token_native.eq(
-                            self.hbm_host_barrier.token_native),
                         self.hbm_runtime.host_barrier_generation_native.eq(
                             self.hbm_host_barrier.generation_native),
                     ]
+                    if hbm_bist:
+                        self.comb += self.hbm_bist.host_barrier_token_native.eq(
+                            self.hbm_host_barrier.token_native)
                 admission_gates = []
                 window_idle_signals = []
                 cdc_idle_signals = []
@@ -509,6 +607,23 @@ class BaseSoC(SoCCore):
                             cdc_idle_signals.append(crossing.idle)
                             cdc_fault_signals.append(crossing.fault)
                             port = crossed
+                        native_channel = 4*bank + channel
+                        if hbm_endpoint and native_channel == 31:
+                            # Keep the narrow CPU CDC and its terminal-response
+                            # accounting, but never attach CPU traffic to PC31.
+                            self.submodules += ClockDomainsRenamer(axi_domain)(HBMReservedPortError(port))
+                            # The existing HBM wrapper uses an AXI4-shaped
+                            # record for the ordered AXI3 subset: no physical
+                            # WID pin and only four significant LEN bits.
+                            # Preserve endpoint AXI3 and all native data widths.
+                            endpoint_native = self.hbm_transport.native
+                            runtime_native = axi.AXIInterface(data_width=256,
+                                address_width=33, id_width=6)
+                            self.hbm_endpoint_runtime_native = runtime_native
+                            self.submodules += HBMEndpointNativeWiring(endpoint_native, runtime_native)
+                            self.hbm_runtime.add_port(native_channel, runtime_native,
+                                self.hbm.axi[native_channel], host_idle=observed_idle_axi)
+                            continue
                         for name in ("aw", "w", "ar"):
                             self.comb += getattr(port, name).connect(getattr(local, name))
                         self.comb += local.b.connect(port.b)
@@ -583,6 +698,8 @@ class BaseSoC(SoCCore):
                     external_fault = external_fault | Reduce("OR", cdc_fault_signals)
                 if hbm_bist:
                     external_fault = external_fault | (self.hbm_bist.error_mask_sys != 0)
+                if hbm_endpoint:
+                    external_fault = external_fault | self.hbm_transport.protocol_error
                 self.comb += self.hbm_runtime.external_fault.eq(external_fault)
 
         # PCIe -------------------------------------------------------------------------------------
@@ -613,9 +730,11 @@ class BaseSoC(SoCCore):
                 self.csr.add(name, location, use_loc_if_exists=True)
             if hbm_bist:
                 self.csr.add("hbm_bist", 9, use_loc_if_exists=True)
+            if hbm_endpoint:
+                self.csr.add("hbm_endpoint", 9, use_loc_if_exists=True)
 
     def _finalize_bus(self):
-        if not (self.hbm_primitive and hasattr(self, "hbm_bist")):
+        if not (self.hbm_primitive and (hasattr(self, "hbm_bist") or hasattr(self, "hbm_endpoint"))):
             return super()._finalize_bus()
         # The primitive-HBM BIST CSR bank is reached through the JTAG Wishbone
         # master. Register this bridge to split the address/decode path before
@@ -650,7 +769,7 @@ class BaseSoC(SoCCore):
             address_map=self.csr.address_map, data_width=self.csr.data_width,
             address_width=self.csr.address_width, alignment=self.csr.alignment,
             paging=self.csr.paging, ordering=self.csr.ordering,
-            read_pipeline=hasattr(self, "hbm_bist"))
+            read_pipeline=hasattr(self, "hbm_bist") or hasattr(self, "hbm_endpoint"))
         self.csr_interconnect = csr_bus.InterconnectShared(
             list(self.csr.masters.values()), self.csr_bankarray.get_buses() + [self.hbm.control_bus])
         for name, registers, address, bank in self.csr_bankarray.banks:
@@ -680,7 +799,8 @@ def main():
     parser.add_target_argument("--hbm-primitive", action="store_true", help="Use bundled primitive HBM and processor calibration firmware.")
     parser.add_target_argument("--hbm-primitive-rtl", help="Override the bundled primitive/control RTL directory.")
     parser.add_target_argument("--hbm-bist", action="store_true", help="Add exclusive per-channel burst test masters and counters.")
-    parser.add_target_argument("--hbm-axi-domain", action="store_true", help="Independent HBM AXI clock domain (requires primitive BIST).")
+    parser.add_target_argument("--hbm-endpoint", action="store_true", help="Dedicate PC31 to the processor-driven four-command wide endpoint.")
+    parser.add_target_argument("--hbm-axi-domain", action="store_true", help="Independent HBM AXI clock domain (requires primitive BIST or endpoint).")
     parser.add_target_argument("--hbm-axi-clk-freq", default=250e6, type=float, choices=[250e6, 400e6], help="HBM AXI clock frequency; 400 MHz requires --hbm-axi-domain and --sys-clk-freq=200e6.")
     parser.add_target_argument("--hbm-channels", default="0,1,2,3",         help="HBM channels to map (comma/range list or all).")
     parser.add_target_argument("--hbm-main-channel", default=0, type=int,   help="Mapped HBM channel used as main RAM.")
@@ -715,6 +835,7 @@ def main():
         hbm_primitive         = args.hbm_primitive,
         hbm_primitive_rtl     = args.hbm_primitive_rtl,
         hbm_bist              = args.hbm_bist,
+        hbm_endpoint          = args.hbm_endpoint,
         hbm_axi_domain        = args.hbm_axi_domain,
         hbm_axi_clk_freq      = args.hbm_axi_clk_freq,
         **parser.soc_argdict

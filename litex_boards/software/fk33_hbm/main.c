@@ -25,7 +25,8 @@ enum { WAIT = 1, INITIALIZING = 2, READY = 3, TESTING = 4, STOPPED = 5, QUIESCIN
 enum { BAD_ABI = 1, APB_TIMEOUT = 2, APB_ERROR = 3, DFI_TIMEOUT = 4,
        CAL_TIMEOUT = 5, CAL_WINDOW = 6, DRIVE_CHANGED = 7, BAD_TEMP = 8,
        TRIP = 9, COMMIT_FAILED = 10, MEMORY_ERROR = 11, BUS_ERROR = 12,
-       DRAIN_TIMEOUT = 13, DRAIN_ERROR = 14, INTERVAL_MODE = 15 };
+       DRAIN_TIMEOUT = 13, DRAIN_ERROR = 14, INTERVAL_MODE = 15,
+       ENDPOINT_ERROR = 16, ENDPOINT_TIMEOUT = 17 };
 static const clock_profile *active_profile;
 
 static inline uint32_t rd(uint32_t address) { return *(volatile uint32_t *)address; }
@@ -47,7 +48,8 @@ static void fail(uint32_t reason) __attribute__((noreturn));
 static void fail(uint32_t reason) {
     /* A failed drain may still own transactions. Keep admission closed and
      * allow their responses to retire without asserting native AXI reset. */
-    if (reason == DRAIN_ERROR || reason == DRAIN_TIMEOUT) wr(HBM_RUNTIME_BASE, 1);
+    if (reason == DRAIN_ERROR || reason == DRAIN_TIMEOUT ||
+            reason == ENDPOINT_ERROR || reason == ENDPOINT_TIMEOUT) wr(HBM_RUNTIME_BASE, 1);
     else wr(HBM_CONTROL_BASE + 16, 16); /* BLOCK is a SYS-domain operation. */
     mb->failure = reason;
     mb->errors++;
@@ -257,6 +259,9 @@ static void transactions(void) {
     mb->bus_errors_before = rd(CTRL_BUS_ERRORS);
     refresh_temperatures();
     for (uint32_t channel = 0; channel < 32; channel++) {
+#ifdef HBM_ENDPOINT_PORT
+        if (channel == HBM_ENDPOINT_PORT) continue;
+#endif
         mark(12, channel >> 4, channel);
         refresh_temperatures();
         uint32_t base = channel_base(channel);
@@ -268,6 +273,9 @@ static void transactions(void) {
     }
     /* All channel/address markers were written before reading any of them. */
     for (uint32_t channel = 0; channel < 32; channel++) {
+#ifdef HBM_ENDPOINT_PORT
+        if (channel == HBM_ENDPOINT_PORT) continue;
+#endif
         uint32_t base = channel_base(channel);
         refresh_temperatures();
         for (uint32_t sample = 0; sample < 5; sample++) {
@@ -329,6 +337,9 @@ static void stress(void) {
     for (uint32_t round = 0; round < rounds; round++) {
         uint32_t offset = 0x00100000u + round * 0x4000u;
         for (uint32_t channel = 0; channel < 32; channel++) {
+#ifdef HBM_ENDPOINT_PORT
+            if (channel == HBM_ENDPOINT_PORT) continue;
+#endif
             uint32_t base = channel_base(channel);
             mark(13, channel >> 4, channel);
             for (uint32_t word = 0; word < words; word++) {
@@ -341,6 +352,9 @@ static void stress(void) {
             mb->written_channels |= 1u << channel;
         }
         for (uint32_t channel = 0; channel < 32; channel++) {
+#ifdef HBM_ENDPOINT_PORT
+            if (channel == HBM_ENDPOINT_PORT) continue;
+#endif
             uint32_t base = channel_base(channel);
             for (uint32_t word = 0; word < words; word++) {
                 if ((word & 255u) == 0) {
@@ -359,6 +373,150 @@ static void stress(void) {
     refresh_temperatures();
     mb->state = READY;
 }
+#ifdef HBM_ENDPOINT_PORT
+/* CMD6 uses only the dedicated endpoint. All expected bytes are calculated
+ * here; HBM contents are established by full-strobe writes before masking. */
+static uint32_t endpoint_status(void) {
+    uint32_t status = rd(EP_STATUS);
+    mb->actual = rd(EP_ERRORS);
+    if (mb->actual || (status & (1u << 10))) fail(ENDPOINT_ERROR);
+    check_trip();
+    return status;
+}
+static void endpoint_wait(uint32_t mask, uint32_t value) {
+    uint32_t start = ticks();
+    while ((endpoint_status() & mask) != value) {
+        if ((uint32_t)(start - ticks()) >= SYS_CLK_FREQ / 10u) fail(ENDPOINT_TIMEOUT);
+    }
+}
+static void endpoint_descriptor(uint32_t read, uint32_t command, uint32_t beats) {
+    /* HBM native address includes its pseudochannel tag in bits32:28. */
+    uint32_t offset = 0x00100000u + command * 0x200u;
+    endpoint_wait(1u << (read ? 2 : 1), 1u << (read ? 2 : 1));
+    wr(read ? EP_AR_ADDR_LO : EP_AW_ADDR_LO, (HBM_ENDPOINT_PORT << 28) | offset);
+    wr(read ? EP_AR_ADDR_HI : EP_AW_ADDR_HI, HBM_ENDPOINT_PORT >> 4);
+    wr(read ? EP_AR_LEN : EP_AW_LEN, beats - 1);
+    wr(read ? EP_AR_ID : EP_AW_ID, read ? 0x2au : 0x15u);
+    wr(read ? EP_AR_SUBMIT : EP_AW_SUBMIT, 1);
+    endpoint_status();
+}
+static uint32_t endpoint_pattern(uint32_t seed, uint32_t command, uint32_t word) {
+    return seed ^ (0x00100000u + command * 0x200u + word * 4u) ^ (word * 0x01020304u);
+}
+static uint32_t endpoint_strobe(uint32_t command, uint32_t upper, uint32_t masked) {
+    if (!masked) return 0xffffffffu;
+    switch (command) {
+    case 0: return 0;
+    case 1: return upper ? 0 : 0xffffffffu;
+    case 2: return upper ? 0xffffffffu : 0;
+    case 3: return upper ? 0xa5a5a5a5u : 0x5a5a5a5au;
+    default: return 0xffffffffu;
+    }
+}
+static void endpoint_write_batch(uint32_t beats, uint32_t count, uint32_t seed, uint32_t masked) {
+    for (uint32_t command = 0; command < count; command++) endpoint_descriptor(0, command, beats);
+    uint32_t stop = masked && (beats == 3 || beats == 16);
+    if (stop) {
+        /* All descriptors are accepted by the adapter, but their W words
+         * are still owed. At LEN16 the fifth descriptor is also queued. */
+        wr(HBM_RUNTIME_BASE, 1);
+        delay_us(100);
+        if ((rd(HBM_RUNTIME_BASE + 12) & 2) || !(endpoint_status() & 512)) fail(ENDPOINT_ERROR);
+    }
+    for (uint32_t command = 0; command < count; command++) {
+        for (uint32_t word = 0; word < (beats + 1) / 2; word++) {
+            endpoint_wait(8, 8);
+            for (uint32_t lane = 0; lane < 16; lane++)
+                wr(ep_w_data_regs[lane], endpoint_pattern(seed, command, word * 16 + lane));
+            wr(EP_W_STRB_LO, endpoint_strobe(command, 0, masked));
+            wr(EP_W_STRB_HI, endpoint_strobe(command, 1, masked));
+            wr(EP_W_LAST, word + 1 == (beats + 1) / 2);
+            wr(EP_W_SUBMIT, 1);
+            endpoint_status();
+        }
+    }
+    endpoint_wait(16, 16);
+    /* Keep B unconsumed: four credits must remain owned, and an optional
+     * fifth descriptor must remain queued until the first B is popped. */
+    delay_us(100);
+    if (rd(EP_WRITE_CREDITS) != 4 || (count == 5 && rd(EP_AW_LEVEL) != 1)) fail(ENDPOINT_ERROR);
+    uint32_t held_id = rd(EP_B_ID), held_resp = rd(EP_B_RESP);
+    delay_us(100);
+    if (rd(EP_B_ID) != held_id || rd(EP_B_RESP) != held_resp) fail(ENDPOINT_ERROR);
+    for (uint32_t command = 0; command < count; command++) {
+        endpoint_wait(16, 16);
+        if (rd(EP_B_ID) != 0x15 || rd(EP_B_RESP)) fail(ENDPOINT_ERROR);
+        wr(EP_B_POP, 1);
+        mb->writes += beats;
+    }
+    endpoint_wait(128, 128);
+    if (stop) { quiesce(); resume(); mb->state = TESTING; }
+}
+static void endpoint_read_batch(uint32_t beats, uint32_t count, uint32_t masked, uint32_t stop) {
+    for (uint32_t command = 0; command < count; command++) endpoint_descriptor(1, command, beats);
+    endpoint_wait(32, 32);
+    delay_us(100);
+    if (rd(EP_READ_CREDITS) != 4 || (count == 5 && rd(EP_AR_LEVEL) != 1)) fail(ENDPOINT_ERROR);
+    uint32_t held_data = rd(ep_r_data_regs[0]), held_last = rd(EP_R_LAST);
+    delay_us(100);
+    if (rd(ep_r_data_regs[0]) != held_data || rd(EP_R_LAST) != held_last) fail(ENDPOINT_ERROR);
+    if (stop) {
+        wr(HBM_RUNTIME_BASE, 1);
+        delay_us(100);
+        if ((rd(HBM_RUNTIME_BASE + 12) & 2) || !(endpoint_status() & 512)) fail(ENDPOINT_ERROR);
+    }
+    for (uint32_t command = 0; command < count; command++) {
+        for (uint32_t word = 0; word < (beats + 1) / 2; word++) {
+            endpoint_wait(32, 32);
+            uint32_t upper = word * 2 + 1 < beats;
+            uint32_t last = word + 1 == (beats + 1) / 2;
+            uint32_t ids = rd(EP_R_ID), responses = rd(EP_R_RESP);
+            if (rd(EP_R_KEEP_LO) != 0xffffffffu || rd(EP_R_KEEP_HI) != (upper ? 0xffffffffu : 0) ||
+                    rd(EP_R_FIRST) != (word == 0) || rd(EP_R_LAST) != last ||
+                    (ids & 63) != 0x2a || (responses & 3) ||
+                    (upper && (((ids >> 6) & 63) != 0x2a || (responses >> 2)))) fail(ENDPOINT_ERROR);
+            for (uint32_t lane = 0; lane < (upper ? 16u : 8u); lane++) {
+                uint32_t expected = endpoint_pattern(0x94660000u, command, word * 16 + lane);
+                uint32_t updated = endpoint_pattern(0x5a39c6e1u, command, word * 16 + lane);
+                uint32_t strobe = endpoint_strobe(command, lane >= 8, masked);
+                uint32_t bytes = (strobe >> (4 * (lane & 7))) & 15;
+                uint32_t mask = 0;
+                for (uint32_t byte = 0; byte < 4; byte++)
+                    if (bytes & (1u << byte)) mask |= 255u << (byte * 8);
+                if (masked) expected = (expected & ~mask) | (updated & mask);
+                mb->expected = expected; mb->actual = rd(ep_r_data_regs[lane]);
+                mb->memory_address = 0x00100000u + command * 0x200u + word * 64 + lane * 4;
+                if (mb->actual != expected) fail(ENDPOINT_ERROR);
+                mb->signature = (mb->signature << 1) ^ mb->actual;
+            }
+            wr(EP_R_POP, 1);
+        }
+        mb->reads += beats;
+    }
+    endpoint_wait(128, 128);
+    if (stop) { quiesce(); resume(); mb->state = TESTING; }
+}
+static void endpoint_transactions(void) {
+    mb->state = TESTING; mb->sequence++; mb->writes = 0; mb->reads = 0;
+    mb->signature = 0; mb->command_result = 0;
+    mb->bus_errors_before = rd(CTRL_BUS_ERRORS);
+    for (uint32_t beats = 1; beats <= 16; beats++) {
+        uint32_t count = beats == 16 ? 5 : 4;
+        mark(14, HBM_ENDPOINT_PORT, beats);
+        refresh_temperatures();
+        endpoint_write_batch(beats, count, 0x94660000u, 0);
+        endpoint_read_batch(beats, count, 0, 0);
+        endpoint_write_batch(beats, count, 0x5a39c6e1u, 1);
+        endpoint_read_batch(beats, count, 1, beats == 3 || beats == 16);
+    }
+    mb->bus_errors_after = rd(CTRL_BUS_ERRORS);
+    if (mb->bus_errors_before != mb->bus_errors_after) fail(BUS_ERROR);
+    endpoint_status();
+    refresh_temperatures();
+    mb->state = READY;
+}
+#endif
+
 int main(void) {
     wr(TIMER_BASE + 8, 0); wr(TIMER_BASE, 0xffffffffu);
     wr(TIMER_BASE + 4, 0xffffffffu); wr(TIMER_BASE + 28, 0); wr(TIMER_BASE + 8, 1);
@@ -374,6 +532,9 @@ int main(void) {
         if (command == 1 && (mb->state == WAIT || mb->state == STOPPED)) { initialize(active_profile); transactions(); }
         if (command == 2 && mb->state == READY) transactions();
         if (command == 4 && mb->state == READY) stress();
+#ifdef HBM_ENDPOINT_PORT
+        if (command == 6 && mb->state == READY) endpoint_transactions();
+#endif
         if (command == 5 && (mb->state == READY || mb->state == STOPPED)) {
             const clock_profile *profile = find_profile(mb->target_mhz);
             mb->command_result = profile ? 0 : 1;

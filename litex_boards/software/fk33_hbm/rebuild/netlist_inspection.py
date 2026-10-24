@@ -5,6 +5,7 @@ reset-synchronizer topology and bounded interstage paths are mandatory outputs.
 """
 import argparse
 import hashlib
+import math
 import json
 from pathlib import Path
 import re
@@ -21,14 +22,15 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def output_paths(evidence, axi_domain=False):
+def output_paths(evidence, axi_domain=False, endpoint=False):
     return [evidence / name for name in (
         'implemented-hbm-properties.txt', 'implemented-clocks.txt',
         'implemented-reset-chains.txt', 'netlist-inspection-console.log',
+        *(['implemented-endpoint-controls.txt'] if endpoint else []),
         *(f'implemented-reset-{name}-timing.rpt' for name in expected_reset_chains(axi_domain)))]
 
 
-def query_tcl(checkpoint, evidence, axi_domain=False):
+def query_tcl(checkpoint, evidence, axi_domain=False, endpoint=False):
     template = r'''set checkpoint {@@CHECKPOINT@@}
 puts "INSPECT_SELECTED_CHECKPOINT $checkpoint"
 open_checkpoint $checkpoint
@@ -136,6 +138,40 @@ puts $reset_out "RESET_CHAIN axi_domain_reset STAGE0=$stage0 STAGE1=$stage1 CLOC
         template = template.replace('close $reset_out', axi_query + '\nclose $reset_out')
     template = template.replace('report_timing -from $clock0 -to $d1 -delay_type max -max_paths 1 -input_pins -file {@@EVIDENCE@@/implemented-reset-PLACEHOLDER-timing.rpt}',
         'report_timing -from $clock0 -to $d1 -delay_type max -max_paths 1 -input_pins -file [file join {@@EVIDENCE@@} "implemented-reset-${chain}-timing.rpt"]')
+    if endpoint:
+        if not axi_domain:
+            raise ValueError("Endpoint inspection requires the separate AXI domain")
+        policy = json.loads(Path(__file__).with_name("timing-contract-endpoint.json").read_text())["direct_control_policy"]
+        tags = [f"hbm_control_{role}_bit{bit}"
+            for role, width in policy["roles"].items() for bit in range(width)]
+        controls = r'''
+set expected_controls {@@TAGS@@}
+set controls [lsort -unique [concat [get_cells -hier -quiet -filter {hbm_direct_reset =~ hbm_control_*}] [get_cells -hier -quiet -filter {NAME =~ *hbm_control_* && REF_NAME =~ FD*}]]]
+set reset_q [require_one [get_pins -of_objects $stage1 -filter {REF_PIN_NAME == Q}] "AXI reset output"]
+set control_out [open {@@EVIDENCE@@/implemented-endpoint-controls.txt} w]
+set seen [dict create]
+foreach cell $controls {
+    set tag [get_property -quiet hbm_direct_reset $cell]
+    if {$tag eq "" && ![regexp {hbm_control_[a-z_]+_bit[0-9]+} $cell tag]} {error "Untagged endpoint control replica $cell"}
+    if {[lsearch -exact $expected_controls $tag] < 0} {error "Unexpected endpoint control $tag"}
+    set ref [get_property REF_NAME $cell]
+    set init [get_property INIT $cell]
+    if {$ref ne "FDRE" || $init ni {0 1'b0 1'h0}} {error "Invalid endpoint FDRE/INIT $cell"}
+    foreach pin {C R} {
+        set inverted [get_property IS_INVERTED [require_one [get_pins $cell/$pin] "Control pin"]]
+        if {$inverted ni {0 FALSE false}} {error "Inverted endpoint control $cell/$pin"}
+    }
+    set reset [require_one [get_pins -leaf -of_objects [get_nets -segments -of_objects [get_pins $cell/R]] -filter {DIRECTION == OUT}] "Control reset driver"]
+    if {$reset ne $reset_q} {error "Endpoint reset is combined or not direct: $cell $reset"}
+    set clock [require_one [get_clocks -of_objects [get_pins $cell/C]] "Control clock"]
+    if {$clock ne "main_clkout3" || abs([get_property PERIOD $clock] - 4.0) > 0.0001} {error "Invalid endpoint control clock"}
+    puts $control_out "ENDPOINT_CONTROL $tag CELL=$cell REF=FDRE INIT=0 RESET_DRIVER=$reset CLOCK=$clock PERIOD_NS=4.0 INVERTED=0"
+    dict set seen $tag 1
+}
+if {[lsort [dict keys $seen]] ne [lsort $expected_controls]} {error "Missing endpoint direct control bits"}
+close $control_out
+'''.replace("@@TAGS@@", " ".join(tags))
+        template = template.replace("puts HBM_NETLIST_INSPECTION_COMPLETE", controls + "\nputs HBM_NETLIST_INSPECTION_COMPLETE")
     return template.replace('@@CHECKPOINT@@', checkpoint.as_posix()).replace('@@EVIDENCE@@', evidence.as_posix())
 
 
@@ -160,3 +196,31 @@ def parse_reset_chains(path, axi_domain=False):
     if len(rows) != len(expected) or {row['name'] for row in rows} != set(expected):
         raise ValueError('Unexpected reset-chain inventory: expected ' + str(sorted(expected)))
     return rows
+
+
+def parse_endpoint_controls(path):
+    """Validate every transport control tag, primitive, reset and native clock."""
+    policy = json.loads(Path(__file__).with_name("timing-contract-endpoint.json").read_text())["direct_control_policy"]
+    expected = {f"hbm_control_{role}_bit{bit}"
+        for role, width in policy["roles"].items() for bit in range(width)}
+    rows, seen, cells, resets = [], set(), set(), set()
+    for line in path.read_text().splitlines():
+        fields = line.split()
+        if len(fields) != 9 or fields[0] != "ENDPOINT_CONTROL":
+            raise ValueError("Malformed endpoint control row: " + line)
+        tag = fields[1]
+        row = dict(item.split("=", 1) for item in fields[2:])
+        if tag not in expected or row["CELL"] in cells:
+            raise ValueError("Unexpected/duplicate endpoint control: " + tag)
+        if (row["REF"], row["INIT"], row["CLOCK"], row["INVERTED"]) != ("FDRE", "0", "main_clkout3", "0"):
+            raise ValueError("Invalid endpoint control primitive/reset/clock: " + tag)
+        period = float(row["PERIOD_NS"])
+        if not math.isfinite(period) or abs(period - 4) > .0001 or not row["RESET_DRIVER"]:
+            raise ValueError("Invalid endpoint control period/reset: " + tag)
+        seen.add(tag)
+        cells.add(row["CELL"])
+        resets.add(row["RESET_DRIVER"])
+        rows.append(dict(tag=tag, **row))
+    if seen != expected or len(resets) != 1 or len(expected) != policy["logical_bits"]:
+        raise ValueError("Incomplete endpoint logical control/reset inventory")
+    return dict(status="PASS", logical_bits=len(expected), physical_ffs=len(rows), rows=rows)

@@ -24,6 +24,39 @@ repositories. An explicit overclock option is deferred to later work.
 
 ## Reference configuration
 
+### Experimental processor endpoint
+
+The opt-in `--hbm-endpoint --hbm-axi-domain` recipe dedicates PC31 to the
+four-command, 512-bit application endpoint with unchanged 256-bit native AXI3
+ports. It uses SYS250/AXI250, HBM900 and a 200 MHz reference. It replaces the
+BIST engines for this build; the other 31 ports retain processor memory access.
+Accidental CPU-window access to PC31 returns an error. Use matching LiteX and
+litex-boards endpoint branches containing `HBMEndpointCSR`.
+
+Add these options to the rebuild command below:
+
+```sh
+python litex_boards/software/fk33_hbm/rebuild/build.py \
+    --hbm-endpoint --hbm-axi-domain --generate-only \
+    --output-dir build/fk33-endpoint
+```
+
+Generation compiles the matching ROM firmware and checks the source constraints.
+To implement that unchanged attempt, replace `--generate-only` with `--resume`
+and supply the Vivado, RapidWright Python and optional Java paths as described
+below. The endpoint profile additionally audits ten Gray buses and 36 transport
+control bits; it retains all 320 CPU Gray-bus checks.
+
+After cold initialization with mailbox command 1, command 6 runs processor-driven
+endpoint transactions. It establishes scratch contents with full-strobe writes,
+then checks zero/mixed strobes, native lengths 1 through 16, held B/R responses,
+four-credit backpressure and a queued fifth command. STOP tests finish owed W
+data and held responses before acknowledging drain. Scratch starts at local
+offset `0x00100000` on PC31. The normal CPU tests omit this reserved port.
+
+This new image requires its own routed timing, calibration and hardware results.
+It does not qualify native AXI500/HBM1000 or inherit the fabric-only timing result.
+
 | Setting | Value |
 | --- | --- |
 | Device | `xcvu33p-fsvh2104-2L-e` |

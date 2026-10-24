@@ -93,6 +93,18 @@ def audit(attempt, contract_path=None, stage="final"):
                  normalized_tcl.index("place_design -directive"), "Gray constraints must follow clock creation and precede placement")
             accepted += [norm(line) for line in gray.splitlines() if TIMING_COMMAND.match(line.strip())]
             need("report_bus_skew -file sqrl_fk33_bus_skew.rpt" in tcl, "Missing routed Gray bus-skew report")
+            if c.get("hbm_endpoint"):
+                need(periods == (4, 4), "Endpoint requires SYS250/AXI250")
+                endpoint_gray = c["accepted_tcl_endpoint_gray_block"]
+                need(normalized_tcl.count(endpoint_gray) == 1,
+                     "Endpoint Gray block differs from contract or is duplicated")
+                need(normalized_tcl.index(gray) < normalized_tcl.index(endpoint_gray) <
+                     normalized_tcl.index("place_design -directive"),
+                     "Endpoint Gray constraints must follow CPU constraints and precede placement")
+                outside_gray = outside_gray.replace(endpoint_gray, "", 1)
+                accepted += [norm(line) for line in endpoint_gray.splitlines()
+                    if TIMING_COMMAND.match(line.strip())]
+
         need(not re.search(r"\bUSER_CLOCK_ROOT\b", outside_gray + "\n" + xdc, re.I),
              "USER_CLOCK_ROOT occurs outside the canonical opt-in constraints")
         need(Counter(tc) == Counter(accepted), "Unexpected Tcl timing exception/clock command")
@@ -140,6 +152,16 @@ def audit(attempt, contract_path=None, stage="final"):
                 need(values == [wanted] and all(0 <= value < (1 << int(width))
                      for (width, _, _), value in zip(hits, values)),
                      "Control wall-clock parameter mismatch: " + name)
+        if c.get("hbm_endpoint"):
+            need(csr["constants"].get("hbm_endpoint_port") == 31, "Endpoint must reserve PC31")
+            need(csr["constants"].get("hbm_endpoint_max_outstanding") == 4, "Endpoint must retain four command credits")
+            need("hbm_bist_channels" not in csr["constants"], "Endpoint and BIST modes must be mutually exclusive")
+            policy = c["direct_control_policy"]
+            expected_tags = {f"hbm_control_{role}_bit{bit}"
+                for role, width in policy["roles"].items() for bit in range(width)}
+            tags = re.findall(r'hbm_direct_reset\s*=\s*"(hbm_control_[a-z_]+_bit[0-9]+)"', v)
+            need(len(tags) == policy["logical_bits"] and set(tags) == expected_tags,
+                 "Generated endpoint direct-control inventory differs from contract")
         expected = c.get("mmcm_parameters", {
             "CLKFBOUT_MULT_F":5, "DIVCLK_DIVIDE":1, "CLKOUT0_DIVIDE_F":4,
             "CLKOUT1_DIVIDE":5, "CLKOUT2_DIVIDE":10})
@@ -220,8 +242,10 @@ def audit(attempt, contract_path=None, stage="final"):
             bound = c["gray_pointer_policy"]["maximum_datapath_ns"]
             pattern = r"\bmax_dpo=" + re.escape(format(bound, "g")) + r"(?:\.0+)?(?:\s|$)"
             gray_rows = [line for line in rows if re.search(pattern, line)]
-            need(len(gray_rows) == 320, "Expected 320 native Gray max-delay exceptions")
-            need(len(rows) == 325, "Unexpected native exception count: " + str(len(rows)))
+            groups = c["gray_pointer_policy"]["groups"]
+            need(groups == (330 if c.get("hbm_endpoint") else 320), "Unexpected Gray contract inventory")
+            need(len(gray_rows) == groups, f"Expected {groups} native Gray max-delay exceptions")
+            need(len(rows) == groups + 5, "Unexpected native exception count: " + str(len(rows)))
             # datapath_only intentionally removes hold analysis on these
             # first-stage CDC paths; the max bound itself must remain active.
             need(all("overridden" not in line.lower() for line in gray_rows),
