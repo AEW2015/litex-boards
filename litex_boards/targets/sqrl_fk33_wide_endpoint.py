@@ -243,12 +243,18 @@ class QueuedNativePeer(Module):
         stage_address=Signal(6);stage_id=Signal(6);stage_last=Signal()
         self.commit_stage_valid=stage_valid
         self.commit_stage_terminal=stage_last
+        self.commit_stage_address=stage_address
+        self.commit_words=commit_words=Signal(64)
+
         self.b_count=bcount;self.aw_queue_level=awq.level;self.write_active=active
         self.write_accounted=Signal(4)
         self.comb += self.write_accounted.eq(bcount+active+awq.level+(stage_valid & stage_last))
         start_w=awq.source.valid & ~active
         enqueue=active & wq.source.valid
         finish_enqueue=enqueue & (left==1)
+        self.submodules.peer_window_commit_words=HBMSynchronousControlRegister(
+            commit_words,Cat(*[enqueue & (address==word) for word in range(64)]),1,
+            domain='axi',name='peer_window_commit_words')
         commit=stage_valid
         finish_w=commit & stage_last
         self.comb += [awq.source.ready.eq(~active),wq.source.ready.eq(active),
@@ -259,7 +265,7 @@ class QueuedNativePeer(Module):
                 stage_data.eq(wq.source.data),stage_strb.eq(wq.source.strb),
                 stage_id.eq(write_id),stage_last.eq(left==1),
                 If((wq.source.id!=write_id) | (wq.source.last!=(left==1)),self.protocol_error.eq(1))),
-            If(commit,*[If(stage_strb[byte],valid[stage_address][byte].eq(1)) for byte in range(32)]),
+            *[If(commit_words[word],valid[word].eq(valid[word] | stage_strb)) for word in range(64)],
             If(aw_fire,If((bus.aw.size!=5)|(bus.aw.burst!=1)|(bus.aw.addr[:5]!=0)|(bus.aw.addr[11:]!=0)|
                 ((bus.aw.addr[5:11]+bus.aw.len+1)>64),self.protocol_error.eq(1))),
             If(ar_fire,If((bus.ar.size!=5)|(bus.ar.burst!=1)|(bus.ar.addr[:5]!=0)|(bus.ar.addr[11:]!=0)|
@@ -275,26 +281,33 @@ class QueuedNativePeer(Module):
                 domain='axi',name='peer_window_bdelay_'+('zero','one','two','three')[slot]))
         read_active=Signal();read_left=Signal(5);read_address=Signal(6);read_id=Signal(6);delay=Signal(8)
         issued_last=Signal();rvalid=Signal();rlast=Signal();rdata=Signal(256,name='peer4_registered_read_source',attr={('DONT_TOUCH','TRUE')})
-        # Two elastic stages: capture the RAM and byte-valid mask together,
-        # then apply the mask into the externally stalled registered R source.
-        prefetch_valid=Signal();prefetch_data=Signal(256);prefetch_mask=Signal(32)
+        # Three elastic stages: capture RAM and byte-valid metadata, retain
+        # an unmasked raw stage for memory output registering, then mask R.
+        prefetch_valid=Signal();prefetch_data=Signal(256,reset_less=True);prefetch_mask=Signal(32)
         prefetch_id=Signal(6);prefetch_last=Signal();response_id=Signal(6)
         self.prefetch_valid=prefetch_valid
         self.prefetch_data=prefetch_data;self.prefetch_mask=prefetch_mask
         self.prefetch_id=prefetch_id;self.prefetch_last=prefetch_last
+        raw_valid=Signal();raw_data=Signal(256,reset_less=True);raw_mask=Signal(32)
+        raw_id=Signal(6);raw_last=Signal()
+        self.raw_valid=raw_valid;self.raw_data=raw_data;self.raw_mask=raw_mask
+        self.raw_id=raw_id;self.raw_last=raw_last
         start_r=arq.source.valid & ~read_active
         response_space=~rvalid | bus.r.ready
-        prefetch_space=~prefetch_valid | response_space
+        raw_space=~raw_valid | response_space
+        prefetch_space=~prefetch_valid | raw_space
         prefetch_enqueue=read_active & ~issued_last & (delay==0) & prefetch_space & accept
-        load_r=prefetch_valid & response_space
+        load_raw=prefetch_valid & raw_space
+        load_r=raw_valid & response_space
         finish_r=r_fire & rlast
         self.comb += [arq.source.ready.eq(~read_active),rp.adr.eq(read_address),bus.r.valid.eq(rvalid),bus.r.last.eq(rlast),
             bus.r.data.eq(rdata),bus.r.id.eq(response_id),bus.r.resp.eq(0)]
-        mask=Cat(*[Replicate(prefetch_mask[byte],8) for byte in range(32)])
+        mask=Cat(*[Replicate(raw_mask[byte],8) for byte in range(32)])
         self.sync.axi += [If(start_r,read_address.eq(arq.source.addr[5:11]),read_id.eq(arq.source.id)),
             If(prefetch_enqueue,prefetch_data.eq(rp.dat_r),prefetch_mask.eq(valid[read_address]),
                 prefetch_id.eq(read_id),prefetch_last.eq(read_left==1),read_address.eq(read_address+1)),
-            If(load_r,rdata.eq(prefetch_data & mask),rlast.eq(prefetch_last),response_id.eq(prefetch_id))]
+            If(load_raw,raw_data.eq(prefetch_data),raw_mask.eq(prefetch_mask),raw_id.eq(prefetch_id),raw_last.eq(prefetch_last)),
+            If(load_r,rdata.eq(raw_data & mask),rlast.eq(raw_last),response_id.eq(raw_id))]
         decrement_read=read_active & (delay!=0)
         self.submodules.peer_window_read_delay=HBMSynchronousControlRegister(
             delay,Mux(start_r,read_latency,delay-1),start_r | decrement_read,
@@ -312,7 +325,8 @@ class QueuedNativePeer(Module):
             ('peer_window_read_issued_last',issued_last,Mux(start_r,0,1),start_r | (prefetch_enqueue & (read_left==1))),
             ('peer_window_rvalid',rvalid,Mux(load_r,1,0),response_space),
             ('peer_window_commit_valid',stage_valid,enqueue,1),
-            ('peer_window_prefetch_valid',prefetch_valid,prefetch_enqueue,prefetch_space))
+            ('peer_window_prefetch_valid',prefetch_valid,prefetch_enqueue,prefetch_space),
+            ('peer_window_raw_valid',raw_valid,prefetch_valid,raw_space))
         for name,q,d,ce in controls:setattr(self.submodules,name,HBMSynchronousControlRegister(q,d,ce,domain='axi',name=name))
 
 
@@ -417,7 +431,7 @@ def generate(output_dir, *, max_outstanding=1):
     result={'max_outstanding':max_outstanding,'peer_capacity_commands':1 if max_outstanding==1 else 4,
         'peer_memory_words':16 if max_outstanding==1 else 64,'peer_memory_data_width':256,
         'peer_byte_valid_bits':0 if max_outstanding==1 else 2048,'peer_W_ingress_beats':0 if max_outstanding==1 else 64,
-        'peer_write_commit_stages':0 if max_outstanding==1 else 1,'peer_read_prefetch_stages':0 if max_outstanding==1 else 1,
+        'peer_write_commit_stages':0 if max_outstanding==1 else 1,'peer_read_prefetch_stages':0 if max_outstanding==1 else 2,
         'peer_response_latency_cycles':0 if max_outstanding==1 else 12,'peer_read_latency_cycles':0 if max_outstanding==1 else 12,
         'clock_io':clock_io,'scope':('Fabric-only single-address registered peer' if max_outstanding==1 else 'Fabric-only four-address queued registered peer')+'; NOT HBM or a programming image',
         'part':platform.device,'top':'fk33_wide_endpoint','ports':names,
