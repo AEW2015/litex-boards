@@ -92,13 +92,14 @@ class PortabilityTests(unittest.TestCase):
         self.assertEqual(RW.command_path(wrapper.name), wrapper.name)
         selected = shutil.which(wrapper.name, path=env['PATH'])
         self.assertIsNotNone(selected)
-        relative = os.path.relpath(wrapper, Path.cwd())
-        explicit = RW.command_path(relative)
+        explicit = RW.command_path(str(wrapper))
         self.assertTrue(Path(explicit).is_absolute())
         for command in (selected, explicit):
-            log = self.base / 'wrapper.log'
-            BUILD.command([command], other, log, env=env)
-            self.assertIn('wrapper executed', log.read_text(encoding='utf-8'))
+            for cwd in (other, ROOT):
+                with self.subTest(command=command, cwd=cwd):
+                    log = self.base / 'wrapper.log'
+                    BUILD.command([command], cwd, log, env=env)
+                    self.assertIn('wrapper executed', log.read_text(encoding='utf-8'))
 
     def test_best_effort_git_missing_executable_mock(self):
         # Explicit isolated failure injection, not evidence of another OS.
