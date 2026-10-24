@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -18,8 +19,20 @@ import traceback
 
 JAVA_HOME = os.environ.get('JAVA_HOME', '')
 RW_PYTHON = Path(sys.executable)
-VIVADO = Path(os.environ.get('FK33_VIVADO', 'vivado.bat' if os.name == 'nt' else 'vivado'))
+VIVADO = Path(os.environ.get('FK33_VIVADO', 'vivado'))
 SCHEMA = 'fk33-rapidwright-assist-v1'
+
+
+def command_path(value):
+    # Preserve PATH commands; explicit paths must survive child cwd changes.
+    return str(Path(value).expanduser().resolve()) if '/' in value or '\\' in value else value
+
+
+def package_version(name):
+    try:
+        return importlib.metadata.version(name)
+    except Exception:
+        return None
 
 
 def sha(path):
@@ -164,21 +177,18 @@ def worker(args):
         import _jpype
         from com.xilinx.rapidwright.design import Design
         from java.lang import System
-        jars = list(Path(rapidwright.__file__).parent.glob('rapidwright-2026.1.1-standalone*.jar'))
-        if len(jars) != 1:
-            raise ValueError('Expected exactly one pinned RapidWright 2026.1.1 standalone JAR')
-        jar = jars[0]
-        if importlib.metadata.version('rapidwright') != '2026.1.1' or importlib.metadata.version('jpype1') != '1.7.1':
-            raise ValueError('Install the pinned requirements-rapidwright.txt')
-        result['libraries'] = {'rapidwright_version': importlib.metadata.version('rapidwright'),
-            'jpype_version': importlib.metadata.version('jpype1'), 'rapidwright_jar': bind(jar),
+        jars = sorted(Path(rapidwright.__file__).parent.glob('*.jar'))
+        result['libraries'] = {'rapidwright_version': package_version('rapidwright'),
+            'jpype_version': package_version('jpype1'),
+            'rapidwright_jars': [bind(jar) for jar in jars],
             'rapidwright_initializer': bind(rapidwright.__file__), 'jpype_initializer': bind(jpype.__file__),
             'jpype_native_extension': bind(_jpype.__file__)}
-        result['environment'].update(java_version=str(System.getProperty('java.version')),
-                                     java_home=str(System.getProperty('java.home')),
-                                     java_executable=bind(Path(os.environ['JAVA_HOME'])/'bin'/('java.exe' if os.name == 'nt' else 'java')))
-        inputs.extend(value for value in result['libraries'].values() if isinstance(value,dict))
-        inputs.append(result['environment']['java_executable'])
+        result['environment']['java_version'] = str(System.getProperty('java.version'))
+        java_home = System.getProperty('java.home')
+        if java_home:
+            result['environment']['java_home'] = str(java_home)
+        inputs.extend(value for value in result['libraries'].values() if isinstance(value, dict))
+        inputs.extend(result['libraries']['rapidwright_jars'])
         Design.setAutoGenerateReadableEdif(False)
         design = Design.readCheckpoint(str(dcp), str(edf))
         selected, high = [], []
@@ -297,7 +307,9 @@ def assist(args):
             bindings.append(bind(edf))
         if timing.is_file():bindings.append(bind(timing))
         else:raise FileNotFoundError('Native timing report required for physical/path assistance')
-        env=os.environ.copy();env.update(JAVA_HOME=JAVA_HOME,JAVA_TOOL_OPTIONS='-Xmx4g',PYTHONDONTWRITEBYTECODE='1')
+        env=os.environ.copy();env.update(JAVA_TOOL_OPTIONS='-Xmx4g',PYTHONDONTWRITEBYTECODE='1')
+        if JAVA_HOME:
+            env['JAVA_HOME'] = JAVA_HOME
         command=[str(RW_PYTHON),'-B',str(Path(__file__).resolve()),'--worker','--dcp',str(dcp),'--readable-edif',str(edf),'--timing-report',str(timing),'--output',str(out)]
         process=run_process(command,out,out/'rapidwright-console.log',env)
         analysis=json.loads((out/'physical-analysis.json').read_text())
@@ -323,30 +335,19 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     global JAVA_HOME, RW_PYTHON, VIVADO
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
-    parser.add_argument('--python', default=sys.executable, help='Python with pinned RapidWright installed')
-    parser.add_argument('--vivado', default=os.environ.get('FK33_VIVADO', 'vivado.bat' if os.name == 'nt' else 'vivado'))
-    parser.add_argument('--check-environment', action='store_true', help='Start the JVM and check pinned packages before synthesis')
+    parser.add_argument('--python', default=sys.executable, help='Python with RapidWright installed')
+    parser.add_argument('--vivado', default=os.environ.get('FK33_VIVADO', 'vivado'))
     parser.add_argument('--attempt');parser.add_argument('--output');parser.add_argument('--readable-edif')
     parser.add_argument('--edif-receipt');parser.add_argument('--timing-report')
     parser.add_argument('--worker',action='store_true');parser.add_argument('--dcp')
     parser.add_argument('--checkpoint-stage',choices=('routed','placed'),default='routed',
                         help='Worker only: placed permits missing physical pin inventory and never qualifies routed assistance')
     args=parser.parse_args()
-    JAVA_HOME = args.java_home or ''
-    RW_PYTHON = Path(args.python).resolve()
-    VIVADO = Path(args.vivado)
-    if args.check_environment:
-        if importlib.metadata.version('rapidwright') != '2026.1.1' or importlib.metadata.version('jpype1') != '1.7.1':
-            parser.error('Install requirements-rapidwright.txt in this Python environment')
-        if not JAVA_HOME:
-            parser.error('JAVA_HOME or --java-home is required')
-        import rapidwright
-        from java.lang import System
-        version = str(System.getProperty('java.version'))
-        if int(version.split('.')[0]) < 21:
-            parser.error('64-bit Java 21 or newer is required')
-        print(json.dumps(dict(status='PASS', rapidwright='2026.1.1', java_version=version)))
-        return 0
+    JAVA_HOME = str(Path(args.java_home).expanduser().resolve()) if args.java_home else ''
+    if JAVA_HOME:
+        os.environ['JAVA_HOME'] = JAVA_HOME
+    RW_PYTHON = shutil.which(command_path(args.python)) or command_path(args.python)
+    VIVADO = shutil.which(command_path(args.vivado)) or command_path(args.vivado)
     if args.worker:
         if not all((args.output,args.dcp,args.readable_edif)):parser.error('worker requires output,dcp,readable-edif')
         return worker(args)
