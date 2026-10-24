@@ -209,6 +209,30 @@
     "reset_value": 0,
     "clock": "main_clkout3",
     "period_ns": 4.0,
-    "logical_bits": 36
+    "logical_bits": 36,
+    "native_required_roles": {
+      "window_write_dispatch": 3,
+      "window_read_dispatch": 2,
+      "window_write_active": 1,
+      "window_write_left": 5,
+      "window_write_unpack_index": 1,
+      "window_write_unpack_drop": 1,
+      "window_read_active": 1,
+      "window_read_left": 5,
+      "window_read_beats": 5,
+      "window_read_id": 6
+    },
+    "native_required_bits": 30,
+    "native_optional_pruned_roles": {
+      "window_write_id": {
+        "width": 6,
+        "reason": "The physical HBM interface has no WID pin. The board omits endpoint WID; AWID/BID and descriptor ownership remain independent."
+      }
+    },
+    "native_reset_path": {
+      "source": "Verified AXI reset synchronizer stage1/Q",
+      "allowed": "Direct wire or one noninverting BUFG/BUFGCE; BUFGCE enable must be noninverted and driven directly by VCC/P",
+      "logic_or_cascaded_buffers": false
+    }
   }
 }

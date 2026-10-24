@@ -102,8 +102,14 @@ def read_paths(path):
     return rows
 
 
-def family(name):
+def family(name, endpoint=False):
     lower = name.lower()
+    if endpoint:
+        if 'hbmendpointcsr' in lower:
+            return 'endpoint_configuration'
+        if 'hbmwindowfourendpoint' in lower:
+            return 'endpoint_transport'
+        return None
     if 'owner' in lower and 'hbm' in lower:
         return 'ownership'
     if ('fk33_hbm_bist' in lower or 'hbm_bist_pc' in lower) and any(
@@ -112,14 +118,16 @@ def family(name):
     return None
 
 
-def channel(name):
+def channel(name, endpoint=False):
+    if endpoint:
+        return 31 if family(name, endpoint=True) else None
     match = re.search(r'(?:hbm_bist_pc|fk33_hbm_bist_)(\d+)', name)
     if match:
         return int(match[1])
     return 0 if 'fk33_hbm_bist/' in name else None
 
 
-def summarize(nets, paths, cells, physical_pin_inventory=None):
+def summarize(nets, paths, cells, physical_pin_inventory=None, endpoint=False):
     matched_paths = []
     for path in paths:
         row = dict(path)
@@ -131,13 +139,13 @@ def summarize(nets, paths, cells, physical_pin_inventory=None):
             row['site_coordinate_delta'] = [abs(a-b) for a, b in zip(source['site_xy'], destination['site_xy'])]
             row['coordinate_caution'] = 'Site X/Y are resource coordinates, not physical distance or delay.'
         matched_paths.append(row)
-    selected = [row for row in nets if family(row['name'])]
+    selected = [row for row in nets if family(row['name'], endpoint)]
     selected.sort(key=lambda row: row['site_pin_fanout'], reverse=True)
-    counts = {name: sum(family(row['name']) == name for row in selected)
-              for name in ('ownership', 'per_port_configuration')}
+    families = ('endpoint_configuration', 'endpoint_transport') if endpoint else ('ownership', 'per_port_configuration')
+    counts = {name: sum(family(row['name'], endpoint) == name for row in selected) for name in families}
     failures = [row for row in matched_paths if row['slack_ns'] < 0]
     recommendations = []
-    owner = [row for row in selected if family(row['name']) == 'ownership' and row['site_pin_fanout'] > 0]
+    owner = [row for row in selected if family(row['name'], endpoint) == 'ownership' and row['site_pin_fanout'] > 0]
     if owner and (physical_pin_inventory is None or physical_pin_inventory['available']):
         recommendations.append({'kind': 'ownership_fanout', 'evidence_nets': owner[:16],
             'action': 'Compare global ownership fanout with per-port owner copies and matched native failing paths before choosing another local register or placement change.',
@@ -147,7 +155,8 @@ def summarize(nets, paths, cells, physical_pin_inventory=None):
             'action': 'Use matched placement and native route/logic delay to review these exact failed endpoints. Rebuild and verify native setup, hold and DRC after any proposed change.',
             'automatic_constraint_change': False})
     return {'selected_owner_and_config_nets': selected, 'matched_net_counts': counts,
-            'matched_configuration_channels': sorted({channel(row['name']) for row in selected if channel(row['name']) is not None}),
+            'analysis_profile': 'endpoint' if endpoint else 'bist',
+            'matched_configuration_channels': sorted({channel(row['name'], endpoint) for row in selected if channel(row['name'], endpoint) is not None}),
             'native_timing_paths': matched_paths, 'matched_timing_endpoint_cells': len(cells),
             'native_failed_paths_reported': len(failures), 'recommendations': recommendations,
             **({'physical_pin_inventory': physical_pin_inventory} if physical_pin_inventory is not None else {}),
@@ -205,6 +214,7 @@ def worker(args):
         inventory = {'available': False, 'signal_nets': 0, 'nets_with_site_pins': 0,
                      'site_pin_instances': 0, 'selected_nets': 0,
                      'selected_nets_with_site_pins': 0, 'selected_site_pin_instances': 0}
+        endpoint = getattr(args, 'hbm_endpoint', False)
         for net in design.getNets():
             if net.isClockNet() or str(net.getType()) != 'WIRE':
                 continue
@@ -214,11 +224,11 @@ def worker(args):
             inventory['signal_nets'] += 1
             inventory['nets_with_site_pins'] += int(pin_count > 0)
             inventory['site_pin_instances'] += pin_count
-            if family(name):
+            if family(name, endpoint):
                 inventory['selected_nets'] += 1
                 inventory['selected_nets_with_site_pins'] += int(pin_count > 0)
                 inventory['selected_site_pin_instances'] += pin_count
-            if not family(name) and fanout < 100:
+            if not family(name, endpoint) and fanout < 100:
                 continue
             source = net.getSource()
             sites = sorted({str(pin.getSiteInst().getSiteName()) for pin in net.getPins() if pin.getSiteInst()})
@@ -230,7 +240,7 @@ def worker(args):
                    'distinct_pin_sites': len(sites),
                    'site_coordinate_bounds': [min(x for x,y in xy), min(y for x,y in xy), max(x for x,y in xy), max(y for x,y in xy)] if xy else None,
                    'site_coordinate_caution': 'Resource coordinates across site types; not physical distance or delay.'}
-            if family(name):selected.append(row)
+            if family(name, endpoint):selected.append(row)
             if fanout >= 100:high.append(row)
         paths = read_paths(args.timing_report)
         if not paths:
@@ -247,11 +257,14 @@ def worker(args):
         result['physical_analysis'] = {'part': str(design.getPartName()),
             'physical_cells': int(design.getCells().size()), 'physical_nets': int(design.getNets().size()),
             'high_fanout_signal_nets': sorted(high,key=lambda row:row['site_pin_fanout'],reverse=True)[:40],
-            **summarize(selected, paths, cells, inventory)}
+            **summarize(selected, paths, cells, inventory, endpoint)}
         if not str(design.getPartName()).startswith('xcvu33p') or not selected or not cells:
             raise ValueError('FK33 part, selected physical nets or matched timing endpoint cells missing')
         if args.checkpoint_stage == 'routed' and not inventory['available']:
             raise ValueError('Routed assistance requires physical SitePinInst metrics; placement-only analysis must explicitly select --checkpoint-stage placed')
+        if endpoint and any(not result['physical_analysis']['matched_net_counts'][name]
+                for name in ('endpoint_configuration', 'endpoint_transport')):
+            raise ValueError('Endpoint assistance requires configuration and transport nets')
         result['status'] = 'PASS'
     except Exception:
         result.update(status='FAIL', error=traceback.format_exc())
@@ -349,6 +362,8 @@ def assist(args):
             '--dcp', str(dcp), '--readable-edif', str(edf),
             '--timing-report', str(timing), '--output', str(out),
         ]
+        if getattr(args, 'hbm_endpoint', False):
+            command.append('--hbm-endpoint')
         process = run_process(command, out, out/'rapidwright-console.log', env)
         analysis = json.loads((out/'physical-analysis.json').read_text(encoding='utf-8-sig'))
         if process['returncode'] or analysis['status'] != 'PASS' or not analysis['inputs_unchanged']:
@@ -392,6 +407,8 @@ def main():
     parser.add_argument('--readable-edif')
     parser.add_argument('--edif-receipt')
     parser.add_argument('--timing-report')
+    parser.add_argument('--hbm-endpoint', action='store_true',
+        help='Analyze the PC31 endpoint nets instead of BIST configuration nets')
 
     # Analysis worker.
     parser.add_argument('--worker',           action='store_true')

@@ -492,6 +492,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
             else:
                 from litex.soc.cores.ram.xilinx_usp_hbm2 import PrimitiveHBM2
                 hbm_clock_options = {"axi_clk_freq": hbm_axi_clk_freq}
+                if hbm_endpoint:
+                    hbm_clock_options["with_native_ready"] = False
                 if hbm_axi_clk_freq == 400e6:
                     hbm_clock_options["sys_clk_freq"] = sys_clk_freq
                 hbm_core = PrimitiveHBM2(platform, rtl_dir=hbm_primitive_rtl,
@@ -516,6 +518,10 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     sys_host_idle=all_host_idle if hbm_axi_domain else None)
                 host_idle_axi = Signal(name="hbm_host_admission_closed_and_idle_axi")
                 observed_idle_axi = Signal(name="hbm_host_observed_idle_axi")
+                endpoint_host_idle_axi = Signal(name="hbm_endpoint_host_idle_axi") if hbm_endpoint else observed_idle_axi
+                if hbm_endpoint:
+                    self.comb += endpoint_host_idle_axi.eq(observed_idle_axi &
+                        (~self.hbm_runtime.native_quiesce_request | host_idle_axi))
                 if hbm_bist:
                     from litex.soc.cores.ram.xilinx_usp_hbm2_bist import HBMBurstBIST
                     self.hbm_bist = HBMBurstBIST(platform,
@@ -622,7 +628,7 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                             self.hbm_endpoint_runtime_native = runtime_native
                             self.submodules += HBMEndpointNativeWiring(endpoint_native, runtime_native)
                             self.hbm_runtime.add_port(native_channel, runtime_native,
-                                self.hbm.axi[native_channel], host_idle=observed_idle_axi)
+                                self.hbm.axi[native_channel], host_idle=endpoint_host_idle_axi)
                             continue
                         for name in ("aw", "w", "ar"):
                             self.comb += getattr(port, name).connect(getattr(local, name))
@@ -651,7 +657,7 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                         native_channel = 4*bank + channel
                         native_upstream = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
                         tracked_upstream = native_upstream
-                        port_idle = observed_idle_axi if hbm_axi_domain else admission.idle & window_pipeline.idle
+                        port_idle = endpoint_host_idle_axi if hbm_axi_domain else admission.idle & window_pipeline.idle
                         if hbm_bist:
                             tracked_upstream = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
                             engine_idle = self.hbm_bist.add_port(native_channel,

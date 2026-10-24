@@ -144,8 +144,14 @@ puts $reset_out "RESET_CHAIN axi_domain_reset STAGE0=$stage0 STAGE1=$stage1 CLOC
         policy = json.loads(Path(__file__).with_name("timing-contract-endpoint.json").read_text())["direct_control_policy"]
         tags = [f"hbm_control_{role}_bit{bit}"
             for role, width in policy["roles"].items() for bit in range(width)]
+        required_tags = [f"hbm_control_{role}_bit{bit}"
+            for role, width in policy["native_required_roles"].items() for bit in range(width)]
+        optional_groups = ["{" + " ".join(f"hbm_control_{role}_bit{bit}" for bit in range(row["width"])) + "}"
+            for role, row in policy["native_optional_pruned_roles"].items()]
         controls = r'''
 set expected_controls {@@TAGS@@}
+set required_controls {@@REQUIRED@@}
+set optional_control_groups {@@OPTIONAL@@}
 set controls [lsort -unique [concat [get_cells -hier -quiet -filter {hbm_direct_reset =~ hbm_control_*}] [get_cells -hier -quiet -filter {NAME =~ *hbm_control_* && REF_NAME =~ FD*}]]]
 set reset_q [require_one [get_pins -of_objects $stage1 -filter {REF_PIN_NAME == Q}] "AXI reset output"]
 set control_out [open {@@EVIDENCE@@/implemented-endpoint-controls.txt} w]
@@ -162,15 +168,51 @@ foreach cell $controls {
         if {$inverted ni {0 FALSE false}} {error "Inverted endpoint control $cell/$pin"}
     }
     set reset [require_one [get_pins -leaf -of_objects [get_nets -segments -of_objects [get_pins $cell/R]] -filter {DIRECTION == OUT}] "Control reset driver"]
-    if {$reset ne $reset_q} {error "Endpoint reset is combined or not direct: $cell $reset"}
+    set reset_topology DIRECT
+    set reset_buffer NONE
+    if {$reset ne $reset_q} {
+        set reset_cell [require_one [get_cells -of_objects $reset] "Control reset buffer"]
+        set reset_topology [get_property REF_NAME $reset_cell]
+        if {$reset_topology ni {BUFG BUFGCE} || [get_property REF_PIN_NAME $reset] ne "O"} {
+            error "Endpoint reset passes through non-buffer logic: $cell $reset"
+        }
+        set input [require_one [get_pins $reset_cell/I] "Reset buffer input"]
+        set input_driver [require_one [get_pins -leaf -of_objects [get_nets -segments -of_objects $input] -filter {DIRECTION == OUT}] "Reset buffer source"]
+        if {$input_driver ne $reset_q || [get_property IS_INVERTED $input] ni {0 FALSE false}} {
+            error "Endpoint reset buffer is inverted or not directly driven by AXI reset: $cell"
+        }
+        if {$reset_topology eq "BUFGCE"} {
+            set enable [require_one [get_pins $reset_cell/CE] "Reset buffer enable"]
+            set enable_driver [require_one [get_pins -leaf -of_objects [get_nets -segments -of_objects $enable] -filter {DIRECTION == OUT}] "Reset enable constant"]
+            set enable_cell [require_one [get_cells -of_objects $enable_driver] "Reset enable driver"]
+            if {[get_property REF_NAME $enable_cell] ne "VCC" || [get_property REF_PIN_NAME $enable_driver] ne "P" || [get_property IS_INVERTED $enable] ni {0 FALSE false}} {
+                error "Endpoint reset buffer is gated or inverted: $cell"
+            }
+        }
+        set reset_buffer $reset_cell
+    }
     set clock [require_one [get_clocks -of_objects [get_pins $cell/C]] "Control clock"]
     if {$clock ne "main_clkout3" || abs([get_property PERIOD $clock] - 4.0) > 0.0001} {error "Invalid endpoint control clock"}
-    puts $control_out "ENDPOINT_CONTROL $tag CELL=$cell REF=FDRE INIT=0 RESET_DRIVER=$reset CLOCK=$clock PERIOD_NS=4.0 INVERTED=0"
+    puts $control_out "ENDPOINT_CONTROL $tag CELL=$cell REF=FDRE INIT=0 RESET_DRIVER=$reset RESET_SOURCE=$reset_q RESET_TOPOLOGY=$reset_topology RESET_BUFFER=$reset_buffer CLOCK=$clock PERIOD_NS=4.0 INVERTED=0"
     dict set seen $tag 1
 }
-if {[lsort [dict keys $seen]] ne [lsort $expected_controls]} {error "Missing endpoint direct control bits"}
+foreach tag $required_controls {
+    if {![dict exists $seen $tag]} {error "Missing required endpoint direct control $tag"}
+}
+foreach group $optional_control_groups {
+    set retained 0
+    foreach tag $group {if {[dict exists $seen $tag]} {incr retained}}
+    if {$retained != 0 && $retained != [llength $group]} {error "Partially retained optional endpoint role: $group"}
+    foreach tag $group {
+        if {[dict exists $seen $tag]} {
+            puts $control_out "OPTIONAL_CONTROL $tag STATE=RETAINED"
+        } else {
+            puts $control_out "OPTIONAL_CONTROL $tag STATE=PRUNED"
+        }
+    }
+}
 close $control_out
-'''.replace("@@TAGS@@", " ".join(tags))
+'''.replace("@@TAGS@@", " ".join(tags)).replace("@@REQUIRED@@", " ".join(required_tags)).replace("@@OPTIONAL@@", " ".join(optional_groups))
         template = template.replace("puts HBM_NETLIST_INSPECTION_COMPLETE", controls + "\nputs HBM_NETLIST_INSPECTION_COMPLETE")
     return template.replace('@@CHECKPOINT@@', checkpoint.as_posix()).replace('@@EVIDENCE@@', evidence.as_posix())
 
@@ -203,10 +245,22 @@ def parse_endpoint_controls(path):
     policy = json.loads(Path(__file__).with_name("timing-contract-endpoint.json").read_text())["direct_control_policy"]
     expected = {f"hbm_control_{role}_bit{bit}"
         for role, width in policy["roles"].items() for bit in range(width)}
+    required = {f"hbm_control_{role}_bit{bit}"
+        for role, width in policy["native_required_roles"].items() for bit in range(width)}
+    optional = {role: {f"hbm_control_{role}_bit{bit}" for bit in range(row["width"])}
+        for role, row in policy["native_optional_pruned_roles"].items()}
+    optional_tags = set().union(*optional.values())
     rows, seen, cells, resets = [], set(), set(), set()
+    reset_sources, reset_topologies = set(), set()
+    optional_states = {}
     for line in path.read_text().splitlines():
         fields = line.split()
-        if len(fields) != 9 or fields[0] != "ENDPOINT_CONTROL":
+        if fields and fields[0] == "OPTIONAL_CONTROL":
+            if len(fields) != 3 or fields[1] not in optional_tags or fields[1] in optional_states or fields[2] not in ("STATE=RETAINED", "STATE=PRUNED"):
+                raise ValueError("Invalid optional endpoint control inventory: " + line)
+            optional_states[fields[1]] = fields[2].split("=", 1)[1]
+            continue
+        if len(fields) != 12 or fields[0] != "ENDPOINT_CONTROL":
             raise ValueError("Malformed endpoint control row: " + line)
         tag = fields[1]
         row = dict(item.split("=", 1) for item in fields[2:])
@@ -217,10 +271,36 @@ def parse_endpoint_controls(path):
         period = float(row["PERIOD_NS"])
         if not math.isfinite(period) or abs(period - 4) > .0001 or not row["RESET_DRIVER"]:
             raise ValueError("Invalid endpoint control period/reset: " + tag)
+        topology, buffer = row["RESET_TOPOLOGY"], row["RESET_BUFFER"]
+        if topology == "DIRECT":
+            if buffer != "NONE" or row["RESET_DRIVER"] != row["RESET_SOURCE"]:
+                raise ValueError("Invalid direct endpoint reset topology: " + tag)
+        elif topology in ("BUFG", "BUFGCE"):
+            if not buffer or buffer == "NONE" or row["RESET_DRIVER"] != buffer + "/O":
+                raise ValueError("Invalid buffered endpoint reset topology: " + tag)
+        else:
+            raise ValueError("Unreviewed endpoint reset topology: " + topology)
+        if not row["RESET_SOURCE"].endswith("/Q"):
+            raise ValueError("Endpoint reset source is not a FF output: " + tag)
         seen.add(tag)
         cells.add(row["CELL"])
         resets.add(row["RESET_DRIVER"])
+        reset_sources.add(row["RESET_SOURCE"])
+        reset_topologies.add(topology)
         rows.append(dict(tag=tag, **row))
-    if seen != expected or len(resets) != 1 or len(expected) != policy["logical_bits"]:
+    if not required <= seen or not seen <= expected or len(resets) != 1 or len(reset_sources) != 1 or len(reset_topologies) != 1 or len(expected) != policy["logical_bits"]:
         raise ValueError("Incomplete endpoint logical control/reset inventory")
-    return dict(status="PASS", logical_bits=len(expected), physical_ffs=len(rows), rows=rows)
+    if set(optional_states) != optional_tags or len(required) != policy["native_required_bits"]:
+        raise ValueError("Incomplete optional endpoint control inventory")
+    for role, tags in optional.items():
+        retained = seen & tags
+        if retained not in (set(), tags):
+            raise ValueError("Partially retained optional endpoint control role: " + role)
+        for tag in tags:
+            if optional_states[tag] != ("RETAINED" if tag in seen else "PRUNED"):
+                raise ValueError("Optional endpoint state disagrees with physical inventory: " + tag)
+    return dict(status="PASS", source_logical_bits=len(expected), logical_bits=len(seen),
+        required_logical_bits=len(required), physical_ffs=len(rows),
+        reset_source=next(iter(reset_sources)), reset_topology=next(iter(reset_topologies)),
+        optional_retained_tags=sorted(seen & optional_tags),
+        optional_pruned_tags=sorted(optional_tags - seen), rows=rows)

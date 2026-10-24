@@ -329,12 +329,14 @@ def main():
                 '--python', rw_python, '--vivado', vivado, '--output', attempt/'rapidwright']
             if args.java_home:
                 rapidwright_args += ['--java-home', args.java_home]
+            if args.hbm_endpoint:
+                rapidwright_args.append('--hbm-endpoint')
             command(rapidwright_args, attempt, attempt/'rapidwright-console.log')
             assistance = load(attempt/'rapidwright/result.json')
             physical = assistance.get('timing_assistance', {})
             if (assistance.get('status') != 'PASS' or not assistance.get('inputs_unchanged')
                     or not physical.get('physical_pin_inventory', {}).get('available')
-                    or physical.get('matched_configuration_channels') != list(range(32))
+                    or physical.get('matched_configuration_channels') != ([31] if args.hbm_endpoint else list(range(32)))
                     or len(physical.get('native_timing_paths', [])) != 400):
                 raise ValueError('RapidWright receipt lacks required routed pin/channel/path evidence')
             result['rapidwright'] = binding(attempt/'rapidwright/result.json')
