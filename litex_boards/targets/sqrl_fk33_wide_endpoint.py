@@ -239,7 +239,11 @@ class QueuedNativePeer(Module):
         self.comb += [bus.b.valid.eq((bcount!=0) & bvalid[bhead] & (bdelay[bhead]==0)),bus.b.id.eq(bid[bhead]),bus.b.resp.eq(0)]
         # The memory stage always drains. AW/W ownership advances on enqueue;
         # visible memory/valid bits and B allocation advance only on commit.
-        stage_valid=Signal();stage_data=Signal(256);stage_strb=Signal(32)
+        stage_valid = Signal()
+        # Payload is meaningful only under stage_valid/commit_words, which
+        # retain reset. Avoid folding payload reset into the W FIFO BRAM output.
+        stage_data = Signal(256, reset_less=True)
+        stage_strb = Signal(32, reset_less=True)
         stage_address=Signal(6);stage_id=Signal(6);stage_last=Signal()
         self.commit_stage_valid=stage_valid
         self.commit_stage_terminal=stage_last
