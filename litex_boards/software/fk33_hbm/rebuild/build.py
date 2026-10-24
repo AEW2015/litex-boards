@@ -54,11 +54,12 @@ def command(args, cwd, log, env=None):
         raise RuntimeError(f'Command exited {result.returncode}; inspect {log}')
 
 
-def executable(value):
-    path = Path(shutil.which(value) or value).resolve()
-    if not path.is_file():
-        raise FileNotFoundError(f'Executable not found: {value}')
-    return path
+def git_commit(path):
+    try:
+        return subprocess.check_output(['git', '-C', str(path), 'rev-parse', 'HEAD'],
+            text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
 
 
 def contract_path(axi_domain=False, axi_clk_freq=250e6):
@@ -75,14 +76,8 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=25
     sys.path.insert(0, str(BOARDS))
     import litex
     core = Path(litex.__file__).resolve().parents[1]
-    pinned = subprocess.check_output(['git', '-C', str(core), 'rev-parse', 'HEAD'], text=True).strip()
-    if pinned != core_commit:
-        raise ValueError(f'Install the requested LiteX commit {core_commit}; found {pinned}')
-    if subprocess.check_output(['git', '-C', str(core), 'status', '--porcelain'], text=True).strip():
-        raise ValueError('Requested LiteX checkout must be clean')
-    boards_commit = subprocess.check_output(['git', '-C', str(BOARDS), 'rev-parse', 'HEAD'], text=True).strip()
-    if subprocess.check_output(['git', '-C', str(BOARDS), 'status', '--porcelain'], text=True).strip():
-        raise ValueError('Boards checkout must be clean')
+    core_head = git_commit(core)
+    boards_commit = git_commit(BOARDS)
     args = ['sqrl_fk33', '--with-hbm', '--hbm-primitive', '--hbm-bist',
         '--sys-clk-freq', '200e6' if axi_clk_freq == 400e6 else '250e6', '--cpu-type', 'vexriscv', '--cpu-variant', 'minimal',
         '--build', '--no-compile-gateware', '--output-dir', str(attempt/'output'),
@@ -96,7 +91,7 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=25
     if axi_clk_freq != 250e6:
         args += ['--hbm-axi-clk-freq', str(int(axi_clk_freq))]
     save(attempt/'generation-command.json', dict(python=sys.executable, args=args,
-        core=str(core), core_commit=pinned, requested_core_commit=core_commit,
+        core=str(core), core_commit=core_head, requested_core_commit=core_commit,
         boards=str(BOARDS), boards_commit=boards_commit, hbm_axi_domain=axi_domain,
         hbm_axi_clk_freq=int(axi_clk_freq), sys_clk_freq=200000000 if axi_clk_freq == 400e6 else 250000000,
         python_version=sys.version, packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions()}))
@@ -229,11 +224,11 @@ def diagnostics(attempt):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', required=True, type=Path, help='Fresh directory; failed attempts are never overwritten')
-    parser.add_argument('--vivado', default=os.environ.get('FK33_VIVADO', 'vivado.bat' if os.name=='nt' else 'vivado'))
-    parser.add_argument('--rapidwright-python', default=os.environ.get('FK33_RAPIDWRIGHT_PYTHON'))
+    parser.add_argument('--vivado', default=os.environ.get('FK33_VIVADO', 'vivado'))
+    parser.add_argument('--rapidwright-python', default=os.environ.get('FK33_RAPIDWRIGHT_PYTHON', sys.executable))
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
     parser.add_argument('--core-commit', default=CORE_COMMIT,
-        help='Required LiteX core HEAD (default: the reviewed baseline commit)')
+        help='Reference LiteX commit metadata; not enforced (default: the reviewed baseline)')
     parser.add_argument('--hbm-axi-domain', action='store_true',
         help='Build the separate AXI clock domain and use its timing/reset contracts')
     parser.add_argument('--hbm-axi-clk-freq', type=float, choices=(250e6, 400e6), default=250e6,
@@ -260,40 +255,27 @@ def main():
         except (OSError, ValueError) as error:
             parser.error(f'--resume requires a readable generation-command.json: {error}')
         recorded_axi_domain = generation.get('hbm_axi_domain', False)
-        recorded_core_commit = generation.get('requested_core_commit', generation.get('core_commit'))
         if recorded_axi_domain != args.hbm_axi_domain:
             parser.error('--resume HBM AXI-domain profile does not match generation-command.json')
         if generation.get('hbm_axi_clk_freq', 250000000) != args.hbm_axi_clk_freq:
             parser.error('--resume AXI frequency does not match generation-command.json')
         if generation.get('sys_clk_freq', 250000000) != result['sys_clk_freq']:
             parser.error('--resume SYS profile does not match generation-command.json')
-        if recorded_core_commit != args.core_commit:
-            parser.error('--resume core commit does not match generation-command.json; pass the original --core-commit')
     else:
         attempt.mkdir(parents=True, exist_ok=False)
     try:
         if not args.generate_only:
-            vivado = executable(args.vivado)
-            if not args.rapidwright_python or not args.java_home:
-                raise ValueError('RapidWright is required: set --rapidwright-python and --java-home (or their environment variables)')
-            rw_python = executable(args.rapidwright_python)
-            args.java_home = str(Path(args.java_home).resolve())
-            java = executable(str(Path(args.java_home)/'bin'/('java.exe' if os.name=='nt' else 'java')))
-            version_process = subprocess.run([str(vivado), '-version'], text=True,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            version = version_process.stdout
-            save(attempt/'vivado-version.json', dict(returncode=version_process.returncode, output=version))
-            # The Windows 2025.2 launcher prints a valid version and exits 1.
-            if (version_process.returncode not in (0, 1)
-                    or not re.search(r'vivado\s+v2025\.2\b', version, re.I)
-                    or not re.search(r'SW Build\s+\d+', version)
-                    or re.search(r'(?m)^\s*ERROR:', version)):
-                raise ValueError('This reviewed recipe requires Vivado 2025.2')
-            result.update(vivado_version=version, vivado=str(vivado), java=str(java))
-            environment = os.environ.copy()
-            environment.update(JAVA_HOME=args.java_home, JAVA_TOOL_OPTIONS='-Xmx4g')
-            command([rw_python, '-B', HERE/'rapidwright_assist.py', '--check-environment'],
-                    attempt, attempt/'rapidwright-environment.log', environment)
+            vivado = shutil.which(args.vivado) or args.vivado
+            rw_python = shutil.which(args.rapidwright_python) or args.rapidwright_python
+            # Preserve explicit relative paths across the tool working directories;
+            # bare command names are resolved by the operating system through PATH.
+            if '/' in vivado or '\\' in vivado:
+                vivado = str(Path(vivado).resolve())
+            if '/' in rw_python or '\\' in rw_python:
+                rw_python = str(Path(rw_python).resolve())
+            if args.java_home:
+                args.java_home = str(Path(args.java_home).resolve())
+            result.update(vivado=vivado, rapidwright_python=rw_python, java_home=args.java_home)
         if not args.resume:
             child_args = [sys.executable, '-B', __file__, '--generate-child', attempt,
                 '--core-commit', args.core_commit]
@@ -308,9 +290,11 @@ def main():
         else:
             implement(attempt, vivado)
             # Preserve useful physical analysis even when final STA fails.
-            command([sys.executable, '-B', HERE/'rapidwright_assist.py', '--attempt', attempt,
-                '--python', rw_python, '--java-home', args.java_home, '--vivado', vivado,
-                '--output', attempt/'rapidwright'], attempt, attempt/'rapidwright-console.log')
+            rapidwright_args = [sys.executable, '-B', HERE/'rapidwright_assist.py', '--attempt', attempt,
+                '--python', rw_python, '--vivado', vivado, '--output', attempt/'rapidwright']
+            if args.java_home:
+                rapidwright_args += ['--java-home', args.java_home]
+            command(rapidwright_args, attempt, attempt/'rapidwright-console.log')
             assistance = load(attempt/'rapidwright/result.json')
             physical = assistance.get('timing_assistance', {})
             if (assistance.get('status') != 'PASS' or not assistance.get('inputs_unchanged')

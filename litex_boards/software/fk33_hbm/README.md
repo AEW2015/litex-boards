@@ -63,16 +63,17 @@ Reference firmware BIN SHA-256:
 
 ## Prerequisites
 
-- Git and 64-bit Python **3.11**; the reference used Python 3.11.9.
-- Vivado **2025.2**, including Virtex UltraScale+ device support and an available
-  VU33P synthesis/implementation license. The reference used SW build 6299465.
+- Python with the build dependencies; the reference used 64-bit Python 3.11.9.
+  Git is used by the setup commands; the build launcher does not require it.
+- Vivado with Virtex UltraScale+ device support and an available VU33P
+  synthesis/implementation license. The reference used Vivado 2025.2, SW build 6299465.
   Connect any required license-server VPN before building.
 - A RISC-V bare-metal GCC toolchain supporting `-march=rv32i_zicsr -mabi=ilp32`.
   The reference used the Vivado/Vitis 2025.2 toolchain, GCC 13.4.0. Different
   compiler versions can change the ROM contents.
-- 64-bit Java **21**. Set `JAVA_HOME` to the Java installation, not its `bin`
-  directory. The reference used the bundled Java 21.0.5+11.
-- Internet access for pinned Python/Git dependencies and RapidWright's initial
+- Java usable by RapidWright; the reference used 64-bit Java 21.0.5+11.
+  `JAVA_HOME` or `--java-home` optionally overrides normal JVM discovery.
+- Internet access for Python/Git dependencies and RapidWright's initial
   JAR/device-data download. Keep sufficient RAM/disk space for implementation
   and the checkpoint, EDIF, source snapshots and reports.
 
@@ -97,13 +98,13 @@ py -3.11 -m venv .venv-rapidwright
 .\.venv-rapidwright\Scripts\python.exe -m pip install -r litex_boards/software/fk33_hbm/rebuild/requirements-rapidwright.txt
 
 $env:FK33_RISCV_GCC = 'C:\Xilinx\2025.2\gnu\riscv\nt\bin\riscv64-unknown-elf-gcc.exe'
-$env:JAVA_HOME = 'C:\Xilinx\2025.2\tps\win64\jre21.0.5_11'
 ```
 
-Adjust the Xilinx and Java paths to your installation. The LiteX dependency is
-an editable checkout at the exact reference commit, installed by the requirements
-file. Keep it clean. The CPU data archives include the generated Verilog, so
-Scala/SBT and recursive CPU regression-test submodules are unnecessary.
+Adjust tool paths to your installation. The requirements install a reference
+LiteX checkout; other compatible or edited checkouts are accepted. Git commit
+metadata is recorded when available, alongside snapshots of the sources used.
+The CPU data archives include the generated Verilog, so Scala/SBT and recursive
+CPU regression-test submodules are unnecessary.
 
 ## Build, including RapidWright
 
@@ -113,11 +114,12 @@ Choose a **new output directory** for every complete build:
 .\.venv-fk33\Scripts\python.exe -B litex_boards/software/fk33_hbm/rebuild/build.py `
   --output-dir build/fk33-hbm-wolf-01 `
   --vivado C:/Xilinx/2025.2/Vivado/bin/vivado.bat `
-  --rapidwright-python .venv-rapidwright/Scripts/python.exe `
-  --java-home $env:JAVA_HOME
+  --rapidwright-python .venv-rapidwright/Scripts/python.exe
 ```
 
-The launcher checks the RapidWright/JVM environment before synthesis, generates
+The launcher invokes the supplied tool commands or their PATH defaults without
+environment or version preflights. RapidWright uses the current Python unless
+`--rapidwright-python` is supplied; `--java-home` is optional. The launcher generates
 the RTL and calibration firmware, snapshots inputs, audits source constraints,
 implements once, runs Python RapidWright, checks final native timing/coverage and
 routing/DRC, and inspects the native HBM model and three reset synchronizer pairs.
@@ -140,8 +142,8 @@ kept and any new attempt must use another output directory.
 
 Use the same Python 3.11 requirements and repository commit, with
 `python3.11 -m venv`, `.venv-fk33/bin/python` and
-`.venv-rapidwright/bin/python`. Set `FK33_RISCV_GCC` and `JAVA_HOME` to the local
-toolchain/JDK, and pass the installed `vivado` executable to `--vivado`.
+`.venv-rapidwright/bin/python`. Set `FK33_RISCV_GCC` to the local toolchain and
+pass `vivado` or its path to `--vivado`. Set `JAVA_HOME` only to override JVM discovery.
 The scripts accept Linux paths; the original full hardware-qualified build was
 on Windows. Cross-OS/cross-machine reproduction has not yet been demonstrated.
 
@@ -174,10 +176,10 @@ are not reused to certify a new checkout.
 ## Experimental separate AXI domain
 
 This branch adds `--hbm-axi-domain` to the rebuild launcher and board target.
-Use LiteX commit `906eb27990c68e8b30f661201eea22b18ef7c1ee` and pass
-`--core-commit 906eb27990c68e8b30f661201eea22b18ef7c1ee` to the launcher alongside
-that flag and the normal tool/output arguments. Both source checkouts must be
-clean. The flag is also required when resuming a generated attempt.
+Use a LiteX checkout with the separate-domain core interface. The local
+reference used commit `906eb27990c68e8b30f661201eea22b18ef7c1ee`. Optional
+`--core-commit` records reference metadata; it does not enforce a checkout or
+clean worktree. Keep `--hbm-axi-domain` when resuming that profile.
 
 This first migration keeps SYS and native AXI at 250 MHz on separate MMCM
 outputs, with HBM at 900 MHz and its reference at 200 MHz. CPU, CSRs and
@@ -194,11 +196,11 @@ image. Simulation alone does not establish those hardware results.
 
 ## Rated SYS200 / AXI400 candidate
 
-With the matching core commit above installed and both checkouts clean, add
-these arguments to the rebuild launcher command:
+With a LiteX checkout containing SYS200/AXI400 support, add these arguments
+to the rebuild launcher command:
 
 ```text
---hbm-axi-domain --hbm-axi-clk-freq 400e6 --core-commit 906eb27990c68e8b30f661201eea22b18ef7c1ee
+--hbm-axi-domain --hbm-axi-clk-freq 400e6
 ```
 
 The launcher selects SYS200 / AXI400 / HBM900 / REF200 / APB100. The direct
@@ -246,7 +248,7 @@ revision-check override. Review the firmware/CSR map before using your own host.
 
 ## Demonstrating reproduction
 
-Start from the same repository commit and pinned requirements on both machines.
+For a controlled comparison, use matching sources and dependencies on both machines.
 Record OS, Python, exact Vivado build/patches, GCC and Java versions, commands,
 source/generated-input hashes, and native timing reports. Require all build
 checks to pass, then test each newly built image on an FK33 for calibration and

@@ -85,20 +85,19 @@ def build(output_dir, csr_json=None, profile_path=None):
     if not selected:
         selected = next((found for name in ("riscv64-unknown-elf-gcc", "riscv32-unknown-elf-gcc", "riscv32-xilinx-elf-gcc") if (found := shutil.which(name))), None)
     if not selected:
-        fallback = Path("C:/Xilinx/2025.2/gnu/riscv/nt/bin/riscv64-unknown-elf-gcc.exe")
-        if fallback.is_file():
-            selected = str(fallback)
-    if not selected:
         raise FileNotFoundError("Install a RISC-V bare-metal GCC toolchain or set FK33_RISCV_GCC")
-    compiler = Path(shutil.which(selected) or selected).resolve()
-    if not compiler.is_file():
-        raise FileNotFoundError(f"RISC-V compiler not found: {compiler}")
+    compiler = shutil.which(selected) or selected
     def tool(name):
-        suffix = ".exe" if compiler.name.lower().endswith(".exe") else ""
-        stem = compiler.name[:-len(suffix)] if suffix else compiler.name
-        if not stem.endswith("gcc"):
-            raise ValueError("FK33_RISCV_GCC must name a GCC executable ending in gcc")
-        return str(compiler.with_name(stem[:-3] + name + suffix))
+        # Ask the supplied compiler/wrapper for its companion tool; its own
+        # filename need not encode a GCC prefix or platform suffix.
+        selected_tool = subprocess.check_output(
+            [str(compiler), f"-print-prog-name={name}"], text=True).strip()
+        if not selected_tool:
+            raise RuntimeError(f"Compiler returned no {name} tool")
+        candidate = Path(selected_tool)
+        if not candidate.is_absolute() and (Path(compiler).parent / candidate).is_file():
+            return str((Path(compiler).parent / candidate).resolve())
+        return shutil.which(selected_tool) or selected_tool
     elf, binary = output / "fk33_hbm.elf", output / "fk33_hbm.bin"
     command = [str(compiler), "-march=rv32i_zicsr", "-mabi=ilp32", "-Os", "-g", "-ffreestanding", "-fno-builtin", "-fno-pic", "-mno-relax", "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror", "-nostdlib", "-nostartfiles", "-I", str(output), "-T", str(source / "linker.ld"), "-Wl,--gc-sections", f"-Wl,-Map,{output / 'fk33_hbm.map'}", str(source / "start.S"), str(source / "main.c"), "-lgcc", "-o", str(elf)]
     result = subprocess.run(command, text=True, capture_output=True)
@@ -116,7 +115,15 @@ def build(output_dir, csr_json=None, profile_path=None):
                 "profile": str(profile_path), "profile_sha256": _sha(profile_path),
                 "sources": [{"path": str(source / name), "sha256": _sha(source / name)} for name in ("build.py", "main.c", "start.S", "linker.ld")],
                 "elf_sha256": _sha(elf), "bin_sha256": _sha(binary), "command": command,
-                "compiler_version": subprocess.check_output([str(compiler), "--version"], text=True).splitlines()[0]}
+                "compiler_version": None}
+    try:
+        version = subprocess.run([str(compiler), "--version"], text=True, capture_output=True)
+        if version.returncode == 0 and version.stdout.splitlines():
+            metadata["compiler_version"] = version.stdout.splitlines()[0]
+        else:
+            metadata["compiler_version_note"] = f"Version query exited {version.returncode}"
+    except (OSError, subprocess.SubprocessError) as error:
+        metadata["compiler_version_note"] = str(error)
     (output / "firmware-build.json").write_text(json.dumps({k: v for k, v in metadata.items() if k != "rom_words"}, indent=2) + "\n", encoding="utf-8")
     return metadata
 
