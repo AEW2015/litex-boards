@@ -83,7 +83,7 @@ def contract_path(axi_domain=False, axi_clk_freq=250e6, endpoint=False):
 
 # Build stages -------------------------------------------------------------------------------------
 
-def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=250e6, endpoint=False):
+def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=250e6, endpoint=False, traffic=False):
     contract_path(axi_domain, axi_clk_freq, endpoint)
     # Execute the checked-out board target rather than an unrelated installed copy.
     sys.path.insert(0, str(BOARDS))
@@ -99,6 +99,8 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=25
         '--vivado-route-directive', 'Explore',
         '--vivado-post-route-phys-opt-directive', 'AggressiveExplore',
         '--vivado-report-level', 'signoff']
+    if traffic:
+        args.append('--hbm-endpoint-traffic')
     if axi_domain:
         args.append('--hbm-axi-domain')
     if axi_clk_freq != 250e6:
@@ -106,7 +108,7 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=25
     save(attempt/'generation-command.json', dict(python=sys.executable, args=args,
         core=str(core), core_commit=core_head, requested_core_commit=core_commit,
         boards=str(BOARDS), boards_commit=boards_commit, hbm_axi_domain=axi_domain,
-        hbm_axi_clk_freq=int(axi_clk_freq), hbm_endpoint=endpoint, sys_clk_freq=200000000 if axi_clk_freq == 400e6 else 250000000,
+        hbm_axi_clk_freq=int(axi_clk_freq), hbm_endpoint=endpoint, hbm_endpoint_traffic=traffic, sys_clk_freq=200000000 if axi_clk_freq == 400e6 else 250000000,
         python_version=sys.version, packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions()}))
     sys.argv = args
     runpy.run_module('litex_boards.targets.sqrl_fk33', run_name='__main__')
@@ -259,6 +261,9 @@ def main():
     parser.add_argument('--hbm-endpoint', action='store_true',
         help='Build the PC31 processor-controlled endpoint instead of BIST; requires separate AXI250')
 
+    parser.add_argument('--hbm-endpoint-traffic', action='store_true',
+        help='Use RTL traffic generation instead of processor per-beat CSR transfers')
+
     # Build stages.
     parser.add_argument('--generate-only', action='store_true', help='Generate RTL/firmware and audit source constraints; no CAD or build PASS')
     parser.add_argument('--resume',        action='store_true', help='Implement an unchanged GENERATED output; never retry a failed native build')
@@ -267,11 +272,13 @@ def main():
         parser.error('--hbm-axi-clk-freq=400e6 requires --hbm-axi-domain')
     if args.hbm_endpoint and (not args.hbm_axi_domain or args.hbm_axi_clk_freq != 250e6):
         parser.error('--hbm-endpoint requires --hbm-axi-domain at 250 MHz')
+    if args.hbm_endpoint_traffic and not args.hbm_endpoint:
+        parser.error('--hbm-endpoint-traffic requires --hbm-endpoint')
     attempt = args.output_dir.resolve()
     result = dict(status='FAIL', attempt=str(attempt), started_utc=datetime.now(timezone.utc).isoformat(),
         hardware_tested=False, published=False,
         hbm_axi_domain=args.hbm_axi_domain, hbm_axi_clk_freq=int(args.hbm_axi_clk_freq),
-        hbm_endpoint=args.hbm_endpoint,
+        hbm_endpoint=args.hbm_endpoint, hbm_endpoint_traffic=args.hbm_endpoint_traffic,
         sys_clk_freq=200000000 if args.hbm_axi_clk_freq == 400e6 else 250000000,
         requested_core_commit=args.core_commit,
         scope='Portable build/timing/netlist/RapidWright checks. Local historical simulations and hardware campaign are separate evidence.')
@@ -284,6 +291,8 @@ def main():
             generation = load(attempt/'generation-command.json')
         except (OSError, ValueError) as error:
             parser.error(f'--resume requires a readable generation-command.json: {error}')
+        if generation.get('hbm_endpoint_traffic', False) != args.hbm_endpoint_traffic:
+            parser.error('--resume endpoint traffic mode does not match generation-command.json')
         if generation.get('hbm_endpoint', False) != args.hbm_endpoint:
             parser.error('--resume endpoint profile does not match generation-command.json')
         recorded_axi_domain = generation.get('hbm_axi_domain', False)
@@ -315,6 +324,8 @@ def main():
                 child_args.append('--hbm-axi-domain')
             if args.hbm_endpoint:
                 child_args.append('--hbm-endpoint')
+            if args.hbm_endpoint_traffic:
+                child_args.append('--hbm-endpoint-traffic')
             if args.hbm_axi_clk_freq != 250e6:
                 child_args += ['--hbm-axi-clk-freq', str(int(args.hbm_axi_clk_freq))]
             command(child_args, BOARDS, attempt/'generation.log')
@@ -369,9 +380,10 @@ if __name__ == '__main__':
         child.add_argument('--core-commit', default=CORE_COMMIT)
         child.add_argument('--hbm-axi-domain', action='store_true')
         child.add_argument('--hbm-endpoint', action='store_true')
+        child.add_argument('--hbm-endpoint-traffic', action='store_true')
         child.add_argument('--hbm-axi-clk-freq', type=float, choices=(250e6, 400e6), default=250e6)
         child_args = child.parse_args()
         generate(child_args.generate_child.resolve(), child_args.core_commit,
-            child_args.hbm_axi_domain, child_args.hbm_axi_clk_freq, child_args.hbm_endpoint)
+            child_args.hbm_axi_domain, child_args.hbm_axi_clk_freq, child_args.hbm_endpoint, child_args.hbm_endpoint_traffic)
     else:
         raise SystemExit(main())

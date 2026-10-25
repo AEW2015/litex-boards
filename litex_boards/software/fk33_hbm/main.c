@@ -17,6 +17,14 @@ typedef struct {
     uint32_t stress_rounds, stress_words, stress_completed;
     uint32_t target_mhz, transition_count, contents_generation;
     uint32_t runtime_status, drained_mask, runtime_error, command_result;
+    /* Append-only CMD7 configuration/results; mailbox remains within 128 words. */
+    uint32_t traffic_mode, traffic_cycles_limit, traffic_seed;
+    uint32_t traffic_status, traffic_errors, traffic_cycles;
+    uint32_t traffic_write_beats, traffic_read_beats, traffic_write_bursts, traffic_read_bursts;
+    uint32_t traffic_aw_count, traffic_ar_count, traffic_packed_w, traffic_packed_r;
+    uint32_t traffic_aw_stalls, traffic_w_stalls, traffic_ar_stalls, traffic_read_wait;
+    uint32_t traffic_write_latency_min, traffic_write_latency_max;
+    uint32_t traffic_read_latency_min, traffic_read_latency_max;
 } mailbox;
 static volatile mailbox *const mb = (volatile mailbox *)0x10000000u;
 static uint32_t phy06[2][8];
@@ -373,7 +381,7 @@ static void stress(void) {
     refresh_temperatures();
     mb->state = READY;
 }
-#ifdef HBM_ENDPOINT_PORT
+#if defined(HBM_ENDPOINT_PORT) && !defined(HBM_ENDPOINT_TRAFFIC)
 /* CMD6 uses only the dedicated endpoint. All expected bytes are calculated
  * here; HBM contents are established by full-strobe writes before masking. */
 static uint32_t endpoint_status(void) {
@@ -517,6 +525,79 @@ static void endpoint_transactions(void) {
 }
 #endif
 
+#ifdef HBM_ENDPOINT_TRAFFIC
+/* CMD7 configures a bounded RTL run. The CPU never transfers traffic payloads. */
+static void traffic_statistics(void) {
+    mb->traffic_status = rd(TF_STATUS);
+    mb->traffic_errors = rd(TF_ERRORS);
+    mb->traffic_cycles = rd(TF_CYCLES);
+    mb->traffic_write_beats = rd(TF_WRITE_BEATS);
+    mb->traffic_read_beats = rd(TF_READ_BEATS);
+    mb->traffic_write_bursts = rd(TF_WRITE_BURSTS);
+    mb->traffic_read_bursts = rd(TF_READ_BURSTS);
+    mb->traffic_aw_count = rd(TF_AW_COUNT);
+    mb->traffic_ar_count = rd(TF_AR_COUNT);
+    mb->traffic_packed_w = rd(TF_PACKED_W);
+    mb->traffic_packed_r = rd(TF_PACKED_R);
+    mb->traffic_aw_stalls = rd(TF_AW_STALLS);
+    mb->traffic_w_stalls = rd(TF_W_STALLS);
+    mb->traffic_ar_stalls = rd(TF_AR_STALLS);
+    mb->traffic_read_wait = rd(TF_READ_WAIT);
+    mb->traffic_write_latency_min = rd(TF_WRITE_LATENCY_MIN);
+    mb->traffic_write_latency_max = rd(TF_WRITE_LATENCY_MAX);
+    mb->traffic_read_latency_min = rd(TF_READ_LATENCY_MIN);
+    mb->traffic_read_latency_max = rd(TF_READ_LATENCY_MAX);
+}
+static void traffic_run(void) {
+    uint32_t mode = mb->traffic_mode;
+    uint32_t cycles = mb->traffic_cycles_limit;
+    uint32_t seed = mb->traffic_seed;
+    mb->command_result = 1;
+    if (mode > 3 || cycles > (1u << 28) || (mode && !cycles)) return;
+    uint32_t status = rd(TF_STATUS);
+    if (rd(TF_ERRORS) || (status & 1)) fail(ENDPOINT_ERROR);
+    if ((status & ((1u << 3) | (1u << 7))) != ((1u << 3) | (1u << 7)) ||
+            (status & (1u << 4))) return;
+    refresh_temperatures();
+    /* Clear old completion before publishing the next command generation. */
+    mb->traffic_status = 0;
+    mb->sequence++;
+    mb->state = TESTING;
+    mb->bus_errors_before = rd(CTRL_BUS_ERRORS);
+    wr(TF_CONFIG_MODE, mode);
+    wr(TF_CONFIG_CYCLES, cycles);
+    wr(TF_CONFIG_SEED, seed);
+    wr(TF_START, 1);
+    uint32_t start = ticks(), temperature_tick = start;
+    for (;;) {
+        uint32_t status = rd(TF_STATUS), errors = rd(TF_ERRORS);
+        check_trip();
+        if (errors || (status & (1u << 8))) {
+            traffic_statistics();
+            fail(ENDPOINT_ERROR);
+        }
+        if ((status & ((1u << 1) | (1u << 5))) == ((1u << 1) | (1u << 5))) break;
+        uint32_t now = ticks();
+        if ((uint32_t)(start - now) >= 3u * SYS_CLK_FREQ + cycles) {
+            traffic_statistics();
+            fail(ENDPOINT_TIMEOUT);
+        }
+        if ((uint32_t)(temperature_tick - now) >= SYS_CLK_FREQ / 10u) {
+            refresh_temperatures();
+            temperature_tick = now;
+        }
+        mb->heartbeat++;
+    }
+    /* DONE plus actual response retirement freezes the RTL counters. */
+    traffic_statistics();
+    mb->bus_errors_after = rd(CTRL_BUS_ERRORS);
+    if (mb->bus_errors_before != mb->bus_errors_after) fail(BUS_ERROR);
+    refresh_temperatures();
+    mb->command_result = 0;
+    mb->state = READY;
+}
+#endif
+
 int main(void) {
     wr(TIMER_BASE + 8, 0); wr(TIMER_BASE, 0xffffffffu);
     wr(TIMER_BASE + 4, 0xffffffffu); wr(TIMER_BASE + 28, 0); wr(TIMER_BASE + 8, 1);
@@ -532,7 +613,10 @@ int main(void) {
         if (command == 1 && (mb->state == WAIT || mb->state == STOPPED)) { initialize(active_profile); transactions(); }
         if (command == 2 && mb->state == READY) transactions();
         if (command == 4 && mb->state == READY) stress();
-#ifdef HBM_ENDPOINT_PORT
+#ifdef HBM_ENDPOINT_TRAFFIC
+        if (command == 7 && mb->state == READY) traffic_run();
+#endif
+#if defined(HBM_ENDPOINT_PORT) && !defined(HBM_ENDPOINT_TRAFFIC)
         if (command == 6 && mb->state == READY) endpoint_transactions();
 #endif
         if (command == 5 && (mb->state == READY || mb->state == STOPPED)) {

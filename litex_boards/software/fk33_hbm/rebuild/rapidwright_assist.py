@@ -105,7 +105,7 @@ def read_paths(path):
 def family(name, endpoint=False):
     lower = name.lower()
     if endpoint:
-        if 'hbmendpointcsr' in lower:
+        if 'hbmendpointcsr' in lower or 'hbmendpointtrafficcsr' in lower:
             return 'endpoint_configuration'
         if 'hbmwindowfourendpoint' in lower:
             return 'endpoint_transport'

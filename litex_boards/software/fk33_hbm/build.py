@@ -77,15 +77,19 @@ def build(output_dir, csr_json=None, profile_path=None):
         if port != 31 or (sys_clk_freq, axi_clk_freq) != (250000000, 250000000):
             raise ValueError("The endpoint experiment requires PC31 and SYS250/AXI250")
         header.append(f"#define HBM_ENDPOINT_PORT {port}u")
+        traffic = constants.get("hbm_endpoint_traffic", 0)
+        if traffic:
+            header.append("#define HBM_ENDPOINT_TRAFFIC 1")
         for name, register in layout["csr_registers"].items():
             if name.startswith("hbm_endpoint_"):
                 if register["size"] != 1:
                     raise ValueError("Endpoint registers must each occupy one CSR word")
                 suffix = name[len("hbm_endpoint_"):].upper()
-                header.append(f"#define EP_{suffix} 0x{register['addr']:08x}u")
-        for direction in ("w", "r"):
-            words = ", ".join(f"EP_{direction.upper()}_DATA{index}" for index in range(16))
-            header.append(f"static const uint32_t ep_{direction}_data_regs[] = {{{words}}};")
+                header.append(f"#define {'TF' if traffic else 'EP'}_{suffix} 0x{register['addr']:08x}u")
+        if not traffic:
+            for direction in ("w", "r"):
+                words = ", ".join(f"EP_{direction.upper()}_DATA{index}" for index in range(16))
+                header.append(f"static const uint32_t ep_{direction}_data_regs[] = {{{words}}};")
     header.extend([f"#define BOOT_HBM_MHZ {p['hbm_mhz']}u", f"#define CLOCK_PROFILE_COUNT {len(profiles)}u", "static const clock_profile clock_profiles[] = {"])
     for mhz, profile in sorted(profiles.items(), key=lambda row: int(row[0])):
         words = ", ".join(f"0x{word:08x}u" for word in profile["pll_words"])

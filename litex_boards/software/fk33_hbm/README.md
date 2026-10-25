@@ -340,3 +340,46 @@ processor transactions. Compare configuration payloads separately from `.bit`
 header metadata if testing bit identity. RapidWright analysis does not enforce
 an identical implementation. The reference margin is narrow, so a passing build
 on this machine is not a guarantee that another build will close timing.
+
+
+## Processor-configured RTL traffic experiment
+
+The opt-in traffic build keeps the PC31 four-command endpoint, native AXI3
+interface and SYS250/AXI250/HBM900/reference200 MHz profile. The processor
+configures runs; RTL supplies and checks every data beat. The default build and
+`--hbm-endpoint` CSR-stream example remain available.
+
+```sh
+python litex_boards/software/fk33_hbm/rebuild/build.py \
+    --hbm-endpoint --hbm-endpoint-traffic --hbm-axi-domain \
+    --output-dir build/fk33-endpoint-traffic
+```
+
+Use the same Vivado, RapidWright Python and optional Java arguments described
+above. `--generate-only` performs generation and source auditing without CAD.
+This experiment requires fresh native timing, netlist and hardware qualification;
+adding this option alone does not establish a hardware bandwidth result.
+
+After calibration, mailbox command 7 captures `traffic_mode`,
+`traffic_cycles_limit` and `traffic_seed`. Mode 0 seeds the full reserved PC31
+2 MiB region at byte address `0x1f0200000`; modes 1/2/3 run write/read/mixed traffic.
+Timed modes require 1 through 2^28 SYS cycles. Read and mixed modes require a
+successful seed with the same pattern seed. STOP or lost admission invalidates
+that seed, so seed again after resume or reinitialization. Command 6 belongs to
+the CSR-stream build and is unavailable in the traffic build. Existing commands
+1, 3, 4 and 5 retain their initialization, stop, CPU stress and retuning roles.
+
+The append-only mailbox fields occupy words 40 through 61; the first 40 words
+retain their existing ABI. Results contain frozen elapsed SYS cycles, accepted
+native 256-bit write/read beat counts, completed write/read burst counts,
+accepted AW/AR counts, packed 512-bit W/R counts, channel stall counts and
+minimum/maximum application descriptor-to-response latency in SYS cycles.
+Elapsed cycles include final drain. Compute payload bandwidth on the host as
+`native_beats * 32 * sys_hz / traffic_cycles`, independently for reads and
+writes; mixed aggregate bandwidth is their sum. Latency includes endpoint
+queuing and response handling and is not an isolated DRAM timing measurement.
+
+Firmware polls completion with thermal and timeout checks, then copies the
+stable counters. Engine errors request STOP and fail closed without resetting
+outstanding AXI work. A host may request runtime STOP during command 7; the CPU
+can process mailbox command 3 after the active run returns and drains.

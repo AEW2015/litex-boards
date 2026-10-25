@@ -343,6 +343,7 @@ class BaseSoC(SoCCore):
         hbm_primitive_rtl     = None,
         hbm_bist              = False,
         hbm_endpoint          = False,
+        hbm_endpoint_traffic  = False,
         hbm_axi_domain        = False,
         hbm_axi_clk_freq      = 250e6,
         **kwargs):
@@ -357,6 +358,8 @@ class BaseSoC(SoCCore):
             raise ValueError("Separate HBM AXI domain requires primitive HBM and BIST or endpoint")
         if hbm_bist and not self.hbm_primitive:
             raise ValueError("HBM burst testing requires the primitive HBM profile")
+        if hbm_endpoint_traffic and not hbm_endpoint:
+            raise ValueError("HBM endpoint traffic requires --hbm-endpoint")
         if hbm_endpoint and (not self.hbm_primitive or not hbm_axi_domain or
                 hbm_axi_clk_freq != 250e6 or hbm_bist):
             raise ValueError("HBM endpoint requires primitive SYS250/AXI250 with a separate AXI domain and no BIST")
@@ -539,7 +542,12 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                         gray_bus_prefix="hbm_endpoint_pc31", max_outstanding=4)
                     # Ownership FIFO RAM is transport state, not CSR memory.
                     self.hbm_transport.autocsr_exclude = {"window"}
-                    self.hbm_endpoint = HBMEndpointCSR(self.hbm_transport)
+                    if hbm_endpoint_traffic:
+                        from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint_traffic import HBMEndpointTrafficCSR
+                        self.hbm_endpoint = HBMEndpointTrafficCSR(self.hbm_transport)
+                        self.add_constant("HBM_ENDPOINT_TRAFFIC", 1)
+                    else:
+                        self.hbm_endpoint = HBMEndpointCSR(self.hbm_transport)
                     self.comb += [
                         self.hbm_endpoint.admission_enable.eq(self.hbm.memory_ready),
                         self.hbm_endpoint.stop.eq(host_quiesce),
@@ -805,6 +813,7 @@ def main():
     parser.add_target_argument("--hbm-primitive", action="store_true", help="Use bundled primitive HBM and processor calibration firmware.")
     parser.add_target_argument("--hbm-primitive-rtl", help="Override the bundled primitive/control RTL directory.")
     parser.add_target_argument("--hbm-bist", action="store_true", help="Add exclusive per-channel burst test masters and counters.")
+    parser.add_target_argument("--hbm-endpoint-traffic", action="store_true", help="Use processor-configured RTL traffic generation on the dedicated PC31 endpoint.")
     parser.add_target_argument("--hbm-endpoint", action="store_true", help="Dedicate PC31 to the processor-driven four-command wide endpoint.")
     parser.add_target_argument("--hbm-axi-domain", action="store_true", help="Independent HBM AXI clock domain (requires primitive BIST or endpoint).")
     parser.add_target_argument("--hbm-axi-clk-freq", default=250e6, type=float, choices=[250e6, 400e6], help="HBM AXI clock frequency; 400 MHz requires --hbm-axi-domain and --sys-clk-freq=200e6.")
@@ -842,6 +851,7 @@ def main():
         hbm_primitive_rtl     = args.hbm_primitive_rtl,
         hbm_bist              = args.hbm_bist,
         hbm_endpoint          = args.hbm_endpoint,
+        hbm_endpoint_traffic  = args.hbm_endpoint_traffic,
         hbm_axi_domain        = args.hbm_axi_domain,
         hbm_axi_clk_freq      = args.hbm_axi_clk_freq,
         **parser.soc_argdict
