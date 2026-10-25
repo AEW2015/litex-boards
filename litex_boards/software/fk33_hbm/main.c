@@ -25,6 +25,10 @@ typedef struct {
     uint32_t traffic_aw_stalls, traffic_w_stalls, traffic_ar_stalls, traffic_read_wait;
     uint32_t traffic_write_latency_min, traffic_write_latency_max;
     uint32_t traffic_read_latency_min, traffic_read_latency_max;
+    uint32_t traffic_random, traffic_write_enabled_bytes_lo, traffic_write_enabled_bytes_hi;
+    uint32_t traffic_aw_native_beats, traffic_ar_native_beats;
+    uint32_t traffic_aw_packed_words, traffic_ar_packed_words;
+    uint32_t traffic_aw_length_seen, traffic_ar_length_seen;
 } mailbox;
 static volatile mailbox *const mb = (volatile mailbox *)0x10000000u;
 static uint32_t phy06[2][8];
@@ -547,13 +551,32 @@ static void traffic_statistics(void) {
     mb->traffic_write_latency_max = rd(TF_WRITE_LATENCY_MAX);
     mb->traffic_read_latency_min = rd(TF_READ_LATENCY_MIN);
     mb->traffic_read_latency_max = rd(TF_READ_LATENCY_MAX);
+#ifdef HBM_ENDPOINT_RANDOM
+    /* DONE freezes the split 64-bit enabled-byte count before this copy. */
+    mb->traffic_write_enabled_bytes_lo = rd(TF_WRITE_ENABLED_BYTES_LO);
+    mb->traffic_write_enabled_bytes_hi = rd(TF_WRITE_ENABLED_BYTES_HI);
+    mb->traffic_aw_native_beats = rd(TF_AW_NATIVE_BEATS);
+    mb->traffic_ar_native_beats = rd(TF_AR_NATIVE_BEATS);
+    mb->traffic_aw_packed_words = rd(TF_AW_PACKED_WORDS);
+    mb->traffic_ar_packed_words = rd(TF_AR_PACKED_WORDS);
+    mb->traffic_aw_length_seen = rd(TF_AW_LENGTH_SEEN);
+    mb->traffic_ar_length_seen = rd(TF_AR_LENGTH_SEEN);
+#endif
 }
 static void traffic_run(void) {
     uint32_t mode = mb->traffic_mode;
     uint32_t cycles = mb->traffic_cycles_limit;
     uint32_t seed = mb->traffic_seed;
     mb->command_result = 1;
+#ifdef HBM_ENDPOINT_RANDOM
+    uint32_t random = mb->traffic_random;
+    if (mode > 5 || random > 1 || cycles > (1u << 28) ||
+            (mode >= 1 && mode <= 3 && !cycles) ||
+            ((mode == 0 || mode >= 4) && cycles) ||
+            (mode >= 4 && !random)) return;
+#else
     if (mode > 3 || cycles > (1u << 28) || (mode && !cycles)) return;
+#endif
     uint32_t status = rd(TF_STATUS);
     if (rd(TF_ERRORS) || (status & 1)) fail(ENDPOINT_ERROR);
     if ((status & ((1u << 3) | (1u << 7))) != ((1u << 3) | (1u << 7)) ||
@@ -567,6 +590,9 @@ static void traffic_run(void) {
     wr(TF_CONFIG_MODE, mode);
     wr(TF_CONFIG_CYCLES, cycles);
     wr(TF_CONFIG_SEED, seed);
+#ifdef HBM_ENDPOINT_RANDOM
+    wr(TF_CONFIG_RANDOM, random);
+#endif
     wr(TF_START, 1);
     uint32_t start = ticks(), temperature_tick = start;
     for (;;) {

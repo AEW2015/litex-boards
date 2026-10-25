@@ -546,6 +546,7 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                         from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint_traffic import HBMEndpointTrafficCSR
                         self.hbm_endpoint = HBMEndpointTrafficCSR(self.hbm_transport)
                         self.add_constant("HBM_ENDPOINT_TRAFFIC", 1)
+                        self.add_constant("HBM_ENDPOINT_RANDOM", 1)
                     else:
                         self.hbm_endpoint = HBMEndpointCSR(self.hbm_transport)
                     self.comb += [

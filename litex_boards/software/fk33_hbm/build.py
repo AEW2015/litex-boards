@@ -80,6 +80,8 @@ def build(output_dir, csr_json=None, profile_path=None):
         traffic = constants.get("hbm_endpoint_traffic", 0)
         if traffic:
             header.append("#define HBM_ENDPOINT_TRAFFIC 1")
+            if constants.get("hbm_endpoint_random", 0):
+                header.append("#define HBM_ENDPOINT_RANDOM 1")
         for name, register in layout["csr_registers"].items():
             if name.startswith("hbm_endpoint_"):
                 if register["size"] != 1:

@@ -383,3 +383,42 @@ Firmware polls completion with thermal and timeout checks, then copies the
 stable counters. Engine errors request STOP and fail closed without resetting
 outstanding AXI work. A host may request runtime STOP during command 7; the CPU
 can process mailbox command 3 after the active run returns and drains.
+
+
+## Random address and masked-write qualification
+
+The traffic build also reports `HBM_ENDPOINT_RANDOM=1` and accepts
+`traffic_random=1` in processor command 7. The existing build flags, native
+AXI3 ports, four-command window and clock profile remain the same.
+`traffic_random=0` retains sequential modes 0 through 3.
+
+Timed random modes select among the 4,096 reserved 512-byte slots using
+independent captured PRNG streams for writes and reads, variable AXI3 lengths
+of 1 through 16 native beats, address-dependent data and byte strobes. Seed
+and random setting identify the known memory image. Start
+with finite mode 0 (`cycles=0`) to seed the whole 2 MiB region, then finite
+mode 5 to verify it. Mode 4 is a one-time finite masked epoch: selected bytes
+change while disabled bytes and each slot's unwritten tail retain their seed
+values. This masked phase visits every slot once using a seeded permutation.
+Mode 5 reads every byte using full-length bursts to verify that complete
+composite image. Modes 4 and 5 require `traffic_random=1` and `cycles=0`.
+
+Use mode 5 before and after timed random write, read or mixed jobs. Mixed
+writes reproduce the current expected composite image, so read/write overlap
+does not create a data race in the checker. STOP, loss of admission or a fatal
+error invalidates seed, masked-image and full-verification state. Restart with
+a full seed rather than reusing a partially completed masked epoch.
+
+Mailbox words 0 through 61 retain their offsets. Words 62 through 70 append
+`traffic_random`, enabled-write-byte low/high words, AW/AR accepted native-beat
+sums, AW/AR accepted packed-word sums and AW/AR length-seen masks. Status bits
+9 and 10 report a valid masked image and a completed full-region verification.
+All statistics freeze after DONE and drain. Reconstruct enabled write bytes as
+`lo + (hi << 32)` on the host; this counts asserted WSTRB bytes separately from
+native bus bytes (`write_beats * 32`). For variable or odd burst lengths, use
+the accepted descriptor sums to reconcile retired native beats and packed
+512-bit words. Length-seen bit `n` denotes native length `n + 1`.
+
+The new phase checks require their own simulation, native build and hardware
+evidence. The earlier sequential traffic qualification does not establish
+random or masked-write performance.
