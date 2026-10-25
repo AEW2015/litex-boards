@@ -280,15 +280,13 @@ class HBMCPUWindowPipeline(LiteXModule):
                 self.submodules += buffer
                 self.comb += [request.connect(buffer.sink),
                     buffer.source.connect(getattr(request_buffered, channel))]
-            write_buffer = stream.Buffer(offset_input.b.description,
-                pipe_valid=True, pipe_ready=True)
-            self.submodules += write_buffer
-            self.write_buffer = write_buffer
-            self.comb += [offset_input.b.connect(write_buffer.sink),
-                write_buffer.source.connect(cpu.b)]
-        else:
-            write_buffer = None
-            self.comb += converted.b.connect(cpu.b)
+
+        write_buffer = stream.Buffer(offset_input.b.description,
+            pipe_valid=True, pipe_ready=True)
+        self.submodules += write_buffer
+        self.write_buffer = write_buffer
+        self.comb += [offset_input.b.connect(write_buffer.sink),
+            write_buffer.source.connect(cpu.b)]
 
         read_buffer = stream.Buffer(offset_input.r.description,
             pipe_valid=True, pipe_ready=True)
@@ -322,7 +320,8 @@ class HBMCPUWindowPipeline(LiteXModule):
             self.comb += self.idle.eq(~(write_pending | read_pending |
                 visible_request | visible_response))
         else:
-            self.comb += self.idle.eq(1)
+            self.comb += self.idle.eq(~(write_buffer.sink.valid | write_buffer.source.valid |
+                read_buffer.sink.valid | read_buffer.source.valid))
 
 class BaseSoC(SoCCore):
     def __init__(self, sys_clk_freq=125e6,
