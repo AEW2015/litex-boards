@@ -69,11 +69,13 @@ def git_commit(path):
         return None
 
 
-def contract_path(axi_domain=False, axi_clk_freq=250e6, endpoint=False):
+def contract_path(axi_domain=False, axi_clk_freq=250e6, endpoint=False, endpoint_two_port=False):
+    if endpoint_two_port and not endpoint:
+        raise ValueError("Two-port traffic requires the endpoint profile")
     if endpoint:
         if not axi_domain or axi_clk_freq != 250e6:
             raise ValueError("HBM endpoint requires the separate 250 MHz AXI domain")
-        return HERE/"timing-contract-endpoint.json"
+        return HERE/("timing-contract-two-port.json" if endpoint_two_port else "timing-contract-endpoint.json")
     if axi_clk_freq not in (250e6, 400e6) or (not axi_domain and axi_clk_freq != 250e6):
         raise ValueError('AXI400 requires the separate AXI domain; supported rates are 250/400 MHz')
     name = ('timing-contract-axi400.json' if axi_clk_freq == 400e6 else
@@ -83,8 +85,8 @@ def contract_path(axi_domain=False, axi_clk_freq=250e6, endpoint=False):
 
 # Build stages -------------------------------------------------------------------------------------
 
-def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=250e6, endpoint=False, traffic=False):
-    contract_path(axi_domain, axi_clk_freq, endpoint)
+def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=250e6, endpoint=False, traffic=False, endpoint_two_port=False):
+    contract_path(axi_domain, axi_clk_freq, endpoint, endpoint_two_port)
     # Execute the checked-out board target rather than an unrelated installed copy.
     sys.path.insert(0, str(BOARDS))
     import litex
@@ -101,6 +103,8 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=25
         '--vivado-report-level', 'signoff']
     if traffic:
         args.append('--hbm-endpoint-traffic')
+    if endpoint_two_port:
+        args.append('--hbm-endpoint-two-port')
     if axi_domain:
         args.append('--hbm-axi-domain')
     if axi_clk_freq != 250e6:
@@ -108,7 +112,8 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=25
     save(attempt/'generation-command.json', dict(python=sys.executable, args=args,
         core=str(core), core_commit=core_head, requested_core_commit=core_commit,
         boards=str(BOARDS), boards_commit=boards_commit, hbm_axi_domain=axi_domain,
-        hbm_axi_clk_freq=int(axi_clk_freq), hbm_endpoint=endpoint, hbm_endpoint_traffic=traffic, sys_clk_freq=200000000 if axi_clk_freq == 400e6 else 250000000,
+        hbm_axi_clk_freq=int(axi_clk_freq), hbm_endpoint=endpoint, hbm_endpoint_traffic=traffic,
+        hbm_endpoint_two_port=endpoint_two_port, sys_clk_freq=200000000 if axi_clk_freq == 400e6 else 250000000,
         python_version=sys.version, packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions()}))
     sys.argv = args
     runpy.run_module('litex_boards.targets.sqrl_fk33', run_name='__main__')
@@ -134,9 +139,9 @@ def generate(attempt, core_commit=CORE_COMMIT, axi_domain=False, axi_clk_freq=25
     save(attempt/'generated-hashes.json', [binding(p) for p in sorted((attempt/'output').rglob('*')) if p.is_file()])
 
 
-def audit(attempt, stage, axi_domain=False, axi_clk_freq=250e6, endpoint=False):
+def audit(attempt, stage, axi_domain=False, axi_clk_freq=250e6, endpoint=False, endpoint_two_port=False):
     from timing_audit import audit as run_audit
-    options = {'stage': stage, 'contract_path': contract_path(axi_domain, axi_clk_freq, endpoint)}
+    options = {'stage': stage, 'contract_path': contract_path(axi_domain, axi_clk_freq, endpoint, endpoint_two_port)}
     result = run_audit(attempt, **options)
     save(attempt/f'timing-audit-{stage}.json', result)
     if result['status'] != 'PASS':
@@ -175,7 +180,7 @@ def implement(attempt, vivado):
         save(attempt/'implementation-result.json', result)
 
 
-def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6, endpoint=False):
+def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6, endpoint=False, endpoint_two_port=False):
     from netlist_inspection import query_tcl, parse_reset_chains, output_paths
     evidence = attempt/'inspection'
     evidence.mkdir(exist_ok=False)
@@ -185,11 +190,12 @@ def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6, endpoint=Fals
     for path in (dcp, evidence):
         if any(c in path.as_posix() for c in '{}\n\r'):
             raise ValueError('Unsupported Tcl path characters')
-    inspection_tcl = query_tcl(dcp, evidence, axi_domain=axi_domain, endpoint=endpoint)
+    inspection_tcl = query_tcl(dcp, evidence, axi_domain=axi_domain, endpoint=endpoint, endpoint_two_port=endpoint_two_port)
     if axi_domain:
         import gray_cdc
         inspection_tcl = inspection_tcl.replace('puts HBM_NETLIST_INSPECTION_COMPLETE',
-            gray_cdc.query_tcl(evidence, axi_clk_freq=axi_clk_freq, endpoint=endpoint) + '\nputs HBM_NETLIST_INSPECTION_COMPLETE')
+            gray_cdc.query_tcl(evidence, axi_clk_freq=axi_clk_freq, endpoint=endpoint,
+                endpoint_two_port=endpoint_two_port) + '\nputs HBM_NETLIST_INSPECTION_COMPLETE')
     query.write_text(inspection_tcl, encoding='utf-8')
     command([vivado, '-mode', 'batch', '-source', query, '-log', evidence/'vivado.log',
         '-journal', evidence/'vivado.jou'], evidence, evidence/'netlist-inspection-console.log')
@@ -207,11 +213,13 @@ def inspect(attempt, vivado, axi_domain=False, axi_clk_freq=250e6, endpoint=Fals
     result = dict(status='PASS', checkpoint=binding(dcp), reset_chains=chains,
         outputs=[binding(p) for p in output_paths(evidence, axi_domain=axi_domain, endpoint=endpoint)], datarate_mt_s=1800)
     if axi_domain:
-        result['gray_cdc'] = gray_cdc.parse(evidence, axi_clk_freq=axi_clk_freq, endpoint=endpoint)
+        result['gray_cdc'] = gray_cdc.parse(evidence, axi_clk_freq=axi_clk_freq,
+            endpoint=endpoint, endpoint_two_port=endpoint_two_port)
         result['outputs'] += [binding(p) for p in gray_cdc.output_paths(evidence)]
     if endpoint:
         from netlist_inspection import parse_endpoint_controls
-        result['endpoint_controls'] = parse_endpoint_controls(evidence/'implemented-endpoint-controls.txt')
+        result['endpoint_controls'] = parse_endpoint_controls(evidence/'implemented-endpoint-controls.txt',
+            endpoint_two_port=endpoint_two_port)
     save(evidence/'result.json', result)
     return result
 
@@ -263,6 +271,8 @@ def main():
 
     parser.add_argument('--hbm-endpoint-traffic', action='store_true',
         help='Use RTL traffic generation instead of processor per-beat CSR transfers')
+    parser.add_argument('--hbm-endpoint-two-port', action='store_true',
+        help='Reserve PC30 and PC31 for two independent RTL traffic engines')
 
     # Build stages.
     parser.add_argument('--generate-only', action='store_true', help='Generate RTL/firmware and audit source constraints; no CAD or build PASS')
@@ -274,11 +284,14 @@ def main():
         parser.error('--hbm-endpoint requires --hbm-axi-domain at 250 MHz')
     if args.hbm_endpoint_traffic and not args.hbm_endpoint:
         parser.error('--hbm-endpoint-traffic requires --hbm-endpoint')
+    if args.hbm_endpoint_two_port and not (args.hbm_endpoint and args.hbm_endpoint_traffic):
+        parser.error('--hbm-endpoint-two-port requires --hbm-endpoint and --hbm-endpoint-traffic')
     attempt = args.output_dir.resolve()
     result = dict(status='FAIL', attempt=str(attempt), started_utc=datetime.now(timezone.utc).isoformat(),
         hardware_tested=False, published=False,
         hbm_axi_domain=args.hbm_axi_domain, hbm_axi_clk_freq=int(args.hbm_axi_clk_freq),
         hbm_endpoint=args.hbm_endpoint, hbm_endpoint_traffic=args.hbm_endpoint_traffic,
+        hbm_endpoint_two_port=args.hbm_endpoint_two_port,
         sys_clk_freq=200000000 if args.hbm_axi_clk_freq == 400e6 else 250000000,
         requested_core_commit=args.core_commit,
         scope='Portable build/timing/netlist/RapidWright checks. Local historical simulations and hardware campaign are separate evidence.')
@@ -293,6 +306,8 @@ def main():
             parser.error(f'--resume requires a readable generation-command.json: {error}')
         if generation.get('hbm_endpoint_traffic', False) != args.hbm_endpoint_traffic:
             parser.error('--resume endpoint traffic mode does not match generation-command.json')
+        if generation.get('hbm_endpoint_two_port', False) != args.hbm_endpoint_two_port:
+            parser.error('--resume endpoint port count does not match generation-command.json')
         if generation.get('hbm_endpoint', False) != args.hbm_endpoint:
             parser.error('--resume endpoint profile does not match generation-command.json')
         recorded_axi_domain = generation.get('hbm_axi_domain', False)
@@ -326,11 +341,13 @@ def main():
                 child_args.append('--hbm-endpoint')
             if args.hbm_endpoint_traffic:
                 child_args.append('--hbm-endpoint-traffic')
+            if args.hbm_endpoint_two_port:
+                child_args.append('--hbm-endpoint-two-port')
             if args.hbm_axi_clk_freq != 250e6:
                 child_args += ['--hbm-axi-clk-freq', str(int(args.hbm_axi_clk_freq))]
             command(child_args, BOARDS, attempt/'generation.log')
         audit(attempt, 'source', axi_domain=args.hbm_axi_domain, axi_clk_freq=args.hbm_axi_clk_freq,
-            endpoint=args.hbm_endpoint)
+            endpoint=args.hbm_endpoint, endpoint_two_port=args.hbm_endpoint_two_port)
         if args.generate_only:
             result['status'] = 'GENERATED'
         else:
@@ -342,20 +359,27 @@ def main():
                 rapidwright_args += ['--java-home', args.java_home]
             if args.hbm_endpoint:
                 rapidwright_args.append('--hbm-endpoint')
+            if args.hbm_endpoint_two_port:
+                rapidwright_args.append('--hbm-endpoint-two-port')
             command(rapidwright_args, attempt, attempt/'rapidwright-console.log')
             assistance = load(attempt/'rapidwright/result.json')
             physical = assistance.get('timing_assistance', {})
             if (assistance.get('status') != 'PASS' or not assistance.get('inputs_unchanged')
                     or not physical.get('physical_pin_inventory', {}).get('available')
-                    or physical.get('matched_configuration_channels') != ([31] if args.hbm_endpoint else list(range(32)))
+                    or physical.get('matched_configuration_channels') !=
+                        ([30, 31] if args.hbm_endpoint_two_port else [31] if args.hbm_endpoint else list(range(32)))
                     or len(physical.get('native_timing_paths', [])) != 400):
                 raise ValueError('RapidWright receipt lacks required routed pin/channel/path evidence')
+            if args.hbm_endpoint_two_port and physical.get('matched_transport_channels') != [30, 31]:
+                raise ValueError('RapidWright receipt lacks both native endpoint transports')
             result['rapidwright'] = binding(attempt/'rapidwright/result.json')
             result['timing'] = audit(attempt, 'final', axi_domain=args.hbm_axi_domain,
-                axi_clk_freq=args.hbm_axi_clk_freq, endpoint=args.hbm_endpoint)['checks']['routed_sta']['detail']
+                axi_clk_freq=args.hbm_axi_clk_freq, endpoint=args.hbm_endpoint,
+                endpoint_two_port=args.hbm_endpoint_two_port)['checks']['routed_sta']['detail']
             result['diagnostics'] = diagnostics(attempt)
             result['inspection'] = inspect(attempt, vivado, axi_domain=args.hbm_axi_domain,
-                axi_clk_freq=args.hbm_axi_clk_freq, endpoint=args.hbm_endpoint)
+                axi_clk_freq=args.hbm_axi_clk_freq, endpoint=args.hbm_endpoint,
+                endpoint_two_port=args.hbm_endpoint_two_port)
             unchanged(load(attempt/'input-hashes.json'))
             result.update(status='BUILD_PASS', bitstream=binding(attempt/'output/gateware/sqrl_fk33.bit'))
             result['artifacts'] = [binding(attempt/path) for path in (
@@ -381,9 +405,11 @@ if __name__ == '__main__':
         child.add_argument('--hbm-axi-domain', action='store_true')
         child.add_argument('--hbm-endpoint', action='store_true')
         child.add_argument('--hbm-endpoint-traffic', action='store_true')
+        child.add_argument('--hbm-endpoint-two-port', action='store_true')
         child.add_argument('--hbm-axi-clk-freq', type=float, choices=(250e6, 400e6), default=250e6)
         child_args = child.parse_args()
         generate(child_args.generate_child.resolve(), child_args.core_commit,
-            child_args.hbm_axi_domain, child_args.hbm_axi_clk_freq, child_args.hbm_endpoint, child_args.hbm_endpoint_traffic)
+            child_args.hbm_axi_domain, child_args.hbm_axi_clk_freq, child_args.hbm_endpoint,
+            child_args.hbm_endpoint_traffic, child_args.hbm_endpoint_two_port)
     else:
         raise SystemExit(main())

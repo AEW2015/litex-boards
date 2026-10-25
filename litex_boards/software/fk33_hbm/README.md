@@ -422,3 +422,43 @@ the accepted descriptor sums to reconcile retired native beats and packed
 The new phase checks require their own simulation, native build and hardware
 evidence. The earlier sequential traffic qualification does not establish
 random or masked-write performance.
+
+
+## Concurrent PC31 and PC30 traffic
+
+Add `--hbm-endpoint-two-port` alongside `--hbm-endpoint`,
+`--hbm-endpoint-traffic` and `--hbm-axi-domain` to instantiate two independent
+four-command engines. PC31 keeps CSR bank 9 and the existing mailbox ABI;
+PC30 uses CSR bank 10. Both reserve local 0x200000 through 0x3fffff on their
+own native pseudochannel. Ordinary processor transactions and stress skip
+both ports. This option uses the existing SYS250/AXI250/HBM900/ref200 profile.
+
+Processor command 7 retains the PC31-only operation. Command 8 captures the
+primary request and the secondary request independently, validates both
+before launching either, then starts both engines with consecutive MMIO
+writes. It polls both errors, DONE and response retirement before publishing
+statistics. The host must measure overlap from actual BUSY/accepted-command
+observations; the starts are not promised to occur in the same cycle.
+
+Mailbox words 0 through 70 retain their offsets. Words 71 through 74 contain
+`traffic2_mode`, `traffic2_cycles_limit`, `traffic2_seed`, and `traffic2_random`.
+Words 75 through 101 contain the secondary's 27 statistics in the same order
+as the primary snapshot: status, errors, cycles, native write/read beats,
+completed write/read bursts, AW/AR counts, packed W/R words, AW/W/AR stalls,
+read wait, write/read minimum/maximum latency, enabled-byte low/high words,
+AW/AR accepted native beats, AW/AR accepted packed words, and AW/AR LEN masks.
+Word 102 adds `traffic_pair_elapsed_cycles`: a processor-observed common SYS
+interval starting immediately before the first START and ending after both
+engines report DONE and drain. It includes start skew, polling and retirement;
+use it with the sum of retired bytes for aggregate bandwidth. Each engine also
+retains its own elapsed-cycle counter. Both per-port counters must fit inside
+this common interval. Each engine has its own seed, image qualification and
+counters. Seed/profile validation assumes firmware owns the configuration CSRs; configure requests
+through the mailbox instead of editing engine CSRs during a command.
+
+A global STOP closes both engines and the existing runtime barrier waits for
+both to drain and quiesce. Errors and timeouts request STOP without resetting
+busy AXI transactions. Report each port's bandwidth from its own retired
+counters and elapsed cycles; separately establish simultaneous activity before
+claiming aggregate throughput. Single-port qualification does not qualify
+this optional two-port design; it requires its own build and hardware evidence.

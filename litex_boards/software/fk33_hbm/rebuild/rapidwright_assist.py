@@ -71,14 +71,53 @@ def tcl_path(path):
     return '{' + text + '}'
 
 
-def export_tcl(dcp, edf, timing, summary):
-    return '\n'.join([
+def export_tcl(dcp, edf, timing, summary, endpoint_identities=None):
+    text = '\n'.join([
         'set_param general.maxThreads 2',
         'open_checkpoint ' + tcl_path(dcp),
         'write_edif -force ' + tcl_path(edf),
         'report_timing -delay_type max -max_paths 400 -nworst 1 -input_pins -file ' + tcl_path(timing),
         'report_timing_summary -file ' + tcl_path(summary),
         'puts FK33_RAPIDWRIGHT_EXPORT_COMPLETE', 'quit', ''])
+    if endpoint_identities is not None:
+        identity_query = r'''
+set identities [open @@IDENTITIES@@ w]
+foreach cell [get_cells -hier -filter {hbm_direct_reset =~ hbm_control_*}] {
+    set tag [get_property hbm_direct_reset $cell]
+    if {[string match hbm_control_pc30_window_* $tag]} {
+        set port 30
+    } elseif {[string match hbm_control_window_* $tag]} {
+        set port 31
+    } else {error "Unexpected endpoint control identity: $tag"}
+    set nets [get_nets -of_objects [get_pins $cell/Q]]
+    if {[llength $nets] != 1} {error "Missing unique control output net: $cell"}
+    puts $identities "$port\tendpoint_transport\t[lindex $nets 0]"
+}
+foreach net [get_nets -hier -filter {NAME =~ *hbm_endpoint_pc30_config_* || NAME =~ *hbm_endpoint_pc31_config_*}] {
+    if {![regexp {hbm_endpoint_pc(30|31)_config_} $net -> port]} {error "Unknown configuration identity: $net"}
+    puts $identities "$port\tendpoint_configuration\t$net"
+}
+close $identities
+'''.replace('@@IDENTITIES@@', tcl_path(endpoint_identities))
+        text = text.replace('puts FK33_RAPIDWRIGHT_EXPORT_COMPLETE', identity_query + '\nputs FK33_RAPIDWRIGHT_EXPORT_COMPLETE')
+    return text
+
+
+def read_endpoint_identities(path):
+    """Use native cell tags/configuration nets rather than instance numbering."""
+    result = {}
+    for line in Path(path).read_text().splitlines():
+        port, role, name = line.split('\t')
+        port = int(port)
+        if port not in (30, 31) or role not in ('endpoint_configuration', 'endpoint_transport'):
+            raise ValueError('Unexpected endpoint physical identity: ' + line)
+        if not name or name in result:
+            raise ValueError('Duplicate or empty endpoint physical net: ' + name)
+        result[name] = (port, role)
+    if set(result.values()) != {(port, role) for port in (30, 31)
+            for role in ('endpoint_configuration', 'endpoint_transport')}:
+        raise ValueError('Both ports require native configuration and transport identities')
+    return result
 
 
 def read_paths(path):
@@ -127,7 +166,7 @@ def channel(name, endpoint=False):
     return 0 if 'fk33_hbm_bist/' in name else None
 
 
-def summarize(nets, paths, cells, physical_pin_inventory=None, endpoint=False):
+def summarize(nets, paths, cells, physical_pin_inventory=None, endpoint=False, endpoint_two_port=False):
     matched_paths = []
     for path in paths:
         row = dict(path)
@@ -139,10 +178,10 @@ def summarize(nets, paths, cells, physical_pin_inventory=None, endpoint=False):
             row['site_coordinate_delta'] = [abs(a-b) for a, b in zip(source['site_xy'], destination['site_xy'])]
             row['coordinate_caution'] = 'Site X/Y are resource coordinates, not physical distance or delay.'
         matched_paths.append(row)
-    selected = [row for row in nets if family(row['name'], endpoint)]
+    selected = [row for row in nets if row.get('endpoint_family') or family(row['name'], endpoint)]
     selected.sort(key=lambda row: row['site_pin_fanout'], reverse=True)
     families = ('endpoint_configuration', 'endpoint_transport') if endpoint else ('ownership', 'per_port_configuration')
-    counts = {name: sum(family(row['name'], endpoint) == name for row in selected) for name in families}
+    counts = {name: sum((row.get('endpoint_family') or family(row['name'], endpoint)) == name for row in selected) for name in families}
     failures = [row for row in matched_paths if row['slack_ns'] < 0]
     recommendations = []
     owner = [row for row in selected if family(row['name'], endpoint) == 'ownership' and row['site_pin_fanout'] > 0]
@@ -154,9 +193,22 @@ def summarize(nets, paths, cells, physical_pin_inventory=None, endpoint=False):
         recommendations.append({'kind': 'native_failed_path_locality', 'paths': failures[:40],
             'action': 'Use matched placement and native route/logic delay to review these exact failed endpoints. Rebuild and verify native setup, hold and DRC after any proposed change.',
             'automatic_constraint_change': False})
+    port_evidence = {}
+    if endpoint_two_port:
+        for role in ('endpoint_configuration', 'endpoint_transport'):
+            port_evidence['matched_' + role.removeprefix('endpoint_') + '_channels'] = sorted({
+                row['endpoint_port'] for row in selected if row.get('endpoint_family') == role})
+        if any(ports != [30, 31] for ports in port_evidence.values()):
+            raise ValueError('Both ports need matched native physical configuration and transport nets')
+        for port in (30, 31):
+            for role in ('endpoint_configuration', 'endpoint_transport'):
+                if not any(row.get('endpoint_port') == port and row.get('endpoint_family') == role
+                        and row.get('site_pin_metrics_available') for row in selected):
+                    raise ValueError(f'Missing physical site pins for PC{port} {role}')
     return {'selected_owner_and_config_nets': selected, 'matched_net_counts': counts,
             'analysis_profile': 'endpoint' if endpoint else 'bist',
             'matched_configuration_channels': sorted({channel(row['name'], endpoint) for row in selected if channel(row['name'], endpoint) is not None}),
+            **port_evidence,
             'native_timing_paths': matched_paths, 'matched_timing_endpoint_cells': len(cells),
             'native_failed_paths_reported': len(failures), 'recommendations': recommendations,
             **({'physical_pin_inventory': physical_pin_inventory} if physical_pin_inventory is not None else {}),
@@ -215,6 +267,10 @@ def worker(args):
                      'site_pin_instances': 0, 'selected_nets': 0,
                      'selected_nets_with_site_pins': 0, 'selected_site_pin_instances': 0}
         endpoint = getattr(args, 'hbm_endpoint', False)
+        two_port = getattr(args, 'hbm_endpoint_two_port', False)
+        identities = read_endpoint_identities(args.endpoint_identities) if two_port else {}
+        if two_port:
+            inputs.append(bind(args.endpoint_identities))
         for net in design.getNets():
             if net.isClockNet() or str(net.getType()) != 'WIRE':
                 continue
@@ -224,11 +280,12 @@ def worker(args):
             inventory['signal_nets'] += 1
             inventory['nets_with_site_pins'] += int(pin_count > 0)
             inventory['site_pin_instances'] += pin_count
-            if family(name, endpoint):
+            selected_net = name in identities or family(name, endpoint)
+            if selected_net:
                 inventory['selected_nets'] += 1
                 inventory['selected_nets_with_site_pins'] += int(pin_count > 0)
                 inventory['selected_site_pin_instances'] += pin_count
-            if not family(name, endpoint) and fanout < 100:
+            if not selected_net and fanout < 100:
                 continue
             source = net.getSource()
             sites = sorted({str(pin.getSiteInst().getSiteName()) for pin in net.getPins() if pin.getSiteInst()})
@@ -240,7 +297,9 @@ def worker(args):
                    'distinct_pin_sites': len(sites),
                    'site_coordinate_bounds': [min(x for x,y in xy), min(y for x,y in xy), max(x for x,y in xy), max(y for x,y in xy)] if xy else None,
                    'site_coordinate_caution': 'Resource coordinates across site types; not physical distance or delay.'}
-            if family(name, endpoint):selected.append(row)
+            if name in identities:
+                row['endpoint_port'], row['endpoint_family'] = identities[name]
+            if selected_net:selected.append(row)
             if fanout >= 100:high.append(row)
         paths = read_paths(args.timing_report)
         if not paths:
@@ -257,7 +316,7 @@ def worker(args):
         result['physical_analysis'] = {'part': str(design.getPartName()),
             'physical_cells': int(design.getCells().size()), 'physical_nets': int(design.getNets().size()),
             'high_fanout_signal_nets': sorted(high,key=lambda row:row['site_pin_fanout'],reverse=True)[:40],
-            **summarize(selected, paths, cells, inventory, endpoint)}
+            **summarize(selected, paths, cells, inventory, endpoint, two_port)}
         if not str(design.getPartName()).startswith('xcvu33p') or not selected or not cells:
             raise ValueError('FK33 part, selected physical nets or matched timing endpoint cells missing')
         if args.checkpoint_stage == 'routed' and not inventory['available']:
@@ -292,6 +351,7 @@ def run_process(command, cwd, log, env=None):
 # Native export and analysis -----------------------------------------------------------------------
 
 def assist(args):
+    two_port = getattr(args, 'hbm_endpoint_two_port', False)
     attempt = Path(args.attempt).resolve()
     out = Path(args.output).resolve() if args.output else attempt/'rapidwright-assist/runs'/str(time.time_ns())
     out.mkdir(parents=True, exist_ok=True)
@@ -312,8 +372,11 @@ def assist(args):
             raise ValueError('Implementation must be completed with unchanged captured sources')
         bindings = [bind(dcp), bind(implementation), bind(attempt/'input-hashes.json'), bind(__file__)]
         edf = Path(args.readable_edif).resolve() if args.readable_edif else out/'readable.edf'
+        identities = out/'endpoint-physical-identities.txt' if two_port else None
         timing = Path(args.timing_report).resolve() if args.timing_report else out/'native-paths.rpt'
         if args.readable_edif:
+            if two_port:
+                raise ValueError('Two-port physical identities require a fresh native EDIF export')
             if not args.edif_receipt:
                 raise ValueError('Reused EDIF requires its export receipt')
             receipt_path = Path(args.edif_receipt).resolve()
@@ -326,7 +389,7 @@ def assist(args):
             result['export'] = {'reused': True, 'receipt': bind(receipt_path)}
         else:
             query = out/'export-readable-edif.tcl'
-            query.write_text(export_tcl(dcp, edf, timing, out/'native-summary.rpt'), encoding='utf-8')
+            query.write_text(export_tcl(dcp, edf, timing, out/'native-summary.rpt', identities), encoding='utf-8')
             bindings.append(bind(query))
             export = run_process(
                 [str(VIVADO), '-mode', 'batch', '-source', str(query),
@@ -349,6 +412,9 @@ def assist(args):
             export['receipt'] = bind(out/'edif-export-receipt.json')
             result['export'] = export
             bindings.append(bind(edf))
+            if identities is not None:
+                read_endpoint_identities(identities)
+                bindings.append(bind(identities))
         if timing.is_file():
             bindings.append(bind(timing))
         else:
@@ -364,6 +430,8 @@ def assist(args):
         ]
         if getattr(args, 'hbm_endpoint', False):
             command.append('--hbm-endpoint')
+        if two_port:
+            command += ['--hbm-endpoint-two-port', '--endpoint-identities', str(identities)]
         process = run_process(command, out, out/'rapidwright-console.log', env)
         analysis = json.loads((out/'physical-analysis.json').read_text(encoding='utf-8-sig'))
         if process['returncode'] or analysis['status'] != 'PASS' or not analysis['inputs_unchanged']:
@@ -409,6 +477,9 @@ def main():
     parser.add_argument('--timing-report')
     parser.add_argument('--hbm-endpoint', action='store_true',
         help='Analyze the PC31 endpoint nets instead of BIST configuration nets')
+    parser.add_argument('--hbm-endpoint-two-port', action='store_true',
+        help='Bind PC30/PC31 physical nets to native configuration and control identities')
+    parser.add_argument('--endpoint-identities', help='Worker-only native endpoint net identities')
 
     # Analysis worker.
     parser.add_argument('--worker',           action='store_true')
@@ -416,6 +487,10 @@ def main():
     parser.add_argument('--checkpoint-stage', choices=('routed', 'placed'), default='routed',
         help='Worker only: placed permits missing physical pin inventory and never qualifies routed assistance')
     args = parser.parse_args()
+    if args.hbm_endpoint_two_port and not args.hbm_endpoint:
+        parser.error('--hbm-endpoint-two-port requires --hbm-endpoint')
+    if args.worker and args.hbm_endpoint_two_port and not args.endpoint_identities:
+        parser.error('two-port worker requires native endpoint identities')
     JAVA_HOME = str(Path(args.java_home).expanduser().resolve()) if args.java_home else ''
     if JAVA_HOME:
         os.environ['JAVA_HOME'] = JAVA_HOME

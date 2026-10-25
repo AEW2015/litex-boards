@@ -8,7 +8,9 @@ from pathlib import Path
 import re
 
 
-def expected_groups(endpoint=False):
+def expected_groups(endpoint=False, endpoint_two_port=False):
+    if endpoint_two_port and not endpoint:
+        raise ValueError("Two-port Gray proof requires the endpoint profile")
     groups = {f"hbm_cpu_pc{port:02d}_{channel}_{pointer}":
         (("main_clkout0", "main_clkout3")
             if (channel in ("aw", "w", "ar")) == (pointer == "produce")
@@ -18,6 +20,9 @@ def expected_groups(endpoint=False):
     if endpoint:
         groups.update({name.replace("hbm_cpu_pc31_", "hbm_endpoint_pc31_"): clocks
             for name, clocks in list(groups.items()) if name.startswith("hbm_cpu_pc31_")})
+    if endpoint_two_port:
+        groups.update({name.replace("hbm_cpu_pc30_", "hbm_endpoint_pc30_"): clocks
+            for name, clocks in list(groups.items()) if name.startswith("hbm_cpu_pc30_")})
     return groups
 
 
@@ -36,8 +41,12 @@ def _clock_periods_ns(axi_clk_freq):
     raise ValueError("Native Gray proof requires SYS250/AXI250 or SYS200/AXI400")
 
 
-def query_tcl(evidence, axi_clk_freq=250e6, endpoint=False):
+def query_tcl(evidence, axi_clk_freq=250e6, endpoint=False, endpoint_two_port=False):
     """Return standalone query body; caller owns opening/closing checkpoint."""
+    if endpoint_two_port and not endpoint:
+        raise ValueError("Two-port Gray proof requires the endpoint profile")
+    if endpoint_two_port and axi_clk_freq != 250e6:
+        raise ValueError("Two-port endpoint native proof requires SYS250/AXI250")
     sys_period, axi_period = _clock_periods_ns(axi_clk_freq)
     template = r'''
 proc hbm_gray_one {objects label} {
@@ -149,6 +158,17 @@ puts HBM_GRAY_NATIVE_QUERY_COMPLETE
         template = template.replace(
             "{^hbm_cpu_pc(0[0-9]|[12][0-9]|3[01])_(aw|w|b|ar|r)_(produce|consume)$} $group -> port channel pointer",
             "{^hbm_(cpu_pc(?:0[0-9]|[12][0-9]|3[01])|endpoint_pc31)_(aw|w|b|ar|r)_(produce|consume)$} $group -> port channel pointer")
+    if endpoint_two_port:
+        template = template.replace(
+            "HBM_GRAY_SRC =~ hbm_endpoint_pc31_*",
+            "HBM_GRAY_SRC =~ hbm_endpoint_pc31_* || HBM_GRAY_SRC =~ hbm_endpoint_pc30_*")
+        template = template.replace(
+            "HBM_GRAY_DST =~ hbm_endpoint_pc31_*",
+            "HBM_GRAY_DST =~ hbm_endpoint_pc31_* || HBM_GRAY_DST =~ hbm_endpoint_pc30_*")
+        template = template.replace("990", "1020").replace("330", "340")
+        template = template.replace(
+            "{^hbm_(cpu_pc(?:0[0-9]|[12][0-9]|3[01])|endpoint_pc31)_(aw|w|b|ar|r)_(produce|consume)$} $group -> port channel pointer",
+            "{^hbm_(cpu_pc(?:0[0-9]|[12][0-9]|3[01])|endpoint_pc(?:30|31))_(aw|w|b|ar|r)_(produce|consume)$} $group -> port channel pointer")
     return template.replace("@@EVIDENCE@@", Path(evidence).as_posix())
 
 
@@ -216,14 +236,16 @@ def _parse_clock_roots(inventory, report, axi_clk_freq=250e6):
     return {"status": "PASS", "required_region": "X4Y1", "rows": rows}
 
 
-def parse(evidence, axi_clk_freq=250e6, endpoint=False):
+def parse(evidence, axi_clk_freq=250e6, endpoint=False, endpoint_two_port=False):
     """Validate native output; missing/unrecognized report formats are errors."""
+    if endpoint_two_port and not endpoint:
+        raise ValueError("Two-port Gray proof requires the endpoint profile")
     bound = min(_clock_periods_ns(axi_clk_freq))
     buses, paths, skew, root_inventory, root_report = output_paths(evidence)
     clock_roots = _parse_clock_roots(root_inventory, root_report, axi_clk_freq)
     if endpoint and axi_clk_freq != 250e6:
         raise ValueError("Endpoint native proof requires SYS250/AXI250")
-    expected = expected_groups(endpoint)
+    expected = expected_groups(endpoint, endpoint_two_port)
     group_count = len(expected)
     bit_count = 3 * group_count
     rows = []

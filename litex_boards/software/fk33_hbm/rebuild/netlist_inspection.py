@@ -30,7 +30,9 @@ def output_paths(evidence, axi_domain=False, endpoint=False):
         *(f'implemented-reset-{name}-timing.rpt' for name in expected_reset_chains(axi_domain)))]
 
 
-def query_tcl(checkpoint, evidence, axi_domain=False, endpoint=False):
+def query_tcl(checkpoint, evidence, axi_domain=False, endpoint=False, endpoint_two_port=False):
+    if endpoint_two_port and not endpoint:
+        raise ValueError("Two-port inspection requires the endpoint profile")
     template = r'''set checkpoint {@@CHECKPOINT@@}
 puts "INSPECT_SELECTED_CHECKPOINT $checkpoint"
 open_checkpoint $checkpoint
@@ -141,7 +143,7 @@ puts $reset_out "RESET_CHAIN axi_domain_reset STAGE0=$stage0 STAGE1=$stage1 CLOC
     if endpoint:
         if not axi_domain:
             raise ValueError("Endpoint inspection requires the separate AXI domain")
-        policy = json.loads(Path(__file__).with_name("timing-contract-endpoint.json").read_text())["direct_control_policy"]
+        policy = endpoint_control_policy(endpoint_two_port)
         tags = [f"hbm_control_{role}_bit{bit}"
             for role, width in policy["roles"].items() for bit in range(width)]
         required_tags = [f"hbm_control_{role}_bit{bit}"
@@ -214,6 +216,8 @@ foreach group $optional_control_groups {
 close $control_out
 '''.replace("@@TAGS@@", " ".join(tags)).replace("@@REQUIRED@@", " ".join(required_tags)).replace("@@OPTIONAL@@", " ".join(optional_groups))
         template = template.replace("puts HBM_NETLIST_INSPECTION_COMPLETE", controls + "\nputs HBM_NETLIST_INSPECTION_COMPLETE")
+    if endpoint_two_port:
+        template = template.replace("hbm_control_[a-z_]+_bit", "hbm_control_[a-z0-9_]+_bit")
     return template.replace('@@CHECKPOINT@@', checkpoint.as_posix()).replace('@@EVIDENCE@@', evidence.as_posix())
 
 
@@ -240,9 +244,14 @@ def parse_reset_chains(path, axi_domain=False):
     return rows
 
 
-def parse_endpoint_controls(path):
+def endpoint_control_policy(endpoint_two_port=False):
+    name = "timing-contract-two-port.json" if endpoint_two_port else "timing-contract-endpoint.json"
+    return json.loads(Path(__file__).with_name(name).read_text())["direct_control_policy"]
+
+
+def parse_endpoint_controls(path, endpoint_two_port=False):
     """Validate every transport control tag, primitive, reset and native clock."""
-    policy = json.loads(Path(__file__).with_name("timing-contract-endpoint.json").read_text())["direct_control_policy"]
+    policy = endpoint_control_policy(endpoint_two_port)
     expected = {f"hbm_control_{role}_bit{bit}"
         for role, width in policy["roles"].items() for bit in range(width)}
     required = {f"hbm_control_{role}_bit{bit}"
@@ -288,8 +297,14 @@ def parse_endpoint_controls(path):
         reset_sources.add(row["RESET_SOURCE"])
         reset_topologies.add(topology)
         rows.append(dict(tag=tag, **row))
-    if not required <= seen or not seen <= expected or len(resets) != 1 or len(reset_sources) != 1 or len(reset_topologies) != 1 or len(expected) != policy["logical_bits"]:
+    if not required <= seen or not seen <= expected or len(reset_sources) != 1 or len(expected) != policy["logical_bits"]:
         raise ValueError("Incomplete endpoint logical control/reset inventory")
+    # Each port may have its own dedicated reset buffer, driven by the same
+    # verified AXI reset FF. Never accept different reset drivers within a port.
+    for prefix in (("hbm_control_window_", "hbm_control_pc30_window_") if endpoint_two_port else ("hbm_control_window_",)):
+        port_rows = [row for row in rows if row["tag"].startswith(prefix)]
+        if not port_rows or len({row["RESET_DRIVER"] for row in port_rows}) != 1 or len({row["RESET_TOPOLOGY"] for row in port_rows}) != 1:
+            raise ValueError("Inconsistent endpoint reset topology: " + prefix)
     if set(optional_states) != optional_tags or len(required) != policy["native_required_bits"]:
         raise ValueError("Incomplete optional endpoint control inventory")
     for role, tags in optional.items():
@@ -301,6 +316,7 @@ def parse_endpoint_controls(path):
                 raise ValueError("Optional endpoint state disagrees with physical inventory: " + tag)
     return dict(status="PASS", source_logical_bits=len(expected), logical_bits=len(seen),
         required_logical_bits=len(required), physical_ffs=len(rows),
-        reset_source=next(iter(reset_sources)), reset_topology=next(iter(reset_topologies)),
+        reset_source=next(iter(reset_sources)),
+        reset_topology=next(iter(reset_topologies)) if len(reset_topologies) == 1 else "PER_PORT",
         optional_retained_tags=sorted(seen & optional_tags),
         optional_pruned_tags=sorted(optional_tags - seen), rows=rows)

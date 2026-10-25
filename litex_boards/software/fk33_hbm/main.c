@@ -29,6 +29,35 @@ typedef struct {
     uint32_t traffic_aw_native_beats, traffic_ar_native_beats;
     uint32_t traffic_aw_packed_words, traffic_ar_packed_words;
     uint32_t traffic_aw_length_seen, traffic_ar_length_seen;
+    uint32_t traffic2_mode, traffic2_cycles_limit, traffic2_seed, traffic2_random;
+    uint32_t traffic2_status;
+    uint32_t traffic2_errors;
+    uint32_t traffic2_cycles;
+    uint32_t traffic2_write_beats;
+    uint32_t traffic2_read_beats;
+    uint32_t traffic2_write_bursts;
+    uint32_t traffic2_read_bursts;
+    uint32_t traffic2_aw_count;
+    uint32_t traffic2_ar_count;
+    uint32_t traffic2_packed_w;
+    uint32_t traffic2_packed_r;
+    uint32_t traffic2_aw_stalls;
+    uint32_t traffic2_w_stalls;
+    uint32_t traffic2_ar_stalls;
+    uint32_t traffic2_read_wait;
+    uint32_t traffic2_write_latency_min;
+    uint32_t traffic2_write_latency_max;
+    uint32_t traffic2_read_latency_min;
+    uint32_t traffic2_read_latency_max;
+    uint32_t traffic2_write_enabled_bytes_lo;
+    uint32_t traffic2_write_enabled_bytes_hi;
+    uint32_t traffic2_aw_native_beats;
+    uint32_t traffic2_ar_native_beats;
+    uint32_t traffic2_aw_packed_words;
+    uint32_t traffic2_ar_packed_words;
+    uint32_t traffic2_aw_length_seen;
+    uint32_t traffic2_ar_length_seen;
+    uint32_t traffic_pair_elapsed_cycles;
 } mailbox;
 static volatile mailbox *const mb = (volatile mailbox *)0x10000000u;
 static uint32_t phy06[2][8];
@@ -274,6 +303,9 @@ static void transactions(void) {
 #ifdef HBM_ENDPOINT_PORT
         if (channel == HBM_ENDPOINT_PORT) continue;
 #endif
+#ifdef HBM_ENDPOINT_SECOND_PORT
+        if (channel == HBM_ENDPOINT_SECOND_PORT) continue;
+#endif
         mark(12, channel >> 4, channel);
         refresh_temperatures();
         uint32_t base = channel_base(channel);
@@ -287,6 +319,9 @@ static void transactions(void) {
     for (uint32_t channel = 0; channel < 32; channel++) {
 #ifdef HBM_ENDPOINT_PORT
         if (channel == HBM_ENDPOINT_PORT) continue;
+#endif
+#ifdef HBM_ENDPOINT_SECOND_PORT
+        if (channel == HBM_ENDPOINT_SECOND_PORT) continue;
 #endif
         uint32_t base = channel_base(channel);
         refresh_temperatures();
@@ -352,6 +387,9 @@ static void stress(void) {
 #ifdef HBM_ENDPOINT_PORT
             if (channel == HBM_ENDPOINT_PORT) continue;
 #endif
+#ifdef HBM_ENDPOINT_SECOND_PORT
+            if (channel == HBM_ENDPOINT_SECOND_PORT) continue;
+#endif
             uint32_t base = channel_base(channel);
             mark(13, channel >> 4, channel);
             for (uint32_t word = 0; word < words; word++) {
@@ -366,6 +404,9 @@ static void stress(void) {
         for (uint32_t channel = 0; channel < 32; channel++) {
 #ifdef HBM_ENDPOINT_PORT
             if (channel == HBM_ENDPOINT_PORT) continue;
+#endif
+#ifdef HBM_ENDPOINT_SECOND_PORT
+            if (channel == HBM_ENDPOINT_SECOND_PORT) continue;
 #endif
             uint32_t base = channel_base(channel);
             for (uint32_t word = 0; word < words; word++) {
@@ -622,6 +663,102 @@ static void traffic_run(void) {
     mb->command_result = 0;
     mb->state = READY;
 }
+
+#ifdef HBM_ENDPOINT_TWO_PORT
+static void traffic2_statistics(void) {
+    mb->traffic2_status = rd(TF2_STATUS);
+    mb->traffic2_errors = rd(TF2_ERRORS);
+    mb->traffic2_cycles = rd(TF2_CYCLES);
+    mb->traffic2_write_beats = rd(TF2_WRITE_BEATS);
+    mb->traffic2_read_beats = rd(TF2_READ_BEATS);
+    mb->traffic2_write_bursts = rd(TF2_WRITE_BURSTS);
+    mb->traffic2_read_bursts = rd(TF2_READ_BURSTS);
+    mb->traffic2_aw_count = rd(TF2_AW_COUNT);
+    mb->traffic2_ar_count = rd(TF2_AR_COUNT);
+    mb->traffic2_packed_w = rd(TF2_PACKED_W);
+    mb->traffic2_packed_r = rd(TF2_PACKED_R);
+    mb->traffic2_aw_stalls = rd(TF2_AW_STALLS);
+    mb->traffic2_w_stalls = rd(TF2_W_STALLS);
+    mb->traffic2_ar_stalls = rd(TF2_AR_STALLS);
+    mb->traffic2_read_wait = rd(TF2_READ_WAIT);
+    mb->traffic2_write_latency_min = rd(TF2_WRITE_LATENCY_MIN);
+    mb->traffic2_write_latency_max = rd(TF2_WRITE_LATENCY_MAX);
+    mb->traffic2_read_latency_min = rd(TF2_READ_LATENCY_MIN);
+    mb->traffic2_read_latency_max = rd(TF2_READ_LATENCY_MAX);
+    mb->traffic2_write_enabled_bytes_lo = rd(TF2_WRITE_ENABLED_BYTES_LO);
+    mb->traffic2_write_enabled_bytes_hi = rd(TF2_WRITE_ENABLED_BYTES_HI);
+    mb->traffic2_aw_native_beats = rd(TF2_AW_NATIVE_BEATS);
+    mb->traffic2_ar_native_beats = rd(TF2_AR_NATIVE_BEATS);
+    mb->traffic2_aw_packed_words = rd(TF2_AW_PACKED_WORDS);
+    mb->traffic2_ar_packed_words = rd(TF2_AR_PACKED_WORDS);
+    mb->traffic2_aw_length_seen = rd(TF2_AW_LENGTH_SEEN);
+    mb->traffic2_ar_length_seen = rd(TF2_AR_LENGTH_SEEN);
+}
+static uint32_t traffic_pair_request_valid(uint32_t mode, uint32_t cycles,
+        uint32_t seed, uint32_t random, uint32_t status,
+        uint32_t seed_register, uint32_t random_register) {
+    if (mode > 5 || random > 1 || cycles > (1u << 28) ||
+            (mode >= 1 && mode <= 3 && !cycles) ||
+            ((mode == 0 || mode >= 4) && cycles) ||
+            (mode >= 4 && !random)) return 0;
+    if ((status & 0xa8) != 0xa8 || (status & 0x11)) return 0;
+    if (mode == 0 || (!random && mode == 1)) return 1;
+    if (!(status & 4) || seed != rd(seed_register) || random != rd(random_register)) return 0;
+    return mode != 4 || !(status & 0x200);
+}
+static void traffic_pair_run(void) {
+    uint32_t mode = mb->traffic_mode, cycles = mb->traffic_cycles_limit;
+    uint32_t seed = mb->traffic_seed, random = mb->traffic_random;
+    uint32_t mode2 = mb->traffic2_mode, cycles2 = mb->traffic2_cycles_limit;
+    uint32_t seed2 = mb->traffic2_seed, random2 = mb->traffic2_random;
+    uint32_t status = rd(TF_STATUS), status2 = rd(TF2_STATUS);
+    mb->command_result = 1;
+    if (rd(TF_ERRORS) || rd(TF2_ERRORS) || ((status | status2) & 0x101)) fail(ENDPOINT_ERROR);
+    /* Validate both requests and known images before launching either port. */
+    if (!traffic_pair_request_valid(mode, cycles, seed, random, status,
+            TF_CONFIG_SEED, TF_CONFIG_RANDOM) ||
+            !traffic_pair_request_valid(mode2, cycles2, seed2, random2, status2,
+            TF2_CONFIG_SEED, TF2_CONFIG_RANDOM)) return;
+    refresh_temperatures();
+    mb->traffic_status = 0; mb->traffic2_status = 0;
+    mb->traffic_pair_elapsed_cycles = 0;
+    mb->sequence++;
+    mb->state = TESTING;
+    mb->bus_errors_before = rd(CTRL_BUS_ERRORS);
+    wr(TF_CONFIG_MODE, mode); wr(TF_CONFIG_CYCLES, cycles);
+    wr(TF_CONFIG_SEED, seed); wr(TF_CONFIG_RANDOM, random);
+    wr(TF2_CONFIG_MODE, mode2); wr(TF2_CONFIG_CYCLES, cycles2);
+    wr(TF2_CONFIG_SEED, seed2); wr(TF2_CONFIG_RANDOM, random2);
+    uint32_t start = ticks(), temperature_tick = start;
+    wr(TF_START, 1); wr(TF2_START, 1);
+    uint32_t limit = cycles > cycles2 ? cycles : cycles2;
+    for (;;) {
+        status = rd(TF_STATUS); status2 = rd(TF2_STATUS);
+        check_trip();
+        if (rd(TF_ERRORS) || rd(TF2_ERRORS) || ((status | status2) & 0x100)) {
+            traffic_statistics(); traffic2_statistics(); fail(ENDPOINT_ERROR);
+        }
+        if ((status & 0x22) == 0x22 && (status2 & 0x22) == 0x22) break;
+        uint32_t now = ticks();
+        if ((uint32_t)(start - now) >= 3u * SYS_CLK_FREQ + limit) {
+            traffic_statistics(); traffic2_statistics(); fail(ENDPOINT_TIMEOUT);
+        }
+        if ((uint32_t)(temperature_tick - now) >= SYS_CLK_FREQ / 10u) {
+            refresh_temperatures(); temperature_tick = now;
+        }
+        mb->heartbeat++;
+    }
+    /* Include start skew, polling and both drains in the common SYS interval. */
+    mb->traffic_pair_elapsed_cycles = (uint32_t)(start - ticks());
+    /* Both engines have retired all responses before either snapshot is published. */
+    traffic_statistics(); traffic2_statistics();
+    mb->bus_errors_after = rd(CTRL_BUS_ERRORS);
+    if (mb->bus_errors_before != mb->bus_errors_after) fail(BUS_ERROR);
+    refresh_temperatures();
+    mb->command_result = 0;
+    mb->state = READY;
+}
+#endif
 #endif
 
 int main(void) {
@@ -641,6 +778,9 @@ int main(void) {
         if (command == 4 && mb->state == READY) stress();
 #ifdef HBM_ENDPOINT_TRAFFIC
         if (command == 7 && mb->state == READY) traffic_run();
+#ifdef HBM_ENDPOINT_TWO_PORT
+        if (command == 8 && mb->state == READY) traffic_pair_run();
+#endif
 #endif
 #if defined(HBM_ENDPOINT_PORT) && !defined(HBM_ENDPOINT_TRAFFIC)
         if (command == 6 && mb->state == READY) endpoint_transactions();

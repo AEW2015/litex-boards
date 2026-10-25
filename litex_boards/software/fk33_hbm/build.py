@@ -62,6 +62,8 @@ def build(output_dir, csr_json=None, profile_path=None):
         if addresses != {"HBM_CONTROL_BASE": 0xf0003000, "TIMER_BASE": 0xf0002000, "CTRL_BUS_ERRORS": 0xf0000008, "HBM_WINDOW_BASE": 0xf0003800, "HBM_RUNTIME_BASE": 0xf0004000}:
             raise ValueError("Unqualified CPU CSR map")
     constants = layout.get("constants", {}) if layout is not None else {}
+    if constants.get("hbm_endpoint_two_port", 0) and "hbm_endpoint_port" not in constants:
+        raise ValueError("Two-port firmware requires the primary endpoint CSR layout")
     sys_clk_freq = constants.get("config_clock_frequency", 250000000)
     axi_clk_freq = constants.get("hbm_axi_clk_freq", 250000000)
     if ((sys_clk_freq, axi_clk_freq) not in ((250000000, 250000000), (200000000, 400000000)) or
@@ -88,6 +90,28 @@ def build(output_dir, csr_json=None, profile_path=None):
                     raise ValueError("Endpoint registers must each occupy one CSR word")
                 suffix = name[len("hbm_endpoint_"):].upper()
                 header.append(f"#define {'TF' if traffic else 'EP'}_{suffix} 0x{register['addr']:08x}u")
+        if constants.get("hbm_endpoint_two_port", 0):
+            if not traffic or not constants.get("hbm_endpoint_random", 0) or constants.get("hbm_endpoint_second_port") != 30:
+                raise ValueError("Two-port firmware requires random traffic on PC31 and PC30")
+            names = ("config_mode config_cycles config_seed start clear_errors status errors cycles "
+                "write_beats read_beats write_bursts read_bursts aw_count ar_count packed_w packed_r "
+                "aw_stalls w_stalls ar_stalls read_wait write_latency_min write_latency_max "
+                "read_latency_min read_latency_max config_random write_enabled_bytes_lo "
+                "write_enabled_bytes_hi aw_native_beats ar_native_beats aw_packed_words "
+                "ar_packed_words aw_length_seen ar_length_seen").split()
+            registers = layout["csr_registers"]
+            if layout["csr_bases"].get("hbm_endpoint30") != 0xf0005000:
+                raise ValueError("Two-port firmware requires secondary CSR bank 10")
+            for prefix, base in (("hbm_endpoint_", 0xf0004800), ("hbm_endpoint30_", 0xf0005000)):
+                if {name for name in registers if name.startswith(prefix)} != {prefix + name for name in names}:
+                    raise ValueError("Two-port traffic CSR names are incomplete or inconsistent")
+                for index, name in enumerate(names):
+                    register = registers[prefix + name]
+                    if register["size"] != 1 or register["addr"] != base + 4 * index:
+                        raise ValueError("Two-port traffic CSR layout is inconsistent")
+                    if prefix == "hbm_endpoint30_":
+                        header.append(f"#define TF2_{name.upper()} 0x{register['addr']:08x}u")
+            header.extend(["#define HBM_ENDPOINT_TWO_PORT 1", "#define HBM_ENDPOINT_SECOND_PORT 30u"])
         if not traffic:
             for direction in ("w", "r"):
                 words = ", ".join(f"EP_{direction.upper()}_DATA{index}" for index in range(16))

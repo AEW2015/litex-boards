@@ -344,6 +344,7 @@ class BaseSoC(SoCCore):
         hbm_bist              = False,
         hbm_endpoint          = False,
         hbm_endpoint_traffic  = False,
+        hbm_endpoint_two_port = False,
         hbm_axi_domain        = False,
         hbm_axi_clk_freq      = 250e6,
         **kwargs):
@@ -358,6 +359,8 @@ class BaseSoC(SoCCore):
             raise ValueError("Separate HBM AXI domain requires primitive HBM and BIST or endpoint")
         if hbm_bist and not self.hbm_primitive:
             raise ValueError("HBM burst testing requires the primitive HBM profile")
+        if hbm_endpoint_two_port and not (hbm_endpoint and hbm_endpoint_traffic and hbm_axi_domain):
+            raise ValueError("Two-port HBM requires endpoint traffic and a separate AXI domain")
         if hbm_endpoint_traffic and not hbm_endpoint:
             raise ValueError("HBM endpoint traffic requires --hbm-endpoint")
         if hbm_endpoint and (not self.hbm_primitive or not hbm_axi_domain or
@@ -466,6 +469,21 @@ foreach channel {aw w b ar r} {
 }
 puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
 """
+                    if hbm_endpoint_two_port:
+                        endpoint_gray_constraints = endpoint_gray_constraints.replace(
+                            '$attribute =~ hbm_endpoint_pc31_*',
+                            '$attribute =~ hbm_endpoint_pc31_* || $attribute =~ hbm_endpoint_pc30_*')
+                        endpoint_gray_constraints = endpoint_gray_constraints.replace(
+                            '!= 10', '!= 20').replace('Expected ten', 'Expected twenty')
+                        endpoint_gray_constraints = endpoint_gray_constraints.replace(
+                            'foreach channel {aw w b ar r} {',
+                            'foreach port {31 30} {\nforeach channel {aw w b ar r} {')
+                        endpoint_gray_constraints = endpoint_gray_constraints.replace(
+                            'set id hbm_endpoint_pc31_${channel}_${direction}',
+                            'set id hbm_endpoint_pc${port}_${channel}_${direction}')
+                        endpoint_gray_constraints = endpoint_gray_constraints.replace(
+                            'puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10',
+                            '}\nputs "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=20')
                     platform.toolchain.pre_placement_commands.append(
                         endpoint_gray_constraints.replace("{", "{{").replace("}", "}}"))
                 platform.toolchain.additional_commands.append(
@@ -544,16 +562,35 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     self.hbm_transport.autocsr_exclude = {"window"}
                     if hbm_endpoint_traffic:
                         from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint_traffic import HBMEndpointTrafficCSR
-                        self.hbm_endpoint = HBMEndpointTrafficCSR(self.hbm_transport)
+                        self.hbm_endpoint = (HBMEndpointTrafficCSR(self.hbm_transport,
+                            name_prefix="hbm_endpoint_pc31") if hbm_endpoint_two_port
+                            else HBMEndpointTrafficCSR(self.hbm_transport))
                         self.add_constant("HBM_ENDPOINT_TRAFFIC", 1)
                         self.add_constant("HBM_ENDPOINT_RANDOM", 1)
                     else:
                         self.hbm_endpoint = HBMEndpointCSR(self.hbm_transport)
+                    endpoint_idle = self.hbm_endpoint.drained & (~host_quiesce | self.hbm_endpoint.quiesced)
+                    if hbm_endpoint_two_port:
+                        self.hbm_transport30 = HBMWideEndpoint(app_domain="sys", native_domain="axi",
+                            gray_bus_prefix="hbm_endpoint_pc30", control_prefix="pc30_", max_outstanding=4)
+                        self.hbm_transport30.autocsr_exclude = {"window"}
+                        self.hbm_endpoint30 = HBMEndpointTrafficCSR(self.hbm_transport30,
+                            port=30, name_prefix="hbm_endpoint_pc30")
+                        self.comb += [
+                            self.hbm_endpoint30.admission_enable.eq(self.hbm.memory_ready),
+                            self.hbm_endpoint30.stop.eq(host_quiesce),
+                            self.hbm_transport30.quiesce.eq(self.hbm_endpoint30.endpoint_quiesce),
+                        ]
+                        endpoint_idle = endpoint_idle & self.hbm_endpoint30.drained & (
+                            ~host_quiesce | self.hbm_endpoint30.quiesced)
+                        self.add_constant("HBM_ENDPOINT_TWO_PORT", 1)
+                        self.add_constant("HBM_ENDPOINT_SECOND_PORT", 30)
                     self.comb += [
                         self.hbm_endpoint.admission_enable.eq(self.hbm.memory_ready),
                         self.hbm_endpoint.stop.eq(host_quiesce),
                         self.hbm_transport.quiesce.eq(self.hbm_endpoint.endpoint_quiesce),
-                        all_host_idle.eq(all_windows_idle & self.hbm_endpoint.drained &
+                        all_host_idle.eq((all_windows_idle & endpoint_idle) if hbm_endpoint_two_port
+                            else all_windows_idle & self.hbm_endpoint.drained &
                             (~host_quiesce | self.hbm_endpoint.quiesced)),
                     ]
                     self.add_constant("HBM_ENDPOINT_PORT", 31)
@@ -623,18 +660,22 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                             cdc_fault_signals.append(crossing.fault)
                             port = crossed
                         native_channel = 4*bank + channel
-                        if hbm_endpoint and native_channel == 31:
+                        if hbm_endpoint and (native_channel == 31 or (hbm_endpoint_two_port and native_channel == 30)):
                             # Keep the narrow CPU CDC and its terminal-response
-                            # accounting, but never attach CPU traffic to PC31.
+                            # accounting, but never attach CPU traffic to reserved ports.
                             self.submodules += ClockDomainsRenamer(axi_domain)(HBMReservedPortError(port))
                             # The existing HBM wrapper uses an AXI4-shaped
                             # record for the ordered AXI3 subset: no physical
                             # WID pin and only four significant LEN bits.
                             # Preserve endpoint AXI3 and all native data widths.
-                            endpoint_native = self.hbm_transport.native
+                            endpoint_native = (self.hbm_transport.native if native_channel == 31
+                                else self.hbm_transport30.native)
                             runtime_native = axi.AXIInterface(data_width=256,
                                 address_width=33, id_width=6)
-                            self.hbm_endpoint_runtime_native = runtime_native
+                            if native_channel == 31:
+                                self.hbm_endpoint_runtime_native = runtime_native
+                            else:
+                                self.hbm_endpoint30_runtime_native = runtime_native
                             self.submodules += HBMEndpointNativeWiring(endpoint_native, runtime_native)
                             self.hbm_runtime.add_port(native_channel, runtime_native,
                                 self.hbm.axi[native_channel], host_idle=endpoint_host_idle_axi)
@@ -715,6 +756,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     external_fault = external_fault | (self.hbm_bist.error_mask_sys != 0)
                 if hbm_endpoint:
                     external_fault = external_fault | self.hbm_transport.protocol_error
+                    if hbm_endpoint_two_port:
+                        external_fault = external_fault | self.hbm_transport30.protocol_error
                 self.comb += self.hbm_runtime.external_fault.eq(external_fault)
 
         # PCIe -------------------------------------------------------------------------------------
@@ -747,6 +790,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                 self.csr.add("hbm_bist", 9, use_loc_if_exists=True)
             if hbm_endpoint:
                 self.csr.add("hbm_endpoint", 9, use_loc_if_exists=True)
+                if hbm_endpoint_two_port:
+                    self.csr.add("hbm_endpoint30", 10, use_loc_if_exists=True)
 
     def _finalize_bus(self):
         if not (self.hbm_primitive and (hasattr(self, "hbm_bist") or hasattr(self, "hbm_endpoint"))):
@@ -814,6 +859,7 @@ def main():
     parser.add_target_argument("--hbm-primitive", action="store_true", help="Use bundled primitive HBM and processor calibration firmware.")
     parser.add_target_argument("--hbm-primitive-rtl", help="Override the bundled primitive/control RTL directory.")
     parser.add_target_argument("--hbm-bist", action="store_true", help="Add exclusive per-channel burst test masters and counters.")
+    parser.add_target_argument("--hbm-endpoint-two-port", action="store_true", help="Add independent PC30 traffic alongside PC31 (requires endpoint traffic and AXI domain).")
     parser.add_target_argument("--hbm-endpoint-traffic", action="store_true", help="Use processor-configured RTL traffic generation on the dedicated PC31 endpoint.")
     parser.add_target_argument("--hbm-endpoint", action="store_true", help="Dedicate PC31 to the processor-driven four-command wide endpoint.")
     parser.add_target_argument("--hbm-axi-domain", action="store_true", help="Independent HBM AXI clock domain (requires primitive BIST or endpoint).")
@@ -853,6 +899,7 @@ def main():
         hbm_bist              = args.hbm_bist,
         hbm_endpoint          = args.hbm_endpoint,
         hbm_endpoint_traffic  = args.hbm_endpoint_traffic,
+        hbm_endpoint_two_port = args.hbm_endpoint_two_port,
         hbm_axi_domain        = args.hbm_axi_domain,
         hbm_axi_clk_freq      = args.hbm_axi_clk_freq,
         **parser.soc_argdict

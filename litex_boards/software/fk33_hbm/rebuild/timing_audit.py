@@ -154,12 +154,22 @@ def audit(attempt, contract_path=None, stage="final"):
                      "Control wall-clock parameter mismatch: " + name)
         if c.get("hbm_endpoint"):
             need(csr["constants"].get("hbm_endpoint_port") == 31, "Endpoint must reserve PC31")
+            two_port = c.get("hbm_endpoint_two_port", False)
+            need(bool(csr["constants"].get("hbm_endpoint_two_port", 0)) == two_port,
+                 "Endpoint port count differs from contract")
+            if two_port:
+                need(csr["constants"].get("hbm_endpoint_second_port") == 30 and
+                     csr["constants"].get("hbm_endpoint_traffic") == 1,
+                     "Two-port traffic must reserve PC30 and PC31")
+                need(csr["csr_bases"].get("hbm_endpoint") == 0xf0004800 and
+                     csr["csr_bases"].get("hbm_endpoint30") == 0xf0005000,
+                     "Two-port traffic CSR banks differ from contract")
             need(csr["constants"].get("hbm_endpoint_max_outstanding") == 4, "Endpoint must retain four command credits")
             need("hbm_bist_channels" not in csr["constants"], "Endpoint and BIST modes must be mutually exclusive")
             policy = c["direct_control_policy"]
             expected_tags = {f"hbm_control_{role}_bit{bit}"
                 for role, width in policy["roles"].items() for bit in range(width)}
-            tags = re.findall(r'hbm_direct_reset\s*=\s*"(hbm_control_[a-z_]+_bit[0-9]+)"', v)
+            tags = re.findall(r'hbm_direct_reset\s*=\s*"(hbm_control_[a-z0-9_]+_bit[0-9]+)"', v)
             need(len(tags) == policy["logical_bits"] and set(tags) == expected_tags,
                  "Generated endpoint direct-control inventory differs from contract")
         expected = c.get("mmcm_parameters", {
@@ -243,7 +253,8 @@ def audit(attempt, contract_path=None, stage="final"):
             pattern = r"\bmax_dpo=" + re.escape(format(bound, "g")) + r"(?:\.0+)?(?:\s|$)"
             gray_rows = [line for line in rows if re.search(pattern, line)]
             groups = c["gray_pointer_policy"]["groups"]
-            need(groups == (330 if c.get("hbm_endpoint") else 320), "Unexpected Gray contract inventory")
+            expected_groups = 340 if c.get("hbm_endpoint_two_port") else 330 if c.get("hbm_endpoint") else 320
+            need(groups == expected_groups, "Unexpected Gray contract inventory")
             need(len(gray_rows) == groups, f"Expected {groups} native Gray max-delay exceptions")
             need(len(rows) == groups + 5, "Unexpected native exception count: " + str(len(rows)))
             # datapath_only intentionally removes hold analysis on these
