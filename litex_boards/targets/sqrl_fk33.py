@@ -79,7 +79,8 @@ class _HBMResetRequest(LiteXModule):
 
 class _CRG(LiteXModule):
     def __init__(self, platform, sys_clk_freq, with_hbm, hbm_ref_clk_freq=100e6,
-            strict_timing=False, hbm_axi_domain=False, hbm_axi_clk_freq=250e6):
+            strict_timing=False, hbm_axi_domain=False, hbm_axi_clk_freq=250e6,
+            hbm_axi_reset_buf=False):
         self.rst    = Signal()
         self.cd_sys = ClockDomain()
         if with_hbm:
@@ -107,7 +108,10 @@ class _CRG(LiteXModule):
             if hbm_axi_domain:
                 # Preserve SYS/ref/APB CLKOUT0/1/2 assignments. This output is
                 # independently reset-synchronized by USPMMCM.create_clkout.
-                pll.create_clkout(self.cd_axi, hbm_axi_clk_freq)
+                # Buffer the experimental high-fanout reset after its existing
+                # two release stages, without adding a release cycle.
+                pll.create_clkout(self.cd_axi, hbm_axi_clk_freq,
+                    reset_buf="bufg" if hbm_axi_reset_buf else None)
 
 # BaseSoC ------------------------------------------------------------------------------------------
 
@@ -194,11 +198,30 @@ class HBMCPUWindowCDC(LiteXModule):
     Separate AW/W counts retain half-writes across STOP and arbitrary channel
     skew. One CPU window permits at most one read and one write outstanding.
     """
-    def __init__(self, master, slave, gray_bus_prefix=None):
+    def __init__(self, master, slave, gray_bus_prefix=None, forward_read_pipeline=False):
         self.idle = Signal()
         self.fault = Signal()
-        self.crossing = axi.AXILiteClockDomainCrossing(master, slave,
-            cd_from="sys", cd_to="axi", gray_bus_prefix=gray_bus_prefix)
+        if forward_read_pipeline:
+            from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint import HBMRegisteredReadCDC
+            # Reuse the endpoint's registered-current-address FIFO. Keep the
+            # empty/advance decision out of the native RAM read data path.
+            self.crossing = LiteXModule()
+            for name in ("aw", "w", "ar", "b", "r"):
+                forward = name in ("aw", "w", "ar")
+                source = getattr(master if forward else slave, name)
+                sink = getattr(slave if forward else master, name)
+                prefix = None if gray_bus_prefix is None else f"{gray_bus_prefix}_{name}"
+                if forward:
+                    crossing = HBMRegisteredReadCDC(source.description,
+                        cd_from="sys", cd_to="axi", gray_bus_prefix=prefix)
+                else:
+                    crossing = stream.ClockDomainCrossing(source.description,
+                        cd_from="axi", cd_to="sys", gray_bus_prefix=prefix)
+                setattr(self.crossing, name, crossing)
+                self.comb += [source.connect(crossing.sink), crossing.source.connect(sink)]
+        else:
+            self.crossing = axi.AXILiteClockDomainCrossing(master, slave,
+                cd_from="sys", cd_to="axi", gray_bus_prefix=gray_bus_prefix)
         pending = [Signal(4, name=f"hbm_cdc_{name}_pending")
             for name in ("aw", "w", "ar")]
         self.pending = pending
@@ -270,6 +293,7 @@ class HBMNativeElasticBoundary(LiteXModule):
                 raise ValueError("Native elastic boundary preserves AXI256/address33/ID6")
         self.idle = Signal()
         self.levels = {}
+        storage_valid = []
         for name in ("aw", "w", "ar", "b", "r"):
             source, sink = ((getattr(upstream, name), getattr(downstream, name))
                 if name in ("aw", "w", "ar") else
@@ -279,11 +303,11 @@ class HBMNativeElasticBoundary(LiteXModule):
             self.comb += [source.connect(buffer.sink), buffer.source.connect(sink)]
             level = Signal(max=3)
             self.levels[name] = level
-            enter = buffer.sink.valid & buffer.sink.ready
-            leave = buffer.source.valid & buffer.source.ready
-            self.sync += If(enter & ~leave, level.eq(level + 1)).Elif(
-                leave & ~enter, level.eq(level - 1))
-        self.comb += self.idle.eq(Cat(*self.levels.values()) == 0)
+            valid = buffer.pipe_valid.source.valid
+            skid_valid = ~buffer.pipe_ready.sink.ready
+            self.comb += level.eq(Cat(valid, Constant(0, 1)) + Cat(skid_valid, Constant(0, 1)))
+            storage_valid += [valid, skid_valid]
+        self.comb += self.idle.eq(Cat(*storage_valid) == 0)
 
 
 class HBMCPUWindowPipeline(LiteXModule):
@@ -454,7 +478,8 @@ class BaseSoC(SoCCore):
         self.crg = _CRG(platform, sys_clk_freq, with_hbm,
             hbm_ref_clk_freq=200e6 if self.hbm_primitive else 100e6,
             strict_timing=self.hbm_primitive, hbm_axi_domain=hbm_axi_domain,
-            hbm_axi_clk_freq=hbm_axi_clk_freq)
+            hbm_axi_clk_freq=hbm_axi_clk_freq,
+            hbm_axi_reset_buf=hbm_experimental_500_1000)
         if self.hbm_primitive:
             platform.toolchain.pre_placement_commands += [
                 "create_clock -name jtag_tck -period 66.666667 [get_pins BSCANE2/INTERNAL_TCK]",
@@ -611,7 +636,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint import HBMWideEndpoint
                     from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint_csr import HBMEndpointCSR
                     self.hbm_transport = HBMWideEndpoint(app_domain="sys", native_domain="axi",
-                        gray_bus_prefix="hbm_endpoint_pc31", max_outstanding=4)
+                        gray_bus_prefix="hbm_endpoint_pc31", max_outstanding=4,
+                        native_pipe_ready=hbm_experimental_500_1000)
                     # Ownership FIFO RAM is transport state, not CSR memory.
                     self.hbm_transport.autocsr_exclude = {"window"}
                     if hbm_endpoint_traffic:
@@ -626,7 +652,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     endpoint_idle = self.hbm_endpoint.drained & (~host_quiesce | self.hbm_endpoint.quiesced)
                     if hbm_endpoint_two_port:
                         self.hbm_transport30 = HBMWideEndpoint(app_domain="sys", native_domain="axi",
-                            gray_bus_prefix="hbm_endpoint_pc30", control_prefix="pc30_", max_outstanding=4)
+                            gray_bus_prefix="hbm_endpoint_pc30", control_prefix="pc30_", max_outstanding=4,
+                            native_pipe_ready=hbm_experimental_500_1000)
                         self.hbm_transport30.autocsr_exclude = {"window"}
                         self.hbm_endpoint30 = HBMEndpointTrafficCSR(self.hbm_transport30,
                             port=30, name_prefix="hbm_endpoint_pc30")
@@ -708,7 +735,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                         if hbm_axi_domain:
                             crossed = axi.AXILiteInterface(data_width=32, address_width=33)
                             crossing = HBMCPUWindowCDC(port, crossed,
-                                gray_bus_prefix=f"hbm_cpu_pc{4*bank + channel:02d}")
+                                gray_bus_prefix=f"hbm_cpu_pc{4*bank + channel:02d}",
+                                forward_read_pipeline=hbm_experimental_500_1000)
                             self.submodules += crossing
                             cdc_idle_signals.append(crossing.idle)
                             cdc_fault_signals.append(crossing.fault)
