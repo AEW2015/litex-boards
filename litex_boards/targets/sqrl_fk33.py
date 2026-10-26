@@ -256,6 +256,36 @@ class HBMEndpointNativeWiring(LiteXModule):
             runtime.b.connect(endpoint.b), runtime.r.connect(endpoint.r),
         ]
 
+class HBMNativeElasticBoundary(LiteXModule):
+    """Two-slot native AXI channels with registered payload and backpressure.
+
+    The upstream runtime tracker owns requests accepted into these queues and
+    retires responses only after their return to the upstream consumer. Queue
+    occupancy additionally participates in drain, never in admission or reset.
+    """
+    def __init__(self, upstream, downstream):
+        for interface in (upstream, downstream):
+            if ((interface.data_width, interface.address_width, interface.id_width) != (256, 33, 6)
+                    or interface.version != "axi4"):
+                raise ValueError("Native elastic boundary preserves AXI256/address33/ID6")
+        self.idle = Signal()
+        self.levels = {}
+        for name in ("aw", "w", "ar", "b", "r"):
+            source, sink = ((getattr(upstream, name), getattr(downstream, name))
+                if name in ("aw", "w", "ar") else
+                (getattr(downstream, name), getattr(upstream, name)))
+            buffer = stream.Buffer(source.description, pipe_valid=True, pipe_ready=True)
+            self.submodules += buffer
+            self.comb += [source.connect(buffer.sink), buffer.source.connect(sink)]
+            level = Signal(max=3)
+            self.levels[name] = level
+            enter = buffer.sink.valid & buffer.sink.ready
+            leave = buffer.source.valid & buffer.source.ready
+            self.sync += If(enter & ~leave, level.eq(level + 1)).Elif(
+                leave & ~enter, level.eq(level - 1))
+        self.comb += self.idle.eq(Cat(*self.levels.values()) == 0)
+
+
 class HBMCPUWindowPipeline(LiteXModule):
     """BIST-aware narrow AXI-Lite window boundary with idle accounting."""
     def __init__(self, cpu, native, bist=False, name="hbm_cpu_window"):
@@ -534,6 +564,17 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     **hbm_clock_options)
                 self.hbm = hbm_core if hbm_axi_domain else ClockDomainsRenamer({"axi": "sys"})(hbm_core)
                 axi_domain = "axi" if hbm_axi_domain else "sys"
+                runtime_ports = self.hbm.axi
+                downstream_idle = [1] * 32
+                if hbm_experimental_500_1000:
+                    runtime_ports = []
+                    for native_channel in range(32):
+                        native = axi.AXIInterface(data_width=256, address_width=33, id_width=6)
+                        boundary = HBMNativeElasticBoundary(native, self.hbm.axi[native_channel])
+                        self.submodules += ClockDomainsRenamer(axi_domain)(boundary)
+                        runtime_ports.append(native)
+                        downstream_idle[native_channel] = boundary.idle
+                    self.add_constant("HBM_NATIVE_ELASTIC_DEPTH", 2)
                 # Four RV32 windows select eight groups of four native ports.
                 # AXILiteDecoder holds each route through its response, including
                 # when a selector write arrives while a request is outstanding.
@@ -691,7 +732,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                                 self.hbm_endpoint30_runtime_native = runtime_native
                             self.submodules += HBMEndpointNativeWiring(endpoint_native, runtime_native)
                             self.hbm_runtime.add_port(native_channel, runtime_native,
-                                self.hbm.axi[native_channel], host_idle=endpoint_host_idle_axi)
+                                runtime_ports[native_channel], host_idle=endpoint_host_idle_axi,
+                                downstream_idle=downstream_idle[native_channel])
                             continue
                         for name in ("aw", "w", "ar"):
                             self.comb += getattr(port, name).connect(getattr(local, name))
@@ -727,7 +769,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                                 native_upstream, tracked_upstream)
                             port_idle = port_idle & engine_idle
                         self.hbm_runtime.add_port(native_channel, tracked_upstream,
-                            self.hbm.axi[native_channel], host_idle=port_idle)
+                            runtime_ports[native_channel], host_idle=port_idle,
+                            downstream_idle=downstream_idle[native_channel])
                         self.submodules += ClockDomainsRenamer(axi_domain)(axi.AXILite2AXI(routed, native_upstream))
                     self.submodules += axi.AXILiteDecoder(native, ports)
                     self.bus.add_slave(f"hbm{channel}", host,
