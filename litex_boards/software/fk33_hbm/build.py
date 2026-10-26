@@ -18,7 +18,7 @@ def _sha(path):
 
 # Firmware build -----------------------------------------------------------------------------------
 
-def build(output_dir, csr_json=None, profile_path=None):
+def build(output_dir, csr_json=None, profile_path=None, experimental_500_1000=False):
     """Return ELF/BIN paths and little-endian ``rom_words`` for init_rom()."""
     source = Path(__file__).resolve().parent
     output = Path(output_dir).resolve()
@@ -28,17 +28,27 @@ def build(output_dir, csr_json=None, profile_path=None):
         profile_path = Path(xilinx_usp_hbm2.__file__).with_suffix("") / "fk33_hbm_profile.json"
     profile_path = Path(profile_path).resolve()
     p = json.loads(profile_path.read_text(encoding="utf-8-sig"))
-    if tuple(p[k] for k in ("reference_mhz", "hbm_mhz", "stacks", "regions_per_stack", "region_stride")) != (200, 900, 2, 8, 0x20000):
-        raise ValueError("Firmware requires the reviewed 200/900 MHz two-stack boot profile")
+    experimental = p.get("experimental_overclock", False)
+    if experimental != bool(experimental_500_1000):
+        raise ValueError("HBM1000 requires explicit experimental_500_1000 selection and profile")
+    boot_mhz = 1000 if experimental else 900
+    if tuple(p[k] for k in ("reference_mhz", "hbm_mhz", "stacks", "regions_per_stack", "region_stride")) != (200, boot_mhz, 2, 8, 0x20000):
+        raise ValueError("Firmware requires a reviewed REF200 two-stack boot profile")
     profiles = p["destructive_clock_profiles"]
     approved = {"800": ([0xa402, 0x6300, 0x1212], 3120), "900": ([0xa482, 0x9600, 0x1414], 3510)}
+    if experimental:
+        if (experimental is not True or p.get("primitive_model_mts") != 1800
+                or p.get("operating_data_rate_mts") != 2000
+                or p.get("qualification") != "unqualified"):
+            raise ValueError("Experimental HBM1000 requires explicit unqualified model/rate metadata")
+        approved["1000"] = ([0xa502, 0xa300, 0x1616], 3510)
     if set(profiles) != set(approved):
-        raise ValueError("Only reviewed 800/900 MHz destructive profiles are supported")
+        raise ValueError("Unexpected destructive clock profiles")
     for mhz, (words, refresh) in approved.items():
         if profiles[mhz]["pll_words"] != words or profiles[mhz]["refresh_period_cycles"] != refresh:
             raise ValueError("Unreviewed runtime PLL/refresh values")
-    if [row["value"] for row in p["pll"][:3]] != profiles["900"]["pll_words"]:
-        raise ValueError("Boot PLL table differs from the 900 MHz runtime profile")
+    if [row["value"] for row in p["pll"][:3]] != profiles[str(boot_mhz)]["pll_words"]:
+        raise ValueError("Boot PLL table differs from the selected runtime profile")
     for name, count in (("ms_pre", 11), ("pll", 16), ("ms_post", 3), ("phy", 9), ("mc", 42)):
         if len(p[name]) != count:
             raise ValueError(f"Incomplete {name} table")
@@ -66,7 +76,14 @@ def build(output_dir, csr_json=None, profile_path=None):
         raise ValueError("Two-port firmware requires the primary endpoint CSR layout")
     sys_clk_freq = constants.get("config_clock_frequency", 250000000)
     axi_clk_freq = constants.get("hbm_axi_clk_freq", 250000000)
-    if ((sys_clk_freq, axi_clk_freq) not in ((250000000, 250000000), (200000000, 400000000)) or
+    if experimental:
+        if ((sys_clk_freq, axi_clk_freq) != (250000000, 500000000)
+                or not constants.get("hbm_axi_clock_domain")
+                or not constants.get("hbm_experimental_500_1000")
+                or constants.get("hbm_endpoint_port") != 31
+                or constants.get("hbm_endpoint_two_port", 0)):
+            raise ValueError("Experimental firmware requires one PC31 endpoint with separate SYS250/AXI500")
+    elif ((sys_clk_freq, axi_clk_freq) not in ((250000000, 250000000), (200000000, 400000000)) or
             (axi_clk_freq == 400000000 and not constants.get("hbm_axi_clock_domain"))):
         raise ValueError("Firmware requires SYS250/AXI250 or separate SYS200/AXI400")
     header = ["/* Generated from the source-bound, reviewed cold-init profile. */",
@@ -76,8 +93,9 @@ def build(output_dir, csr_json=None, profile_path=None):
     header.extend(f"#define {key} 0x{value:08x}u" for key, value in addresses.items())
     if "hbm_endpoint_port" in constants:
         port = constants["hbm_endpoint_port"]
-        if port != 31 or (sys_clk_freq, axi_clk_freq) != (250000000, 250000000):
-            raise ValueError("The endpoint experiment requires PC31 and SYS250/AXI250")
+        expected_axi = 500000000 if experimental else 250000000
+        if port != 31 or (sys_clk_freq, axi_clk_freq) != (250000000, expected_axi):
+            raise ValueError("The endpoint experiment requires PC31 and the selected SYS/AXI clocks")
         header.append(f"#define HBM_ENDPOINT_PORT {port}u")
         traffic = constants.get("hbm_endpoint_traffic", 0)
         if traffic:
@@ -190,7 +208,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--profile")
+    parser.add_argument("--experimental-500-1000", action="store_true", help="Explicitly select the unqualified AXI500/HBM1000 experiment.")
     parser.add_argument("--csr-json")
     args = parser.parse_args()
-    result = build(args.output_dir, csr_json=args.csr_json, profile_path=args.profile)
+    result = build(args.output_dir, csr_json=args.csr_json, profile_path=args.profile,
+        experimental_500_1000=args.experimental_500_1000)
     print(json.dumps({k: v for k, v in result.items() if k != "rom_words"}, indent=2))

@@ -346,10 +346,16 @@ class BaseSoC(SoCCore):
         hbm_endpoint_two_port = False,
         hbm_axi_domain        = False,
         hbm_axi_clk_freq      = 250e6,
+        hbm_experimental_500_1000 = False,
         **kwargs):
         self.hbm_primitive = hbm_primitive or hbm_primitive_rtl is not None
         self.hbm_axi_domain = bool(hbm_axi_domain)
-        if hbm_axi_clk_freq not in (250e6, 400e6):
+        self.hbm_experimental_500_1000 = bool(hbm_experimental_500_1000)
+        if hbm_experimental_500_1000 and not (
+                self.hbm_primitive and hbm_endpoint and hbm_axi_domain and
+                sys_clk_freq == 250e6 and hbm_axi_clk_freq == 500e6 and not hbm_endpoint_two_port):
+            raise ValueError("Experimental 500/1000 requires a single primitive endpoint at SYS250/AXI500")
+        if hbm_axi_clk_freq not in ((500e6,) if hbm_experimental_500_1000 else (250e6, 400e6)):
             raise ValueError("HBM AXI clock frequency must be 250 MHz or 400 MHz")
         if hbm_axi_clk_freq == 400e6 and (not hbm_axi_domain or sys_clk_freq != 200e6):
             raise ValueError("400 MHz HBM AXI requires a separate domain and 200 MHz SYS")
@@ -363,7 +369,7 @@ class BaseSoC(SoCCore):
         if hbm_endpoint_traffic and not hbm_endpoint:
             raise ValueError("HBM endpoint traffic requires --hbm-endpoint")
         if hbm_endpoint and (not self.hbm_primitive or not hbm_axi_domain or
-                hbm_axi_clk_freq != 250e6 or hbm_bist):
+                hbm_axi_clk_freq != (500e6 if hbm_experimental_500_1000 else 250e6) or hbm_bist):
             raise ValueError("HBM endpoint requires primitive SYS250/AXI250 with a separate AXI domain and no BIST")
         if self.hbm_primitive:
             if not with_hbm:
@@ -431,6 +437,8 @@ class BaseSoC(SoCCore):
             ]
             if hbm_axi_domain:
                 gray_filename = "gray-constraints-axi400.tcl" if hbm_axi_clk_freq == 400e6 else "gray-constraints.tcl"
+                if hbm_experimental_500_1000:
+                    gray_filename = "gray-constraints-axi500.tcl"
                 gray_constraints = (Path(__file__).resolve().parents[1] / "software" /
                     "fk33_hbm" / "rebuild" / gray_filename).read_text()
                 # Vivado command templates expand braces with str.format.
@@ -483,6 +491,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                         endpoint_gray_constraints = endpoint_gray_constraints.replace(
                             'puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10',
                             '}\nputs "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=20')
+                    if hbm_experimental_500_1000:
+                        endpoint_gray_constraints = endpoint_gray_constraints.replace("4.0", "2.0")
                     platform.toolchain.pre_placement_commands.append(
                         endpoint_gray_constraints.replace("{", "{{").replace("}", "}}"))
                 platform.toolchain.additional_commands.append(
@@ -494,6 +504,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
         kwargs["with_jtagbone"]  = True
         kwargs["jtagbone_chain"] = 2 # Chain 1 already used by HBM2 debug probes.
         SoCCore.__init__(self, platform, sys_clk_freq, ident="LiteX SoC on FK33", **kwargs)
+        if hbm_experimental_500_1000:
+            self.add_constant("HBM_EXPERIMENTAL_500_1000", 1)
 
         # HBM --------------------------------------------------------------------------------------
         if with_hbm:
@@ -512,6 +524,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
             else:
                 from litex.soc.cores.ram.xilinx_usp_hbm2 import PrimitiveHBM2
                 hbm_clock_options = {"axi_clk_freq": hbm_axi_clk_freq}
+                if hbm_experimental_500_1000:
+                    hbm_clock_options.update(hbm_clk_freq=1000e6, experimental_500_1000=True)
                 if hbm_endpoint:
                     hbm_clock_options["with_native_ready"] = False
                 if hbm_axi_clk_freq == 400e6:
@@ -862,7 +876,8 @@ def main():
     parser.add_target_argument("--hbm-endpoint-traffic", action="store_true", help="Use processor-configured RTL traffic generation on the dedicated PC31 endpoint.")
     parser.add_target_argument("--hbm-endpoint", action="store_true", help="Dedicate PC31 to the processor-driven four-command wide endpoint.")
     parser.add_target_argument("--hbm-axi-domain", action="store_true", help="Independent HBM AXI clock domain (requires primitive BIST or endpoint).")
-    parser.add_target_argument("--hbm-axi-clk-freq", default=250e6, type=float, choices=[250e6, 400e6], help="HBM AXI clock frequency; 400 MHz requires --hbm-axi-domain and --sys-clk-freq=200e6.")
+    parser.add_target_argument("--hbm-experimental-500-1000", action="store_true", help="Unqualified AXI500/HBM1000 overclock; native model remains 1800 MT/s.")
+    parser.add_target_argument("--hbm-axi-clk-freq", default=250e6, type=float, choices=[250e6, 400e6, 500e6], help="HBM AXI clock frequency; 500 MHz requires --hbm-experimental-500-1000.")
     parser.add_target_argument("--hbm-channels", default="0,1,2,3",         help="HBM channels to map (comma/range list or all).")
     parser.add_target_argument("--hbm-main-channel", default=0, type=int,   help="Mapped HBM channel used as main RAM.")
     parser.add_target_argument("--hbm-base",       default=USPHBM2_DEFAULT_BASE,
@@ -901,6 +916,7 @@ def main():
         hbm_endpoint_two_port = args.hbm_endpoint_two_port,
         hbm_axi_domain        = args.hbm_axi_domain,
         hbm_axi_clk_freq      = args.hbm_axi_clk_freq,
+        hbm_experimental_500_1000 = args.hbm_experimental_500_1000,
         **parser.soc_argdict
     )
     builder = Builder(soc, **parser.builder_argdict)
@@ -912,7 +928,12 @@ def main():
             import json
             layout = json.loads(get_csr_json(soc=soc, csr_regions=soc.csr.regions,
                 constants=soc.constants, mem_regions=soc.bus.regions))
-            firmware = build(os.path.join(builder.output_dir, "software", "fk33_hbm"), csr_json=layout)
+            firmware_options = {}
+            if soc.hbm_experimental_500_1000:
+                firmware_options["profile_path"] = soc.hbm.rtl_dir / "fk33_hbm_profile_1000_experimental.json"
+                firmware_options["experimental_500_1000"] = True
+            firmware = build(os.path.join(builder.output_dir, "software", "fk33_hbm"), csr_json=layout,
+                **firmware_options)
             soc.init_rom("rom", firmware["rom_words"], auto_size=False)
             soc.integrated_rom_initialized = True
             builder.compile_software = False
