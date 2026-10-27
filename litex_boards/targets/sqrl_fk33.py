@@ -405,6 +405,166 @@ proc fk33_cpu_locality_select {pc_regions native_aclk reserve_pc31} {
 """
 
 
+def _add_hbm_status_mailbox_constraints(platform):
+    # The runtime status payload is held until its synchronized acknowledgement.
+    # Only this 98-bit bundle receives a finite datapath bound. Vivado also
+    # excludes its hold checks; this is a protocol exception, not a hold pass.
+    commands = r"""
+# Exact runtime status bundle only. This procedure does not alter any reset,
+# Gray, native-HBM or other-mailbox constraint. DPO automatically waives HOLD.
+proc fk33_status_one {objects label} {
+    if {[llength $objects] != 1} {error "$label requires one object: $objects"}
+    return [lindex $objects 0]
+}
+proc fk33_status_pin {cell name} {
+    return [fk33_status_one [get_pins -of_objects $cell -filter "REF_PIN_NAME == $name"] "$cell/$name"]
+}
+proc fk33_status_driver {pin} {
+    return [fk33_status_one [get_pins -leaf -of_objects [get_nets -segments -of_objects $pin] -filter {DIRECTION == OUT}] "Driver $pin"]
+}
+proc fk33_status_constant {pin type} {
+    set driver [fk33_status_driver $pin]
+    if {[get_property REF_NAME [get_cells -of_objects $driver]] ne $type} {error "$pin requires $type"}
+}
+proc fk33_status_ff {cell period {initial 0} {reference FDRE}} {
+    if {[get_property REF_NAME $cell] ne $reference} {error "Unexpected FF $cell"}
+    set init [string tolower [get_property INIT $cell]]
+    if {$initial == 0 && $init ni {0 1'b0 1'h0 1'd0 0x0}} {error "INIT must be zero $cell/$init"}
+    if {$initial == 1 && $init ni {1 1'b1 1'h1 1'd1 0x1}} {error "INIT must be one $cell/$init"}
+    set c [fk33_status_pin $cell C]
+    set clock [fk33_status_one [get_clocks -of_objects $c] "Clock $cell"]
+    if {[get_property PERIOD $clock] != $period || [get_property IS_INVERTED $c]} {error "Unexpected clock $cell/$clock"}
+    set expected_clock [dict get {2.0 main_clkout3 4.0 main_clkout0} $period]
+    if {[get_property NAME $clock] ne $expected_clock} {error "Wrong mailbox clock identity $cell/$clock"}
+    set reset_pin [fk33_status_pin $cell [expr {$reference eq "FDPE" ? "PRE" : "R"}]]
+    if {[get_property IS_INVERTED $reset_pin]} {error "Inverted mailbox reset $cell/$reset_pin"}
+    return $clock
+}
+proc fk33_status_sync {cell period} {
+    fk33_status_ff $cell $period
+    if {[string toupper [get_property ASYNC_REG $cell]] ni {TRUE 1}} {error "Missing ASYNC_REG $cell"}
+    fk33_status_constant [fk33_status_pin $cell CE] VCC
+    fk33_status_constant [fk33_status_pin $cell R] GND
+}
+proc fk33_status_q_driver {pin} {
+    set seen {}
+    for {set depth 0} {$depth < 8} {incr depth} {
+        set driver [fk33_status_driver $pin]
+        set cell [fk33_status_one [get_cells -of_objects $driver] "Data driver cell"]
+        if {[get_property REF_NAME $cell] eq "FDRE"} {
+            if {[get_property REF_PIN_NAME $driver] ne "Q"} {error "Not an electrical Q driver: $driver"}
+            return [list $cell $driver $seen]
+        }
+        set init [string tolower [get_property -quiet INIT $cell]]
+        if {[get_property REF_NAME $cell] ne "LUT1" || ![regexp {^([0-9]+'h0*2|0x0*2|2|2'b10)$} $init]} {error "Unexpected data transform $cell/$init"}
+        lappend seen $cell
+        set pin [fk33_status_pin $cell I0]
+    }
+    error "Data driver depth exceeded"
+}
+proc fk33_status_sync_next {cell period} {
+    set candidates {}
+    set q [fk33_status_pin $cell Q]
+    foreach pin [get_pins -leaf -of_objects [get_nets -segments -of_objects $q] -filter {DIRECTION == IN && REF_PIN_NAME == D}] {
+        set target [fk33_status_one [get_cells -of_objects $pin] "Synchronizer load"]
+        if {[get_property REF_NAME $target] eq "FDRE" && [string toupper [get_property ASYNC_REG $target]] in {TRUE 1}} {
+            set clock [get_clocks -of_objects [fk33_status_pin $target C]]
+            if {[llength $clock] == 1 && [get_property PERIOD $clock] == $period} {lappend candidates $target}
+        }
+    }
+    return [fk33_status_one $candidates "Synchronizer next stage"]
+}
+proc fk33_status_enable {pin a b value} {
+    set driver [fk33_status_driver $pin]
+    set lut [fk33_status_one [get_cells -of_objects $driver] "Capture enable LUT"]
+    set init [string tolower [get_property -quiet INIT $lut]]
+    set pattern [format {^([0-9]+'h0*%s|0x0*%s|%s)$} $value $value $value]
+    if {[get_property REF_NAME $lut] ne "LUT2" || ![regexp $pattern $init]} {error "Capture enable is not expected two-input function $lut/$init"}
+    set inputs [list [fk33_status_driver [fk33_status_pin $lut I0]] [fk33_status_driver [fk33_status_pin $lut I1]]]
+    if {[lsort $inputs] ne [lsort [list $a $b]]} {error "Capture enable inputs differ: $inputs"}
+}
+proc fk33_status_reset_root {pin period} {
+    set q [fk33_status_driver $pin]
+    set cell [fk33_status_one [get_cells -of_objects $q] "Reset driver"]
+    if {[get_property REF_NAME $cell] eq "BUFGCE"} {
+        fk33_status_constant [fk33_status_pin $cell CE] VCC
+        set q [fk33_status_driver [fk33_status_pin $cell I]]
+        set cell [fk33_status_one [get_cells -of_objects $q] "Buffered reset source"]
+    }
+    set stage1 $cell
+    fk33_status_ff $stage1 $period 1 FDPE
+    set q0 [fk33_status_driver [fk33_status_pin $stage1 D]]
+    set stage0 [fk33_status_one [get_cells -of_objects $q0] "Reset first stage"]
+    fk33_status_ff $stage0 $period 1 FDPE
+    foreach cell [list $stage0 $stage1] {
+        fk33_status_constant [fk33_status_pin $cell CE] VCC
+        if {[string toupper [get_property ASYNC_REG $cell]] ni {TRUE 1}} {error "Missing ASYNC_REG reset stage $cell"}
+    }
+    fk33_status_constant [fk33_status_pin $stage0 D] GND
+    set pre0 [fk33_status_driver [fk33_status_pin $stage0 PRE]]
+    set pre1 [fk33_status_driver [fk33_status_pin $stage1 PRE]]
+    if {$pre0 ne $pre1} {error "Reset stages do not share assertion source"}
+    return [list $pre0 $stage0 $stage1 $q]
+}
+proc fk33_status_mailbox_constraints {{apply 0}} {
+    set prefix main_hbmruntimequiesce_hbm_status_snapshot_hbmclockmailbox
+    set index [dict create]
+    foreach cell [get_cells -hier -filter "NAME =~ $prefix* && REF_NAME =~ FD*"] {dict set index [get_property NAME $cell] $cell}
+    set ack [dict get $index ${prefix}_acknowledge_reg]
+    fk33_status_ff $ack 4.0
+    lassign [fk33_status_q_driver [fk33_status_pin $ack D]] req1 ignored ignored
+    lassign [fk33_status_q_driver [fk33_status_pin $req1 D]] req0 ignored ignored
+    lassign [fk33_status_q_driver [fk33_status_pin $req0 D]] request ignored ignored
+    fk33_status_ff $request 2.0
+    foreach cell [list $req0 $req1] {fk33_status_sync $cell 4.0}
+    set ack0 [fk33_status_sync_next $ack 2.0]
+    set ack1 [fk33_status_sync_next $ack0 2.0]
+    foreach cell [list $ack0 $ack1] {fk33_status_sync $cell 2.0}
+    if {[llength [lsort -unique [list $req0 $req1 $ack0 $ack1 $request $ack]]] != 6} {error "Mailbox control stages alias"}
+    set source_reset [fk33_status_driver [fk33_status_pin $request R]]
+    set destination_reset [fk33_status_driver [fk33_status_pin $ack R]]
+    set source_root [fk33_status_reset_root [fk33_status_pin $request R] 2.0]
+    set destination_root [fk33_status_reset_root [fk33_status_pin $ack R] 4.0]
+    if {[lindex $source_root 0] ne [lindex $destination_root 0]} {error "Mailbox domains do not share reset assertion source"}
+    set request_q [fk33_status_pin $request Q]
+    set ack1_q [fk33_status_pin $ack1 Q]
+    set req1_q [fk33_status_pin $req1 Q]
+    set ack_q [fk33_status_pin $ack Q]
+    fk33_status_enable [fk33_status_pin $request CE] $request_q $ack1_q 9
+    fk33_status_enable [fk33_status_pin $ack CE] $req1_q $ack_q 6
+    set rows {}
+    set commands {}
+    for {set bit 0} {$bit < 98} {incr bit} {
+        set source [dict get $index [format {%s_held_reg[%d]} $prefix $bit]]
+        set destination [dict get $index [format {%s_output_reg[%d]} $prefix $bit]]
+        fk33_status_ff $source 2.0
+        fk33_status_ff $destination 4.0
+        if {[fk33_status_driver [fk33_status_pin $source R]] ne $source_reset || [fk33_status_driver [fk33_status_pin $destination R]] ne $destination_reset} {error "Data/control reset mismatch bit $bit"}
+        fk33_status_enable [fk33_status_pin $source CE] $request_q $ack1_q 9
+        fk33_status_enable [fk33_status_pin $destination CE] $req1_q $ack_q 6
+        set to [fk33_status_pin $destination D]
+        lassign [fk33_status_q_driver $to] actual q buffers
+        if {$actual ne $source || $q ne [fk33_status_pin $source Q]} {error "Data is not corresponding held bit $bit: $actual/$q"}
+        set from [fk33_status_pin $source C]
+        lappend commands [list set_max_delay -datapath_only 4.0 -from $from -to $to]
+        lappend rows [list bit $bit source $source destination $destination electrical_Q $q identity_delay_cells $buffers max_ns 4.0 hold AUTOMATICALLY_EXCEPTED_NOT_STA_PASS]
+    }
+    if {$apply} {foreach command $commands {{*}$command}}
+    return [dict create status PASS_EXACT_STATUS_MAILBOX_SCOPE_ONLY rows $rows commands $commands applied $apply req_sync [list $req0 $req1] ack_sync [list $ack0 $ack1] request $request acknowledge $ack source_reset $source_root destination_reset $destination_root hold AUTOMATICALLY_EXCEPTED_NOT_STA_PASS other_four_mailboxes UNCHANGED_FULLY_TIMED]
+}
+
+set fk33_status_mailbox_policy [fk33_status_mailbox_constraints 1]
+if {[dict get $fk33_status_mailbox_policy status] ne "PASS_EXACT_STATUS_MAILBOX_SCOPE_ONLY" ||
+    ![dict get $fk33_status_mailbox_policy applied] ||
+    [llength [dict get $fk33_status_mailbox_policy rows]] != 98} {
+    error "Runtime status mailbox constraint scope differs"
+}
+puts "FK33_STATUS_MAILBOX_BUNDLE pairs=98 max_ns=4.0 hold=EXCEPTED_BUNDLED_PROTOCOL other_mailboxes=UNCHANGED"
+"""
+    commands = commands.replace("{", "{{").replace("}", "}}")
+    platform.toolchain.pre_placement_commands.append(commands)
+
+
 def _add_hbm_native_floorplan(platform, reserve_pc31=False):
     """Guide native channel storage towards its fixed HBM clock region."""
     commands = r"""
@@ -1032,6 +1192,7 @@ class BaseSoC(SoCCore):
             hbm_axi_reset_buf=hbm_experimental_500_1000)
         if hbm_experimental_500_1000:
             _add_hbm_reset_constraints(platform)
+            _add_hbm_status_mailbox_constraints(platform)
             _add_hbm_native_floorplan(platform, reserve_pc31=hbm_endpoint)
         if self.hbm_primitive:
             platform.toolchain.pre_placement_commands += [
