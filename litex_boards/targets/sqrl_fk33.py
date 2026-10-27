@@ -220,6 +220,432 @@ puts "FK33_NATIVE_RESET_CONSTRAINTS async_clear_pins=64 release_budget_ns=1.8"
     platform.toolchain.bitstream_commands += ["fk33_check_reset_buffer"]
 
 
+def _hbm_cpu_locality_commands():
+    """Select native CPU FIFO storage from its Gray tags and RAM wiring."""
+    return r"""
+# Return additions for the existing native-region pblocks; no pblock policy here.
+proc fk33_cpu_one {objects label} {
+    if {[llength $objects] != 1} {error "$label expectedone:$objects"}
+    return [lindex $objects 0]
+}
+proc fk33_cpu_cell {pin} {return [fk33_cpu_one [get_cells -of_objects $pin] "Typedleafcellof$pin"]}
+proc fk33_cpu_pin {cell role} {return [fk33_cpu_one [get_pins -of_objects $cell -filter "REF_PIN_NAME == $role"] "$cell/$role"]}
+proc fk33_cpu_outputs {pins} {
+    if {![llength $pins]} {return {}}
+    return [get_pins -quiet -leaf -of_objects [get_nets -quiet -segments -of_objects $pins] -filter {DIRECTION == OUT}]
+}
+proc fk33_cpu_inputs {pins} {
+    if {![llength $pins]} {return {}}
+    return [get_pins -quiet -leaf -of_objects [get_nets -quiet -segments -of_objects $pins] -filter {DIRECTION == IN}]
+}
+proc fk33_cpu_eligible {cell} {
+    global fk33_cpu_ff_cache fk33_cpu_clock_pins
+    if {[dict exists $fk33_cpu_ff_cache $cell]} {return [dict get $fk33_cpu_ff_cache $cell]}
+    set reason ORDINARY_NATIVE
+    set ref [get_property REF_NAME [get_cells $cell]]
+    if {$ref ni {FDRE FDSE}} {set reason NOT_ORDINARY_SYNC_FF}
+    if {$reason eq "ORDINARY_NATIVE" && ![dict exists $fk33_cpu_clock_pins [fk33_cpu_pin $cell C]]} {set reason NOT_NATIVE_2NS}
+    foreach property {ASYNC_REG HBM_GRAY_SRC HBM_GRAY_DST ars_ff1 ars_ff2} {
+        set value [get_property -quiet $property $cell]
+        if {$property in {HBM_GRAY_SRC HBM_GRAY_DST}} {
+            if {$value ne ""} {set reason CDC_PUBLICATION_OR_SYNCHRONIZER}
+        } elseif {[string toupper $value] in {TRUE 1 1'B1}} {set reason CDC_OR_RESET_SYNCHRONIZER}
+    }
+    if {[regexp -nocase {quiesce|mailbox|hbmruntime|hbm_control|permit_|trip_hold|reset_sync} $cell]} {set reason GLOBAL_OR_RESET_CONTROL}
+    set ok [expr {$reason eq "ORDINARY_NATIVE"}]
+    dict set fk33_cpu_ff_cache $cell $ok
+    return $ok
+}
+proc fk33_cpu_claim {cell pc region role} {
+    global fk33_cpu_claims
+    dict lappend fk33_cpu_claims $cell [list $pc $region $role]
+}
+proc fk33_cpu_locality_select {pc_regions native_aclk reserve_pc31} {
+    global fk33_cpu_clock_pins fk33_cpu_ff_cache fk33_cpu_claims fk33_cpu_macro_children
+    set fk33_cpu_ff_cache [dict create]
+    set fk33_cpu_claims [dict create]
+    set fk33_cpu_macro_children [dict create]
+    if {[dict size $pc_regions] != 32} {error "CPU locality requires32validated hard-port regions"}
+    set hard_regions $pc_regions
+    set clock [fk33_cpu_one [get_clocks -of_objects $native_aclk] "CPU native clock"]
+    if {[get_property PERIOD $clock] != 2.0} {error "CPU locality requires native500MHz"}
+    set fk33_cpu_clock_pins [dict create]
+    foreach pin [fk33_cpu_inputs $native_aclk] {dict set fk33_cpu_clock_pins $pin 1}
+    set gray_groups [dict create]
+    set cells [get_cells -hier -filter {HBM_GRAY_SRC =~ hbm_cpu_pc*}]
+    foreach cell $cells tag [get_property HBM_GRAY_SRC $cells] {dict lappend gray_groups $tag $cell}
+    set binary_groups [dict create]
+    foreach cell [get_cells -hier -filter {REF_NAME =~ FD* && NAME =~ *q_binary_reg*}] {
+        if {[regexp {^(.+_q_binary)_reg} $cell -> prefix]} {dict lappend binary_groups $prefix $cell}
+    }
+    # Index actual primitive-parent relationships once, including unrequested siblings.
+    set ram_leaves [get_cells -hier -filter {REF_NAME == RAMD32 || REF_NAME == RAMS32}]
+    set leaf_parents [dict create]
+    set all_children [dict create]
+    foreach leaf $ram_leaves parent [get_property PARENT $ram_leaves] {
+        dict set leaf_parents $leaf $parent
+        if {$parent ne ""} {dict lappend all_children $parent $leaf}
+    }
+    set typed_macros [dict create]
+    set parents [get_cells -quiet [dict keys $all_children]]
+    foreach parent $parents ref [get_property REF_NAME $parents] {
+        if {$ref in {RAM32M RAM32M16}} {dict set typed_macros $parent $parent}
+    }
+    set pruned 0
+    set macro_regions [dict create]
+    set bank_count 0
+    foreach tag [lsort [dict keys $gray_groups]] {
+        if {![regexp {^hbm_cpu_pc([0-9][0-9])_(aw|w|ar|b|r)_(produce|consume)$} $tag -> pc channel pointer]} {error "UnknownCPUgraytag:$tag"}
+        scan $pc %d pc
+        set read [expr {$channel in {aw w ar} && $pointer eq "consume"}]
+        set write [expr {$channel in {b r} && $pointer eq "produce"}]
+        if {!$read && !$write} {continue}
+        incr bank_count
+        set role [expr {$read ? "read" : "write"}]
+        set sources [dict get $gray_groups $tag]
+        if {[llength $sources] != 3} {error "Not3Graybits:$tag"}
+        set stems {}
+        foreach source $sources {
+            if {![regexp {^(.+)_q_reg\[[012]\]$} $source -> stem]} {error "UnexpectedGrayFFname:$source"}
+            lappend stems $stem
+            if {![dict exists $fk33_cpu_clock_pins [fk33_cpu_pin $source C]]} {error "Tagnotnative:$tag/$source"}
+        }
+        set stem [fk33_cpu_one [lsort -unique $stems] Graycounterstem]
+        set binary ${stem}_q_binary
+        if {![dict exists $binary_groups $binary]} {
+            if {$pc != 31 || !$reserve_pc31} {error "Missingbinarypointerwithretained/unreservedbank:$tag"}
+            incr pruned
+            puts "FK33_CPU_RESERVED_PRUNE tag=$tag"
+            continue
+        }
+        set pointers [dict get $binary_groups $binary]
+        foreach ff $pointers {if {![fk33_cpu_eligible $ff]} {error "Binarypointernotordinarynative:$ff"}}
+        set addr_pins [fk33_cpu_inputs [get_pins -of_objects $pointers -filter {REF_PIN_NAME == Q}]]
+        set ram_bits [dict create]
+        foreach pin $addr_pins refpin [get_property REF_PIN_NAME $addr_pins] {
+            if {![regexp {^(RADR|WADR|ADR|A)([01])$} $refpin -> kind bit]} {continue}
+            if {$read && $kind eq "WADR" || $write && $kind eq "RADR"} {continue}
+            set cell [fk33_cpu_cell $pin]
+            if {![string match RAM* [get_property REF_NAME [get_cells $cell]]]} {continue}
+            dict lappend ram_bits $cell $bit
+        }
+        set rams [dict keys $ram_bits]
+        set region [dict get $hard_regions $pc]
+        if {![llength $rams]} {
+            if {$pc != 31 || !$reserve_pc31} {error "NoactualRAMforunreservedbank:$tag"}
+            incr pruned
+            puts "FK33_CPU_RESERVED_PRUNE tag=$tag"
+            continue
+        }
+        foreach ram $rams {
+            if {[lsort -unique [dict get $ram_bits $ram]] ne {0 1}} {error "RAMnotdirectlyboundtobothcurrentaddressbits:$tag/$ram"}
+        }
+        # Vivado promotes an internal RAM leaf assignment to its entire macro.
+        foreach ram $rams {
+            if {![dict exists $leaf_parents $ram]} {continue}
+            set parent [dict get $leaf_parents $ram]
+            if {![dict exists $typed_macros $parent]} {continue}
+            dict lappend macro_regions $parent $region
+            if {[llength [lsort -unique [dict get $macro_regions $parent]]] != 1} {error "RAM macro crosses CPU regions:$parent"}
+            dict set fk33_cpu_macro_children $parent [dict get $all_children $parent]
+        }
+        set selected $pointers
+        if {$read} {
+            set sinks [fk33_cpu_inputs [get_pins -of_objects $rams -filter {DIRECTION == OUT}]]
+            foreach pin $sinks rolepin [get_property REF_PIN_NAME $sinks] {
+                if {$rolepin ne "D"} {continue}
+                set ff [fk33_cpu_cell $pin]
+                if {[string match FD* [get_property REF_NAME [get_cells $ff]]] && [fk33_cpu_eligible $ff]} {lappend selected $ff}
+            }
+        } else {
+            set data [get_pins -of_objects $rams -filter {REF_PIN_NAME == I}]
+            if {![llength $data]} {error "RAMwriteinputIabsent:$tag"}
+            set drivers [fk33_cpu_outputs $data]
+            set luts {}
+            foreach cell [get_cells -of_objects $drivers] {
+                set ref [get_property REF_NAME [get_cells $cell]]
+                if {[string match FD* $ref] && [fk33_cpu_eligible $cell]} {lappend selected $cell}
+                if {[string match LUT* $ref]} {lappend luts $cell}
+            }
+            if {[llength $luts]} {
+                set pins [get_pins -of_objects $luts -filter {DIRECTION == IN}]
+                foreach cell [get_cells -of_objects [fk33_cpu_outputs $pins]] {
+                    if {[string match FD* [get_property REF_NAME [get_cells $cell]]] && [fk33_cpu_eligible $cell]} {lappend selected $cell}
+                }
+            }
+        }
+        set selected [lsort -unique $selected]
+        if {[llength $selected] <= [llength $pointers]} {error "NoRAMdataFFsselected:$tag"}
+        foreach cell [concat $rams $selected] {
+            if {[dict exists $leaf_parents $cell] && [dict exists $typed_macros [dict get $leaf_parents $cell]]} {
+                set cell [dict get $typed_macros [dict get $leaf_parents $cell]]
+            }
+            fk33_cpu_claim $cell $pc $region $role
+        }
+        puts "FK33_CPU_BANK tag=$tag region=$region RAMs=[llength $rams] FFs=[llength $selected]"
+    }
+    if {$bank_count != 160} {error "Not160tagboundbanks:$bank_count"}
+    if {$pruned != ($reserve_pc31 ? 5 : 0)} {error "Unexpected CPU reserved-bank count:$pruned"}
+    set additions [dict create]
+    foreach cell [lsort [dict keys $fk33_cpu_claims]] {
+        set claims [lsort -unique [dict get $fk33_cpu_claims $cell]]
+        set regions {}
+        foreach claim $claims {lappend regions [lindex $claim 1]}
+        set regions [lsort -unique $regions]
+        if {[llength $regions] != 1} {
+            puts "FK33_CPU_SHARED_EXCLUDED cell=$cell claims=$claims"
+            continue
+        }
+        set region [lindex $regions 0]
+        dict lappend additions $region $cell
+    }
+    puts "FK33_CPU_LOCALITY banks=$bank_count pruned=$pruned regions=[dict size $additions]"
+    return $additions
+}
+"""
+
+
+def _add_hbm_native_floorplan(platform, reserve_pc31=False):
+    """Guide native channel storage towards its fixed HBM clock region."""
+    commands = r"""
+proc fk33_floorplan_one {objects label} {
+    if {[llength $objects] != 1} {error "$label requires one object: $objects"}
+    return [lindex $objects 0]
+}
+proc fk33_floorplan_driver {pin} {
+    set nets [get_nets -segments -of_objects $pin]
+    return [fk33_floorplan_one [get_pins -leaf -of_objects $nets -filter {DIRECTION == OUT}] "$pin driver"]
+}
+proc fk33_check_native_floorplan_anchors {} {
+    global fk33_native_anchors
+    dict for {native intended} $fk33_native_anchors {
+        set actual [fk33_floorplan_one [get_sites -of_objects [get_cells $native]] "$native placed site"]
+        if {$actual ne $intended} {error "$native placed at $actual instead of architectural site $intended"}
+    }
+    puts "FK33_NATIVE_FLOORPLAN_ANCHORS ports=[dict size $fk33_native_anchors]"
+}
+set native_cells [get_cells -hierarchical -filter {REF_NAME == HBM_SNGLBLI_INTF_AXI}]
+if {[llength $native_cells] != 32} {error "Native floorplan requires 32 hard ports"}
+set boundary_ffs [get_cells -hierarchical -filter {REF_NAME =~ FD* && NAME =~ *hbmnativeelasticboundary*}]
+set stem_cells [dict create]
+set stem_buffers [dict create]
+foreach cell $boundary_ffs {
+    if {[regexp {([^/]*hbmnativeelasticboundary[0-9]+)(_buffer[0-9]+)_pipe_(valid_source|ready)_} $cell -> stem buffer]} {
+        dict lappend stem_cells $stem $cell
+        dict lappend stem_buffers $stem $buffer
+    }
+}
+set region_members [dict create]
+set cell_regions [dict create]
+set boundary_stems {}
+set permit_cells {}
+set fk33_native_anchors [dict create]
+set fk33_hard_regions [dict create]
+set boundary_ports [dict create]
+set fk33_native_aclk [fk33_floorplan_one [get_pins -of_objects [lindex $native_cells 0] -filter {REF_PIN_NAME == ACLK}] "Native ACLK"]
+foreach native $native_cells {
+    # FK33's vendor-expanded HBM stack/port identity fixes its BLI site even
+    # before placement, when the leaf primitive has no LOC property yet.
+    if {![regexp {/HBM_ONE_STACK_INTF<([01])>_INST/HBM_SNGLBLI_INTF_AXI<([0-9]+)>_INST$} $native -> stack local] || $local > 15} {
+        error "Unknown FK33 native architectural identity: $native"
+    }
+    set pc [expr {16 * $stack + $local}]
+    if {[dict exists $fk33_hard_regions $pc]} {error "Duplicate native architectural port $pc"}
+    set site [fk33_floorplan_one [get_sites -quiet BLI_HBM_AXI_INTF_X${pc}Y0] "$native architectural site"]
+    if {[get_property SITE_TYPE $site] ne "BLI_HBM_AXI_INTF"} {error "$site is not a native HBM site"}
+    set existing [get_sites -quiet -of_objects $native]
+    if {[llength $existing] && $existing ne $site} {error "$native existing site $existing differs from $site"}
+    set loc [get_property LOC $native]
+    if {$loc ne "" && $loc ne $site} {error "$native existing LOC $loc differs from $site"}
+    set region [fk33_floorplan_one [get_clock_regions -of_objects $site] "$native clock region"]
+    dict set fk33_native_anchors $native $site
+    dict set fk33_hard_regions $pc $region
+    set data_pin [get_pins -of_objects $native -filter {REF_PIN_NAME == "WDATA[0]" || REF_PIN_NAME == WDATA0}]
+    set driver [fk33_floorplan_driver [fk33_floorplan_one $data_pin "$native WDATA0"]]
+    set source [fk33_floorplan_one [get_cells -of_objects $driver] "$native WDATA0 source"]
+    if {![string match FD* [get_property REF_NAME $source]] || [get_property REF_PIN_NAME $driver] ne "Q"} {
+        error "$native WDATA0 must have a direct FF/Q driver"
+    }
+    if {![regexp {([^/]*hbmnativeelasticboundary[0-9]+)_buffer[0-9]+_pipe_valid_source_payload_data_reg} $source -> stem]} {
+        error "$native WDATA0 source has no boundary stem: $source"
+    }
+    if {$stem in $boundary_stems} {error "Duplicate native boundary stem $stem"}
+    lappend boundary_stems $stem
+    dict set boundary_ports $stem $pc
+    if {![dict exists $stem_cells $stem]} {error "Missing native boundary $stem"}
+    set members [dict get $stem_cells $stem]
+    set buffers [dict get $stem_buffers $stem]
+    if {[llength [lsort -unique $buffers]] != 5} {error "$stem requires five retained channel buffers"}
+    set reset [fk33_floorplan_one [get_pins -of_objects $native -filter {REF_PIN_NAME == ARESET_N}] "$native reset"]
+    set stage1 [fk33_floorplan_one [get_cells -of_objects [fk33_floorplan_driver $reset]] "$native reset stage1"]
+    set d1 [fk33_floorplan_one [get_pins -of_objects $stage1 -filter {REF_PIN_NAME == D}] "$stage1 D"]
+    set stage0 [fk33_floorplan_one [get_cells -of_objects [fk33_floorplan_driver $d1]] "$native reset stage0"]
+    foreach stage [list $stage0 $stage1] {
+        if {[get_property REF_NAME $stage] ne "FDCE"} {error "$stage must remain FDCE"}
+        lappend members $stage
+        lappend permit_cells $stage
+    }
+    foreach cell $members {
+        if {[dict exists $cell_regions $cell]} {error "Duplicate native floorplan member $cell"}
+        dict set cell_regions $cell $region
+        dict lappend region_members $region $cell
+    }
+    puts "FK33_NATIVE_REGION_BINDING hard=$native site=$site region=$region source=$source stem=$stem registers=[llength $members]"
+}
+if {[llength [lsort -unique $permit_cells]] != 64} {error "Native floorplan requires 64 independent permit FFs"}
+if {[llength [lsort -unique [dict values $fk33_native_anchors]]] != 32} {error "Expected 32 distinct native architectural sites"}
+dict for {region members} [fk33_cpu_locality_select $fk33_hard_regions $fk33_native_aclk $fk33_reserve_pc31] {
+    foreach cell $members {
+        if {[dict exists $cell_regions $cell] && [dict get $cell_regions $cell] ne $region} {error "CPU storage crosses native regions: $cell"}
+        dict set cell_regions $cell $region
+        dict lappend region_members $region $cell
+    }
+}
+# Reuse the CPU selector's exact native-clock pin cache.
+set native_clock_pins [get_pins [dict keys $fk33_cpu_clock_pins] -filter {REF_PIN_NAME == C}]
+if {$fk33_reserve_pc31} {
+    set endpoint [get_cells -of_objects $native_clock_pins -filter {REF_NAME =~ FD* && NAME =~ *hbmwindowfourendpoint*}]
+    if {![llength $endpoint]} {error "Reserved PC31 endpoint has no native-clock storage"}
+    foreach cell $endpoint {
+        dict set cell_regions $cell [dict get $fk33_hard_regions 31]
+        dict lappend region_members [dict get $fk33_hard_regions 31] $cell
+    }
+    puts "FK33_NATIVE_ENDPOINT_LOCALITY pc=31 registers=[llength $endpoint]"
+}
+# Tracker instance numbering is allocation-dependent. Its native AW/AR ready
+# inputs instead identify the first skid state, whose boundary has a known PC.
+set tracker_predicates {}
+set tracker_ports {}
+set trackers [get_cells -hierarchical -filter {REF_NAME =~ fk33_hbm_quiesce* && IS_PRIMITIVE == 0}]
+foreach tracker $trackers {
+    set pcs {}
+    set observed_roles 0
+    foreach role {m_awready m_arready} {
+        set pin [get_pins -quiet ${tracker}/$role]
+        if {[llength $pin] != 1} {continue}
+        if {[get_cells -of_objects $pin] ne $tracker} {error "$pin is not owned by $tracker"}
+        incr observed_roles
+        set outputs [get_pins -leaf -of_objects [get_nets -segments -of_objects $pin] -filter {DIRECTION == OUT}]
+        set drivers [get_cells -of_objects $outputs]
+        set luts [get_cells -of_objects $outputs -filter {REF_NAME =~ LUT*}]
+        if {[llength $luts]} {
+            set inputs [get_pins -of_objects $luts -filter {DIRECTION == IN}]
+            set sources [get_pins -leaf -of_objects [get_nets -segments -of_objects $inputs] -filter {DIRECTION == OUT}]
+            set drivers [concat $drivers [get_cells -of_objects $sources]]
+        }
+        set stems {}
+        foreach driver $drivers {
+            if {![string match FD* [get_property REF_NAME [get_cells $driver]]]} {continue}
+            if {[regexp {([^/]*hbmnativeelasticboundary[0-9]+)_buffer[0-9]+_pipe_ready_valid_reg[^/]*$} $driver -> stem] && [dict exists $boundary_ports $stem] && [dict exists $cell_regions $driver]} {
+                lappend stems $stem
+            }
+        }
+        if {[llength [lsort -unique $stems]] == 1} {lappend pcs [dict get $boundary_ports [lindex $stems 0]]}
+    }
+    if {!$observed_roles} {puts "FK33_NATIVE_TRACKER_LOCALITY_PENDING tracker=$tracker reason=hierarchy_pins_unavailable"; continue}
+    set pcs [lsort -unique $pcs]
+    if {[llength $pcs] != 1} {error "$tracker AW/AR readiness does not identify one native boundary"}
+    set pc [lindex $pcs 0]
+    if {$pc in $tracker_ports} {error "Duplicate native tracker for PC$pc"}
+    lappend tracker_ports $pc
+    set region [dict get $fk33_hard_regions $pc]
+    set members [get_cells -hierarchical -filter "REF_NAME =~ FD* && NAME =~ $tracker/*"]
+    if {![llength $members]} {error "$tracker has no retained state"}
+    foreach cell $members {
+        set clock_pin [fk33_cpu_pin $cell C]
+        if {![dict exists $fk33_cpu_clock_pins $clock_pin]} {error "$tracker state is not native-clocked: $cell"}
+        dict set cell_regions $cell $region
+        dict lappend region_members $region $cell
+        lappend tracker_predicates $cell
+    }
+    puts "FK33_NATIVE_TRACKER_LOCALITY tracker=$tracker pc=$pc registers=[llength $members]"
+}
+if {[llength $tracker_ports] != 32} {puts "FK33_NATIVE_TRACKER_LOCALITY_PENDING retained_hierarchies=[llength $trackers] bound_ports=[llength $tracker_ports]"}
+# Guide the measured READY-to-CE cones. Data muxes remain placer-controlled;
+# both payload banks, including direct incoming RDATA FFs, are already grouped.
+# Shared global, cross-region and top-port drivers remain unbound.
+set data_pins [get_pins -of_objects [get_cells [dict keys $cell_regions]] -filter {REF_PIN_NAME == CE}]
+if {[llength $tracker_predicates]} {
+    set data_pins [concat $data_pins [get_pins -of_objects [get_cells $tracker_predicates] -filter {REF_PIN_NAME == D}]]
+}
+set data_nets [get_nets -segments -of_objects $data_pins]
+set data_outputs [get_pins -leaf -of_objects $data_nets -filter {DIRECTION == OUT}]
+set driver_luts [get_cells -of_objects $data_outputs -filter {REF_NAME =~ LUT*}]
+set port_nets [dict create]
+foreach net [get_nets -segments -of_objects [get_ports]] {dict set port_nets $net 1}
+puts "FK33_NATIVE_CE_DRIVERS candidates=[llength $driver_luts]"
+foreach lut $driver_luts {
+    set claims {}
+    set outputs [get_pins -of_objects $lut -filter {DIRECTION == OUT}]
+    set nets [get_nets -segments -of_objects $outputs]
+    set port_connected 0
+    foreach net $nets {
+        if {[dict exists $port_nets $net]} {set port_connected 1; break}
+    }
+    if {$port_connected} {continue}
+    set loads [get_pins -leaf -of_objects $nets -filter {DIRECTION == IN}]
+    if {![llength $loads]} {continue}
+    set owners [get_cells -of_objects $loads]
+    if {![llength $owners]} {continue}
+    set safe 1
+    foreach owner $owners {
+        if {![dict exists $cell_regions $owner]} {
+            set safe 0
+            break
+        }
+        lappend claims [dict get $cell_regions $owner]
+    }
+    set claims [lsort -unique $claims]
+    if {$safe && [llength $claims] == 1} {dict lappend region_members [lindex $claims 0] $lut}
+}
+dict for {region members} $region_members {
+    set members [lsort -unique $members]
+    set slices [get_sites -of_objects [get_clock_regions $region] -filter {SITE_TYPE == SLICEL || SITE_TYPE == SLICEM}]
+    if {![llength $slices]} {error "$region has no SLICE sites"}
+    set ys {}
+    foreach slice $slices {
+        if {![regexp {SLICE_X([0-9]+)Y([0-9]+)$} $slice -> x y]} {error "Unexpected SLICE name $slice"}
+        lappend ys $y
+    }
+    set ys [lsort -integer -unique $ys]
+    set middle [lindex $ys [expr {([llength $ys] - 1) / 2}]]
+    set lower {}
+    foreach slice $slices {
+        regexp {Y([0-9]+)$} $slice -> y
+        if {$y <= $middle} {lappend lower $slice}
+    }
+    set name fk33_native_$region
+    if {[llength [get_pblocks -quiet $name]]} {error "Native pblock already exists: $name"}
+    create_pblock $name
+    resize_pblock [get_pblocks $name] -add $lower
+    set_property IS_SOFT 1 [get_pblocks $name]
+    foreach {property expected} {IS_SOFT 1 EXCLUDE_PLACEMENT 0 CONTAIN_ROUTING 0} {
+        if {[get_property $property [get_pblocks $name]] != $expected} {error "$name $property did not retain $expected"}
+    }
+    add_cells_to_pblock [get_pblocks $name] [get_cells $members]
+    set expected [lsort -unique [get_cells $members]]
+    set actual [lsort -unique [get_cells -of_objects [get_pblocks $name]]]
+    if {$actual ne $expected} {
+        error "$name canonical membership differs: expected=[llength $expected] actual=[llength $actual]"
+    }
+    puts "FK33_NATIVE_REGION_PBLOCK region=$region slices=[llength $lower] cells=[llength $members] max_y=$middle soft=1"
+}
+# Vivado assigns a RAM32M/M16 atomically. Check its typed parent and the
+# complete indexed sibling cohort together, once per macro, after assignment.
+dict for {macro children} $fk33_cpu_macro_children {
+    set expected [list fk33_native_[dict get $cell_regions $macro]]
+    set objects [get_cells [concat [list $macro] $children]]
+    set actual [lsort -unique [get_pblocks -quiet -of_objects $objects]]
+    if {$actual ne $expected} {error "RAM macro effective membership differs: $macro/$actual/$expected"}
+}
+puts "FK33_NATIVE_FLOORPLAN ports=32 boundaries=32 permits=64"
+"""
+    commands = _hbm_cpu_locality_commands() + f"\nset fk33_reserve_pc31 {int(reserve_pc31)}\n" + commands
+    commands = commands.replace("{", "{{").replace("}", "}}")
+    platform.toolchain.pre_placement_commands.append(commands)
+    platform.toolchain.pre_routing_commands.append("fk33_check_native_floorplan_anchors")
+
+
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class HBMHostDrainBarrier(LiteXModule):
@@ -320,7 +746,8 @@ class HBMCPUWindowCDC(LiteXModule):
                 prefix = None if gray_bus_prefix is None else f"{gray_bus_prefix}_{name}"
                 if forward:
                     crossing = HBMRegisteredReadCDC(source.description,
-                        cd_from="sys", cd_to="axi", gray_bus_prefix=prefix)
+                        cd_from="sys", cd_to="axi", gray_bus_prefix=prefix,
+                        read_address_max_fanout=16)
                 else:
                     crossing = stream.ClockDomainCrossing(source.description,
                         cd_from="axi", cd_to="sys", gray_bus_prefix=prefix)
@@ -410,6 +837,7 @@ class HBMNativeElasticBoundary(LiteXModule):
             forward = name in ("aw", "w", "ar")
             buffer = stream.Buffer(source.description, pipe_valid=True, pipe_ready=True,
                 pipe_ready_capture_when_empty=True, pipe_ready_first=forward,
+                pipe_ready_valid_max_fanout=64,
                 pipe_valid_enable_max_fanout=32 if forward else None)
             self.submodules += buffer
             self.comb += [source.connect(buffer.sink), buffer.source.connect(sink)]
@@ -443,7 +871,8 @@ class HBMCPUWindowPipeline(LiteXModule):
             for channel in ("aw", "w", "ar"):
                 request = getattr(converted, channel)
                 buffer = stream.Buffer(request.description, pipe_valid=True, pipe_ready=True,
-                    pipe_ready_capture_when_empty=pipe_ready_capture_when_empty)
+                    pipe_ready_capture_when_empty=pipe_ready_capture_when_empty,
+                    pipe_ready_valid_max_fanout=64 if pipe_ready_capture_when_empty else None)
                 request_buffers[channel] = buffer
                 self.submodules += buffer
                 self.comb += [request.connect(buffer.sink),
@@ -451,7 +880,8 @@ class HBMCPUWindowPipeline(LiteXModule):
 
         write_buffer = stream.Buffer(offset_input.b.description,
             pipe_valid=True, pipe_ready=True,
-            pipe_ready_capture_when_empty=pipe_ready_capture_when_empty)
+            pipe_ready_capture_when_empty=pipe_ready_capture_when_empty,
+            pipe_ready_valid_max_fanout=64 if pipe_ready_capture_when_empty else None)
         self.submodules += write_buffer
         self.write_buffer = write_buffer
         self.comb += [offset_input.b.connect(write_buffer.sink),
@@ -459,7 +889,8 @@ class HBMCPUWindowPipeline(LiteXModule):
 
         read_buffer = stream.Buffer(offset_input.r.description,
             pipe_valid=True, pipe_ready=True,
-            pipe_ready_capture_when_empty=pipe_ready_capture_when_empty)
+            pipe_ready_capture_when_empty=pipe_ready_capture_when_empty,
+            pipe_ready_valid_max_fanout=64 if pipe_ready_capture_when_empty else None)
         self.read_buffer = read_buffer
         self.submodules += read_buffer
         self.comb += [offset_input.r.connect(read_buffer.sink),
@@ -598,6 +1029,7 @@ class BaseSoC(SoCCore):
             hbm_axi_reset_buf=hbm_experimental_500_1000)
         if hbm_experimental_500_1000:
             _add_hbm_reset_constraints(platform)
+            _add_hbm_native_floorplan(platform, reserve_pc31=hbm_endpoint)
         if self.hbm_primitive:
             platform.toolchain.pre_placement_commands += [
                 "create_clock -name jtag_tck -period 66.666667 [get_pins BSCANE2/INTERNAL_TCK]",
@@ -756,7 +1188,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint_csr import HBMEndpointCSR
                     self.hbm_transport = HBMWideEndpoint(app_domain="sys", native_domain="axi",
                         gray_bus_prefix="hbm_endpoint_pc31", max_outstanding=4,
-                        native_pipe_ready=hbm_experimental_500_1000)
+                        native_pipe_ready=hbm_experimental_500_1000,
+                        registered_quiesce_ack=hbm_experimental_500_1000)
                     # Ownership FIFO RAM is transport state, not CSR memory.
                     self.hbm_transport.autocsr_exclude = {"window"}
                     if hbm_endpoint_traffic:
@@ -772,7 +1205,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     if hbm_endpoint_two_port:
                         self.hbm_transport30 = HBMWideEndpoint(app_domain="sys", native_domain="axi",
                             gray_bus_prefix="hbm_endpoint_pc30", control_prefix="pc30_", max_outstanding=4,
-                            native_pipe_ready=hbm_experimental_500_1000)
+                            native_pipe_ready=hbm_experimental_500_1000,
+                            registered_quiesce_ack=hbm_experimental_500_1000)
                         self.hbm_transport30.autocsr_exclude = {"window"}
                         self.hbm_endpoint30 = HBMEndpointTrafficCSR(self.hbm_transport30,
                             port=30, name_prefix="hbm_endpoint_pc30")
@@ -889,7 +1323,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                         # Register the local lane mux before the narrow bank mux.
                         local_read = stream.Buffer(local.r.description,
                             pipe_valid=True, pipe_ready=True,
-                            pipe_ready_capture_when_empty=hbm_experimental_500_1000)
+                            pipe_ready_capture_when_empty=hbm_experimental_500_1000,
+                            pipe_ready_valid_max_fanout=64 if hbm_experimental_500_1000 else None)
                         self.submodules += ClockDomainsRenamer(axi_domain)(local_read)
                         self.comb += local.r.connect(local_read.sink)
                         self.comb += local_read.source.connect(port.r)
@@ -898,7 +1333,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                             request = getattr(wide, name)
                             buffer = stream.Buffer(request.description,
                                 pipe_valid=True, pipe_ready=True,
-                                pipe_ready_capture_when_empty=hbm_experimental_500_1000)
+                                pipe_ready_capture_when_empty=hbm_experimental_500_1000,
+                                pipe_ready_valid_max_fanout=64 if hbm_experimental_500_1000 else None)
                             self.submodules += ClockDomainsRenamer(axi_domain)(buffer)
                             self.comb += request.connect(buffer.sink)
                             self.comb += buffer.source.connect(getattr(routed, name))
@@ -906,7 +1342,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                             response = getattr(routed, name)
                             buffer = stream.Buffer(response.description,
                                 pipe_valid=True, pipe_ready=True,
-                                pipe_ready_capture_when_empty=hbm_experimental_500_1000)
+                                pipe_ready_capture_when_empty=hbm_experimental_500_1000,
+                                pipe_ready_valid_max_fanout=64 if hbm_experimental_500_1000 else None)
                             self.submodules += ClockDomainsRenamer(axi_domain)(buffer)
                             self.comb += response.connect(buffer.sink)
                             self.comb += buffer.source.connect(getattr(wide, name))
