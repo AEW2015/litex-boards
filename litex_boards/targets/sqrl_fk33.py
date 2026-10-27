@@ -289,7 +289,7 @@ proc fk33_cpu_locality_select {pc_regions native_aclk reserve_pc31} {
     set typed_macros [dict create]
     set parents [get_cells -quiet [dict keys $all_children]]
     foreach parent $parents ref [get_property REF_NAME $parents] {
-        if {$ref in {RAM32M RAM32M16}} {dict set typed_macros $parent $parent}
+        if {$ref in {RAM32M RAM32M16 RAM32X1D}} {dict set typed_macros $parent $parent}
     }
     set pruned 0
     set macro_regions [dict create]
@@ -630,7 +630,7 @@ dict for {region members} $region_members {
     }
     puts "FK33_NATIVE_REGION_PBLOCK region=$region slices=[llength $lower] cells=[llength $members] max_y=$middle soft=1"
 }
-# Vivado assigns a RAM32M/M16 atomically. Check its typed parent and the
+# Vivado assigns RAM32M, RAM32M16 and RAM32X1D atomically. Check the parent and the
 # complete indexed sibling cohort together, once per macro, after assignment.
 dict for {macro children} $fk33_cpu_macro_children {
     set expected [list fk33_native_[dict get $cell_regions $macro]]
