@@ -462,6 +462,99 @@ proc fk33_status_q_driver {pin} {
     }
     error "Data driver depth exceeded"
 }
+
+# Bound the actual combinational function, preserving repeated-pin correlation.
+# A LUT's INIT is not an identity whitelist; its electrical input aliases matter.
+proc fk33_status_init {text} {
+    if {![regexp -nocase {^[0-9]+'([hbd])([0-9a-f]+)$} $text ignored radix digits]} {error "Unsupported LUT INIT $text"}
+    set radix [string tolower $radix]
+    if {$radix eq "h"} {scan $digits %x result} elseif {$radix eq "b"} {
+        if {![regexp {^[01]+$} $digits]} {error "Invalid binary INIT"}
+        set result [expr 0b$digits]
+    } else {if {![regexp {^[0-9]+$} $digits]} {error "Invalid decimal INIT"}; scan $digits %d result}
+    return $result
+}
+proc fk33_status_expr {pin {depth 0}} {
+    if {$depth > 8} {error "Mailbox combinational depth exceeds eight"}
+    set driver [fk33_status_driver $pin]
+    set cell [fk33_status_one [get_cells -of_objects $driver] "Boolean driver"]
+    set reference [get_property REF_NAME $cell]
+    set output [get_property REF_PIN_NAME $driver]
+    if {$reference eq "GND" || $reference eq "VCC"} {
+        set expression [list constant [expr {$reference eq "VCC"}]]
+    } elseif {([string match FD* $reference] && $output eq "Q") || ($reference eq "BUFGCE" && $output eq "O")} {
+        set expression [list leaf $driver]
+    } else {
+        if {![regexp {^LUT([1-6])$} $reference ignored width] || $output ne "O"} {error "Unsupported Boolean driver $cell/$reference/$output"}
+        set inputs {}
+        for {set bit 0} {$bit < $width} {incr bit} {
+            lappend inputs [fk33_status_expr [fk33_status_pin $cell I$bit] [expr {$depth+1}]]
+        }
+        set expression [list lut [fk33_status_init [get_property INIT $cell]] $inputs]
+    }
+    set inversion [get_property IS_INVERTED $pin]
+    if {$inversion ni {0 1}} {error "Unknown pin polarity $pin/$inversion"}
+    if {$inversion} {set expression [list not $expression]}
+    return $expression
+}
+proc fk33_status_leaves {expression} {
+    lassign $expression kind value inputs
+    if {$kind eq "leaf"} {return [list $value]}
+    if {$kind eq "constant"} {return {}}
+    if {$kind eq "not"} {return [fk33_status_leaves $value]}
+    set result {}
+    foreach input $inputs {lappend result {*}[fk33_status_leaves $input]}
+    return [lsort -unique $result]
+}
+proc fk33_status_eval {expression state} {
+    lassign $expression kind value inputs
+    if {$kind eq "leaf"} {return [dict get $state $value]}
+    if {$kind eq "constant"} {return $value}
+    if {$kind eq "not"} {return [expr {![fk33_status_eval $value $state]}]}
+    set index 0
+    set bit 0
+    foreach input $inputs {set index [expr {$index | ([fk33_status_eval $input $state] << $bit)}]; incr bit}
+    return [expr {($value >> $index) & 1}]
+}
+proc fk33_status_assign {leaves number} {
+    set state [dict create]
+    set bit 0
+    foreach leaf $leaves {dict set state $leaf [expr {($number >> $bit) & 1}]; incr bit}
+    return $state
+}
+proc fk33_status_control_source {cell period} {
+    set candidates {}
+    foreach role {D CE R} {
+        foreach leaf [fk33_status_leaves [fk33_status_expr [fk33_status_pin $cell $role]]] {
+            set owner [fk33_status_one [get_cells -of_objects $leaf] "Control source"]
+            if {[get_property REF_NAME $owner] ne "FDRE" || [string toupper [get_property ASYNC_REG $owner]] ni {1 TRUE}} {continue}
+            set clocks [get_clocks -of_objects [fk33_status_pin $owner C]]
+            if {[llength $clocks]==1 && [get_property PERIOD $clocks]==$period} {lappend candidates $owner}
+        }
+    }
+    return [fk33_status_one [lsort -unique $candidates] "Actual control synchronizer source"]
+}
+proc fk33_status_control_transition {cell expected invert} {
+    # Existing typed/INIT/clock/reset-root checks run before this proof.
+    set q [fk33_status_pin $cell Q]
+    set reset [fk33_status_driver [fk33_status_pin $cell R]]
+    foreach role {D CE R} {set function($role) [fk33_status_expr [fk33_status_pin $cell $role]]}
+    set leaves [list $q $expected $reset]
+    foreach role {D CE R} {lappend leaves {*}[fk33_status_leaves $function($role)]}
+    set leaves [lsort -unique $leaves]
+    if {[llength $leaves] > 8} {error "Mailbox Boolean leaf budget exceeded $cell/$leaves"}
+    for {set row 0} {$row < (1 << [llength $leaves])} {incr row} {
+        set state [fk33_status_assign $leaves $row]
+        set d [fk33_status_eval $function(D) $state]
+        set ce [fk33_status_eval $function(CE) $state]
+        set r [fk33_status_eval $function(R) $state]
+        set actual [expr {$r ? 0 : ($ce ? $d : [dict get $state $q])}]
+        set wanted [expr {[dict get $state $reset] ? 0 : ([dict get $state $expected] ^ $invert)}]
+        if {$actual != $wanted} {error "Mailbox transition differs $cell/$state: $actual != $wanted"}
+    }
+    return [dict create status PASS_COMPLETE_FDRE_TRANSITION leaves $leaves assignments $row]
+}
+
 proc fk33_status_sync_next {cell period} {
     set candidates {}
     set q [fk33_status_pin $cell Q]
@@ -512,7 +605,7 @@ proc fk33_status_mailbox_constraints {{apply 0}} {
     foreach cell [get_cells -hier -filter "NAME =~ $prefix* && REF_NAME =~ FD*"] {dict set index [get_property NAME $cell] $cell}
     set ack [dict get $index ${prefix}_acknowledge_reg]
     fk33_status_ff $ack 4.0
-    lassign [fk33_status_q_driver [fk33_status_pin $ack D]] req1 ignored ignored
+    set req1 [fk33_status_control_source $ack 4.0]
     lassign [fk33_status_q_driver [fk33_status_pin $req1 D]] req0 ignored ignored
     lassign [fk33_status_q_driver [fk33_status_pin $req0 D]] request ignored ignored
     fk33_status_ff $request 2.0
@@ -530,8 +623,8 @@ proc fk33_status_mailbox_constraints {{apply 0}} {
     set ack1_q [fk33_status_pin $ack1 Q]
     set req1_q [fk33_status_pin $req1 Q]
     set ack_q [fk33_status_pin $ack Q]
-    fk33_status_enable [fk33_status_pin $request CE] $request_q $ack1_q 9
-    fk33_status_enable [fk33_status_pin $ack CE] $req1_q $ack_q 6
+    set request_transition [fk33_status_control_transition $request $ack1_q 1]
+    set acknowledge_transition [fk33_status_control_transition $ack $req1_q 0]
     set rows {}
     set commands {}
     for {set bit 0} {$bit < 98} {incr bit} {
@@ -550,7 +643,7 @@ proc fk33_status_mailbox_constraints {{apply 0}} {
         lappend rows [list bit $bit source $source destination $destination electrical_Q $q identity_delay_cells $buffers max_ns 4.0 hold AUTOMATICALLY_EXCEPTED_NOT_STA_PASS]
     }
     if {$apply} {foreach command $commands {{*}$command}}
-    return [dict create status PASS_EXACT_STATUS_MAILBOX_SCOPE_ONLY rows $rows commands $commands applied $apply req_sync [list $req0 $req1] ack_sync [list $ack0 $ack1] request $request acknowledge $ack source_reset $source_root destination_reset $destination_root hold AUTOMATICALLY_EXCEPTED_NOT_STA_PASS other_four_mailboxes UNCHANGED_FULLY_TIMED]
+    return [dict create status PASS_EXACT_STATUS_MAILBOX_SCOPE_ONLY rows $rows commands $commands applied $apply req_sync [list $req0 $req1] ack_sync [list $ack0 $ack1] request $request acknowledge $ack source_reset $source_root destination_reset $destination_root hold AUTOMATICALLY_EXCEPTED_NOT_STA_PASS other_four_mailboxes UNCHANGED_FULLY_TIMED request_transition $request_transition acknowledge_transition $acknowledge_transition]
 }
 
 set fk33_status_mailbox_policy [fk33_status_mailbox_constraints 1]
