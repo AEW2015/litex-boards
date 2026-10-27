@@ -1451,7 +1451,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
         if csr_origin is None:
             self.logger.error("CSR main-bus origin is not defined.")
             raise SoCError()
-        self.add_csr_bridge(name="csr", origin=csr_origin, with_register=True, read_latency=2)
+        self.add_csr_bridge(name="csr", origin=csr_origin, with_register=True,
+            read_latency=3 if self.hbm_experimental_500_1000 else 2)
         self.bus.finalize()
         if hasattr(self, "ctrl") and self.bus.timeout is not None:
             if hasattr(self.ctrl, "bus_error") and hasattr(self.bus._interconnect, "timeout"):
@@ -1477,7 +1478,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
             address_map=self.csr.address_map, data_width=self.csr.data_width,
             address_width=self.csr.address_width, alignment=self.csr.alignment,
             paging=self.csr.paging, ordering=self.csr.ordering,
-            read_pipeline=hasattr(self, "hbm_bist") or hasattr(self, "hbm_endpoint"))
+            read_pipeline=hasattr(self, "hbm_bist") or hasattr(self, "hbm_endpoint"),
+            read_sample=self.hbm_experimental_500_1000)
         self.csr_interconnect = csr_bus.InterconnectShared(
             list(self.csr.masters.values()), self.csr_bankarray.get_buses() + [self.hbm.control_bus])
         for name, registers, address, bank in self.csr_bankarray.banks:
