@@ -1517,7 +1517,9 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     registered_completions=hbm_bist or hbm_endpoint,
                     clock_domain=axi_domain,
                     sys_host_idle=all_host_idle if hbm_axi_domain else None,
-                    registered_status=hbm_experimental_500_1000)
+                    registered_status=hbm_experimental_500_1000,
+                    local_status_pipeline=hbm_experimental_500_1000,
+                    status_publication_pipeline=hbm_experimental_500_1000)
                 host_idle_axi = Signal(name="hbm_host_admission_closed_and_idle_axi")
                 observed_idle_axi = Signal(name="hbm_host_observed_idle_axi")
                 endpoint_host_idle_axi = Signal(name="hbm_endpoint_host_idle_axi") if hbm_endpoint else observed_idle_axi
