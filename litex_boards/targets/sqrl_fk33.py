@@ -113,6 +113,113 @@ class _CRG(LiteXModule):
                 pll.create_clkout(self.cd_axi, hbm_axi_clk_freq,
                     reset_buf="bufg" if hbm_axi_reset_buf else None)
 
+def _add_hbm_reset_constraints(platform):
+    """Preserve buffered reset distribution and time native reset release."""
+    prepare = r"""
+proc fk33_reset_one {objects label} {
+    if {[llength $objects] != 1} {error "$label requires one object: $objects"}
+    return [lindex $objects 0]
+}
+proc fk33_reset_pin {cell name} {
+    return [fk33_reset_one [get_pins -of_objects $cell -filter "REF_PIN_NAME == $name"] "$cell/$name"]
+}
+proc fk33_reset_driver {pin} {
+    return [fk33_reset_one [get_pins -leaf -of_objects [get_nets -segments -of_objects $pin] -filter {DIRECTION == OUT}] "Driver of $pin"]
+}
+proc fk33_reset_constant {pin reference} {
+    set driver [fk33_reset_driver $pin]
+    set cell [fk33_reset_one [get_cells -of_objects $driver] "Constant driver"]
+    if {[get_property REF_NAME $cell] ne $reference} {error "$pin must be driven by $reference"}
+}
+proc fk33_reset_clock {pin} {
+    set clock [fk33_reset_one [get_clocks -of_objects $pin] "Clock of $pin"]
+    if {$clock ne "main_clkout3" || abs([get_property PERIOD $clock] - 2.0) > 0.001 ||
+        [get_property IS_INVERTED $pin]} {error "$pin requires the rising-edge 500 MHz AXI clock"}
+    return $clock
+}
+proc fk33_reset_ff {cell reference initial} {
+    if {[get_property REF_NAME $cell] ne $reference ||
+        [string toupper [get_property ASYNC_REG $cell]] ni {TRUE 1}} {error "$cell is not a reset synchronizer FF"}
+    set value [string tolower [get_property INIT $cell]]
+    if {$initial == 0 && $value ni {0 1'b0 1'h0 1'd0 0x0}} {error "$cell must initialize to zero"}
+    if {$initial == 1 && $value ni {1 1'b1 1'h1 1'd1 0x1}} {error "$cell must initialize to one"}
+    fk33_reset_clock [fk33_reset_pin $cell C]
+    fk33_reset_constant [fk33_reset_pin $cell CE] VCC
+}
+set fk33_axi_reset_candidates {}
+foreach cell [get_cells -hierarchical -filter {ars_ff2 == TRUE}] {
+    set clocks [get_clocks -of_objects [fk33_reset_pin $cell C]]
+    if {[llength $clocks] == 1 && [lindex $clocks 0] eq "main_clkout3"} {
+        lappend fk33_axi_reset_candidates $cell
+    }
+}
+set fk33_axi_reset_stage1 [fk33_reset_one $fk33_axi_reset_candidates "AXI reset release stage"]
+set fk33_axi_reset_q1 [fk33_reset_pin $fk33_axi_reset_stage1 Q]
+set fk33_axi_reset_q0 [fk33_reset_driver [fk33_reset_pin $fk33_axi_reset_stage1 D]]
+set fk33_axi_reset_stage0 [fk33_reset_one [get_cells -of_objects $fk33_axi_reset_q0] "AXI reset first stage"]
+foreach cell [list $fk33_axi_reset_stage0 $fk33_axi_reset_stage1] {fk33_reset_ff $cell FDPE 1}
+if {[string toupper [get_property ars_ff1 $fk33_axi_reset_stage0]] ni {TRUE 1}} {error "Missing AXI reset first-stage tag"}
+fk33_reset_constant [fk33_reset_pin $fk33_axi_reset_stage0 D] GND
+if {[get_nets -of_objects [fk33_reset_pin $fk33_axi_reset_stage0 PRE]] ne
+    [get_nets -of_objects [fk33_reset_pin $fk33_axi_reset_stage1 PRE]]} {error "AXI reset stages must share PRE"}
+set fk33_axi_reset_load [fk33_reset_one [get_pins -leaf -of_objects [get_nets -segments -of_objects $fk33_axi_reset_q1] -filter {DIRECTION == IN}] "AXI reset prebuffer load"]
+set fk33_axi_reset_buf [fk33_reset_one [get_cells -of_objects $fk33_axi_reset_load] "AXI reset BUFG"]
+if {[get_property REF_NAME $fk33_axi_reset_buf] ne "BUFGCE" ||
+    [get_property REF_PIN_NAME $fk33_axi_reset_load] ne "I" ||
+    [get_property IS_INVERTED $fk33_axi_reset_load]} {error "AXI reset requires its noninverted BUFGCE"}
+fk33_reset_constant [fk33_reset_pin $fk33_axi_reset_buf CE] VCC
+# Protect the small input nets, not the output reset net: downstream FFs may
+# still be replicated, while reset loads cannot move around the BUFG.
+foreach cell [list $fk33_axi_reset_stage0 $fk33_axi_reset_stage1 $fk33_axi_reset_buf] {
+    set_property DONT_TOUCH TRUE $cell
+}
+foreach pin [list $fk33_axi_reset_q0 $fk33_axi_reset_q1] {
+    set_property DONT_TOUCH TRUE [get_nets -segments -of_objects $pin]
+}
+proc fk33_check_reset_buffer {} {
+    global fk33_axi_reset_q1 fk33_axi_reset_load fk33_axi_reset_buf
+    set loads [get_pins -leaf -of_objects [get_nets -segments -of_objects $fk33_axi_reset_q1] -filter {DIRECTION == IN}]
+    if {[llength $loads] != 1 || [lindex $loads 0] ne $fk33_axi_reset_load} {error "AXI reset BUFG bypass: $loads"}
+    if {![get_property DONT_TOUCH $fk33_axi_reset_buf]} {error "AXI reset BUFG lost protection"}
+    puts "FK33_AXI_RESET_BUFFER_PROTECTED source_loads=1"
+}
+fk33_check_reset_buffer
+"""
+    release = r"""
+fk33_check_reset_buffer
+set fk33_native_reset_cells [get_cells -hierarchical -filter {REF_NAME == HBM_SNGLBLI_INTF_AXI}]
+if {[llength $fk33_native_reset_cells] != 32} {error "Expected 32 native HBM reset endpoints"}
+set fk33_native_reset_syncs {}
+foreach native $fk33_native_reset_cells {
+    fk33_reset_clock [fk33_reset_pin $native ACLK]
+    set reset_pin [fk33_reset_pin $native ARESET_N]
+    set q1 [fk33_reset_driver $reset_pin]
+    set stage1 [fk33_reset_one [get_cells -of_objects $q1] "Native reset release FF"]
+    set q0 [fk33_reset_driver [fk33_reset_pin $stage1 D]]
+    set stage0 [fk33_reset_one [get_cells -of_objects $q0] "Native reset first FF"]
+    foreach cell [list $stage0 $stage1] {fk33_reset_ff $cell FDCE 0}
+    if {$stage0 eq $stage1} {error "Native reset requires two stages"}
+    fk33_reset_constant [fk33_reset_pin $stage0 D] VCC
+    set clr0 [fk33_reset_pin $stage0 CLR]
+    set clr1 [fk33_reset_pin $stage1 CLR]
+    if {[get_nets -of_objects $clr0] ne [get_nets -of_objects $clr1]} {error "Native reset stages must share CLR"}
+    # These are asynchronous assertion inputs of a validated two-FF reset
+    # synchronizer. Interstage data and the hard ARESET_N output remain timed.
+    set_false_path -to [list $clr0 $clr1]
+    set_max_delay 1.8 -from [fk33_reset_pin $stage1 C] -to $reset_pin
+    lappend fk33_native_reset_syncs $stage0 $stage1
+}
+if {[llength [lsort -unique $fk33_native_reset_syncs]] != 64} {error "Expected 32 independent two-FF native reset synchronizers"}
+puts "FK33_NATIVE_RESET_CONSTRAINTS async_clear_pins=64 release_budget_ns=1.8"
+"""
+    # Vivado command templates use Python format braces.
+    escape = lambda command: command.replace("{", "{{").replace("}", "}}")
+    platform.toolchain.pre_optimize_commands += [escape(prepare)]
+    platform.toolchain.pre_placement_commands += [escape(release)]
+    platform.toolchain.pre_routing_commands += ["fk33_check_reset_buffer"]
+    platform.toolchain.bitstream_commands += ["fk33_check_reset_buffer"]
+
+
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class HBMHostDrainBarrier(LiteXModule):
@@ -298,7 +405,12 @@ class HBMNativeElasticBoundary(LiteXModule):
             source, sink = ((getattr(upstream, name), getattr(downstream, name))
                 if name in ("aw", "w", "ar") else
                 (getattr(downstream, name), getattr(upstream, name)))
-            buffer = stream.Buffer(source.description, pipe_valid=True, pipe_ready=True)
+            # Requests end in a register at the hard interface. Responses enter
+            # a register first, keeping their native RAM data path unmuxed.
+            forward = name in ("aw", "w", "ar")
+            buffer = stream.Buffer(source.description, pipe_valid=True, pipe_ready=True,
+                pipe_ready_capture_when_empty=True, pipe_ready_first=forward,
+                pipe_valid_enable_max_fanout=32 if forward else None)
             self.submodules += buffer
             self.comb += [source.connect(buffer.sink), buffer.source.connect(sink)]
             level = Signal(max=3)
@@ -312,7 +424,8 @@ class HBMNativeElasticBoundary(LiteXModule):
 
 class HBMCPUWindowPipeline(LiteXModule):
     """BIST-aware narrow AXI-Lite window boundary with idle accounting."""
-    def __init__(self, cpu, native, bist=False, name="hbm_cpu_window"):
+    def __init__(self, cpu, native, bist=False, name="hbm_cpu_window",
+            pipe_ready_capture_when_empty=False):
         self.idle = Signal(name=f"{name}_idle")
         converted = axi.AXILiteInterface(data_width=32, address_width=32)
         self.converted = converted
@@ -329,21 +442,24 @@ class HBMCPUWindowPipeline(LiteXModule):
         if bist:
             for channel in ("aw", "w", "ar"):
                 request = getattr(converted, channel)
-                buffer = stream.Buffer(request.description, pipe_valid=True, pipe_ready=True)
+                buffer = stream.Buffer(request.description, pipe_valid=True, pipe_ready=True,
+                    pipe_ready_capture_when_empty=pipe_ready_capture_when_empty)
                 request_buffers[channel] = buffer
                 self.submodules += buffer
                 self.comb += [request.connect(buffer.sink),
                     buffer.source.connect(getattr(request_buffered, channel))]
 
         write_buffer = stream.Buffer(offset_input.b.description,
-            pipe_valid=True, pipe_ready=True)
+            pipe_valid=True, pipe_ready=True,
+            pipe_ready_capture_when_empty=pipe_ready_capture_when_empty)
         self.submodules += write_buffer
         self.write_buffer = write_buffer
         self.comb += [offset_input.b.connect(write_buffer.sink),
             write_buffer.source.connect(cpu.b)]
 
         read_buffer = stream.Buffer(offset_input.r.description,
-            pipe_valid=True, pipe_ready=True)
+            pipe_valid=True, pipe_ready=True,
+            pipe_ready_capture_when_empty=pipe_ready_capture_when_empty)
         self.read_buffer = read_buffer
         self.submodules += read_buffer
         self.comb += [offset_input.r.connect(read_buffer.sink),
@@ -480,6 +596,8 @@ class BaseSoC(SoCCore):
             strict_timing=self.hbm_primitive, hbm_axi_domain=hbm_axi_domain,
             hbm_axi_clk_freq=hbm_axi_clk_freq,
             hbm_axi_reset_buf=hbm_experimental_500_1000)
+        if hbm_experimental_500_1000:
+            _add_hbm_reset_constraints(platform)
         if self.hbm_primitive:
             platform.toolchain.pre_placement_commands += [
                 "create_clock -name jtag_tck -period 66.666667 [get_pins BSCANE2/INTERNAL_TCK]",
@@ -615,7 +733,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     registered_request=hbm_bist or hbm_endpoint,
                     registered_completions=hbm_bist or hbm_endpoint,
                     clock_domain=axi_domain,
-                    sys_host_idle=all_host_idle if hbm_axi_domain else None)
+                    sys_host_idle=all_host_idle if hbm_axi_domain else None,
+                    registered_status=hbm_experimental_500_1000)
                 host_idle_axi = Signal(name="hbm_host_admission_closed_and_idle_axi")
                 observed_idle_axi = Signal(name="hbm_host_observed_idle_axi")
                 endpoint_host_idle_axi = Signal(name="hbm_endpoint_host_idle_axi") if hbm_endpoint else observed_idle_axi
@@ -717,7 +836,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     else:
                         self.submodules += axi.Wishbone2AXILite(gated, narrow)
                     window_pipeline = HBMCPUWindowPipeline(narrow, native, bist=hbm_bist,
-                        name=f"hbm_window_{channel}")
+                        name=f"hbm_window_{channel}",
+                        pipe_ready_capture_when_empty=hbm_experimental_500_1000)
                     self.submodules += window_pipeline
                     window_idle_signals.append(window_pipeline.idle & hold.idle
                         if hbm_axi_domain else window_pipeline.idle)
@@ -768,7 +888,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                         self.comb += local.b.connect(port.b)
                         # Register the local lane mux before the narrow bank mux.
                         local_read = stream.Buffer(local.r.description,
-                            pipe_valid=True, pipe_ready=True)
+                            pipe_valid=True, pipe_ready=True,
+                            pipe_ready_capture_when_empty=hbm_experimental_500_1000)
                         self.submodules += ClockDomainsRenamer(axi_domain)(local_read)
                         self.comb += local.r.connect(local_read.sink)
                         self.comb += local_read.source.connect(port.r)
@@ -776,14 +897,16 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                         for name in ("aw", "w", "ar"):
                             request = getattr(wide, name)
                             buffer = stream.Buffer(request.description,
-                                pipe_valid=True, pipe_ready=True)
+                                pipe_valid=True, pipe_ready=True,
+                                pipe_ready_capture_when_empty=hbm_experimental_500_1000)
                             self.submodules += ClockDomainsRenamer(axi_domain)(buffer)
                             self.comb += request.connect(buffer.sink)
                             self.comb += buffer.source.connect(getattr(routed, name))
                         for name in ("b", "r"):
                             response = getattr(routed, name)
                             buffer = stream.Buffer(response.description,
-                                pipe_valid=True, pipe_ready=True)
+                                pipe_valid=True, pipe_ready=True,
+                                pipe_ready_capture_when_empty=hbm_experimental_500_1000)
                             self.submodules += ClockDomainsRenamer(axi_domain)(buffer)
                             self.comb += response.connect(buffer.sink)
                             self.comb += buffer.source.connect(getattr(wide, name))
