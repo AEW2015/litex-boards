@@ -806,6 +806,134 @@ puts "FK33_NATIVE_FLOORPLAN ports=32 boundaries=32 permits=64"
     platform.toolchain.pre_routing_commands.append("fk33_check_native_floorplan_anchors")
 
 
+def _add_hbm_reference_placement(platform):
+    # Optional source-shape preset measured on FK33; not a general placement policy.
+    # Literal FF copies must match the reviewed configuration. No alias fallback.
+    platform.toolchain.pre_synthesis_commands.append("set_param synth.maxThreads 1")
+    commands = r"""
+# Twenty source-bound old LOC references; no BELs and no timing edits.
+set fk33_reference_control_locations {
+    {{fk33_hbm_quiesce_17/error_reg} {SLICE_X88Y14}}
+    {{fk33_hbm_quiesce_23/aw_held_reg} {SLICE_X191Y18}}
+    {{main_hbmnativeelasticboundary1_buffer5_pipe_valid_source_valid_reg} {SLICE_X29Y14}}
+    {{main_hbmnativeelasticboundary28_buffer141_pipe_ready_valid_reg_rep} {SLICE_X177Y12}}
+    {{main_hbmnativeelasticboundary28_buffer141_pipe_ready_valid_reg_rep__1} {SLICE_X177Y8}}
+    {{main_hbmnativeelasticboundary29_buffer146_pipe_ready_valid_reg_rep__1} {SLICE_X183Y25}}
+    {{main_hbmnativeelasticboundary2_buffer11_pipe_ready_valid_reg} {SLICE_X33Y18}}
+    {{main_hbmnativeelasticboundary2_buffer11_pipe_ready_valid_reg_rep__2} {SLICE_X33Y18}}
+    {{main_hbmnativeelasticboundary31_buffer155_pipe_ready_valid_reg} {SLICE_X191Y16}}
+    {{main_hbmnativeelasticboundary31_buffer155_pipe_valid_source_valid_reg} {SLICE_X191Y16}}
+    {{main_hbmnativeelasticboundary31_buffer156_pipe_ready_valid_reg_rep__0} {SLICE_X204Y14}}
+    {{main_hbmnativeelasticboundary31_buffer156_pipe_ready_valid_reg_rep__1} {SLICE_X204Y14}}
+    {{main_hbmnativeelasticboundary31_buffer156_pipe_ready_valid_reg_rep__2} {SLICE_X204Y14}}
+    {{main_hbmruntimequiesce_hbm_status_snapshot_hbmclockmailbox_held_reg[64]} {SLICE_X116Y29}}
+    {{main_hbmruntimequiesce_status_image_reg[20]} {SLICE_X116Y18}}
+    {{main_hbmruntimequiesce_status_image_reg[21]} {SLICE_X127Y28}}
+    {{main_hbmruntimequiesce_status_image_reg[27]} {SLICE_X130Y16}}
+    {{main_hbmruntimequiesce_status_image_reg[31]} {SLICE_X165Y21}}
+    {{main_hbmruntimequiesce_status_image_reg[32]} {SLICE_X107Y50}}
+    {{main_hbmruntimequiesce_status_image_reg[9]} {SLICE_X89Y28}}
+}
+proc fk33_refseed_one {objects label} {
+    if {[llength $objects]!=1} {error "$label requires one exact object: $objects"}
+    return [lindex $objects 0]
+}
+proc fk33_refseed_pin {cell name} {
+    return [fk33_refseed_one [get_pins -of_objects $cell -filter "REF_PIN_NAME == $name"] "$cell/$name"]
+}
+proc fk33_refseed_driver {pin} {
+    return [fk33_refseed_one [get_pins -leaf -of_objects [get_nets -segments -of_objects $pin] -filter {DIRECTION == OUT}] "Driver $pin"]
+}
+# Run AFTER the unchanged reset/status98/8regional floorplan validation and
+# BEFORE place_design. No BEL, pblock, clock, timing or RTL edits are made.
+proc fk33_reference_control_seed {{apply 0}} {
+    global fk33_reference_control_locations fk33_axi_reset_buf
+    if {![info exists fk33_axi_reset_buf] || ![llength [info commands fk33_check_reset_buffer]]} {error "Validated AXI reset preparation is required before reference LOCs"}
+    fk33_check_reset_buffer
+    if {[get_property REF_NAME $fk33_axi_reset_buf] ne "BUFGCE"} {error "AXI reset buffer type changed"}
+    set reset_output [fk33_refseed_pin $fk33_axi_reset_buf O]
+    if {[llength $fk33_reference_control_locations]!=20} {error "Reference LOC scope must contain exactly20 cells"}
+    set rows {}
+    set validated {}
+    set seen [dict create]
+    foreach reference $fk33_reference_control_locations {
+        lassign $reference name location
+        if {[dict exists $seen $name]} {error "Duplicate reference cell $name"}
+        dict set seen $name 1
+        set cell [fk33_refseed_one [get_cells -quiet -hier -filter [format {NAME == "%s"} $name]] "Reference cell $name (no alias inference)"]
+        if {[get_property REF_NAME $cell] ne "FDRE" || [string tolower [get_property INIT $cell]] ni {0 1'b0 1'h0 1'd0 0x0}} {error "Reference FF type/INIT differs $name"}
+        set c [fk33_refseed_pin $cell C]
+        set clock [fk33_refseed_one [get_clocks -of_objects $c] "Reference FF clock"]
+        set waveform [get_property WAVEFORM $clock]
+        if {$clock ne "main_clkout3" || [get_property PERIOD $clock]!=2.0 || [get_property IS_INVERTED $c] ||
+                [llength $waveform]!=2 || [lindex $waveform 0]!=0.0 || [lindex $waveform 1]!=1.0} {error "Reference FF must retain positive-edge AXI500 $name/$clock"}
+        set r [fk33_refseed_pin $cell R]
+        if {[get_property IS_INVERTED $r]} {error "Reference FF reset pin must stay positive $name"}
+        set actual_reset_driver [fk33_refseed_driver $r]
+        set reset_realization DIRECT_POSITIVE_R
+        if {$actual_reset_driver ne $reset_output} {
+            # Exactly these two observed PC2 state copies have synchronous
+            # reset folded into D. Every other reference keeps direct R.
+            if {$name ni {
+                main_hbmnativeelasticboundary2_buffer11_pipe_ready_valid_reg
+                main_hbmnativeelasticboundary2_buffer11_pipe_ready_valid_reg_rep__2
+            }} {error "Unapproved folded reset realization $name"}
+            set reset_constant [fk33_refseed_one [get_cells -of_objects $actual_reset_driver] "Folded reset GND"]
+            if {[get_property REF_NAME $reset_constant] ne "GND" || [get_property REF_PIN_NAME $actual_reset_driver] ne "G"} {error "Folded reset requires direct positive GND on R $name"}
+            set d [fk33_refseed_pin $cell D]
+            set ce [fk33_refseed_pin $cell CE]
+            if {[get_property IS_INVERTED $d] || [get_property IS_INVERTED $ce]} {error "Folded reset D/CE pin inversion $name"}
+            set enable_driver [fk33_refseed_driver $ce]
+            set enable_constant [fk33_refseed_one [get_cells -of_objects $enable_driver] "Folded reset VCC"]
+            if {[get_property REF_NAME $enable_constant] ne "VCC" || [get_property REF_PIN_NAME $enable_driver] ne "P"} {error "Folded reset requires constant-one CE $name"}
+            set data_driver [fk33_refseed_driver $d]
+            set lut [fk33_refseed_one [get_cells -of_objects $data_driver] "Folded reset D LUT"]
+            if {[get_property REF_PIN_NAME $data_driver] ne "O" || [get_property REF_NAME $lut] ne "LUT4" ||
+                    [string tolower [get_property INIT $lut]] ne "16'h0032"} {error "Folded reset requires exact observed LUT4/0032 $name"}
+            set reset_input [fk33_refseed_pin $lut I3]
+            if {[get_property IS_INVERTED $reset_input] || [fk33_refseed_driver $reset_input] ne $reset_output} {error "Folded D reset must directly receive positive protected AXI reset on I3 $name"}
+            # INIT0032 bits8..15 are all0: I3=reset=1 forcesD=0 for
+            # arbitraryI0/I1/I2; CE=1,R=0 then forcesnextQ=0.
+            set reset_realization EXACT_TWO_CELL_D_LUT4_0032_I3_CE1_R0
+        }
+        foreach property {MACRO_NAME PARENT_MACRO} {
+            if {[get_property -quiet $property $cell] ne ""} {error "Reference FF is macro-owned; no partial macro LOC $name"}
+        }
+        if {[get_property IS_BEL_FIXED $cell]} {error "Reference FF already has a BEL constraint $name"}
+        set current [get_property LOC $cell]
+        if {$current ne "" && $current ne $location} {error "Reference LOC conflicts with existing placement $name/$current"}
+        set site [fk33_refseed_one [get_sites -quiet $location] "Reference SLICE site"]
+        if {[get_property SITE_TYPE $site] ni {SLICEL SLICEM}} {error "Reference site is not a compatible SLICE $location"}
+        set blocks [get_pblocks -quiet -of_objects $cell]
+        foreach block $blocks {
+            if {![get_property IS_SOFT $block] || [get_property EXCLUDE_PLACEMENT $block] || [get_property CONTAIN_ROUTING $block]} {error "Reference LOC requires unchanged soft/nonexclusive regional policy $name/$block"}
+        }
+        lappend validated [list $cell $location]
+        lappend rows [dict create name $name REF FDRE INIT 0 clock $clock period 2.0 reset $reset_output physical_R_driver $actual_reset_driver reset_realization $reset_realization requested_LOC $location BEL NOT_CONSTRAINED pblocks $blocks]
+    }
+    # Validate the entire scope first: a missing/copy/role mismatch applies no
+    # partial LOCs. Excluding a missing name requires a new reviewed manifest.
+    if {$apply} {
+        foreach reference $validated {
+            lassign $reference cell location
+            set_property LOC $location $cell
+        }
+    }
+    return [dict create status VALIDATED20_REFERENCE_LOC_ONLY applied $apply rows $rows exclusions {main_buffer76_pipe_ready_valid_reg_rep__1 {fk33_hbm_quiesce_8/addresses_reg[1]_replica} {main_hbmruntimequiesce_status_image_reg[31]_replica}} no_BEL_constraints 1 no_timing_constraints 1 no_clock_changes 1 no_RTL_changes 1 qualification NOT_CLAIMED]
+}
+
+set fk33_reference_seed_result [fk33_reference_control_seed 1]
+if {[dict get $fk33_reference_seed_result status] ne "VALIDATED20_REFERENCE_LOC_ONLY" ||
+        ![dict get $fk33_reference_seed_result applied] ||
+        [llength [dict get $fk33_reference_seed_result rows]]!=20} {
+    error "Reference LOC20 scope differs"
+}
+puts "FK33_REFERENCE_CONTROL_LOC20_APPLIED no_BELs=1 no_timing_edits=1 no_clock_edits=1 qualification=NOT_CLAIMED"
+"""
+    commands = commands.replace("{", "{{").replace("}", "}}")
+    platform.toolchain.pre_placement_commands.append(commands)
+
+
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class HBMHostDrainBarrier(LiteXModule):
@@ -1111,10 +1239,19 @@ class BaseSoC(SoCCore):
         hbm_axi_domain        = False,
         hbm_axi_clk_freq      = 250e6,
         hbm_experimental_500_1000 = False,
+        hbm_reference_placement = False,
         **kwargs):
         self.hbm_primitive = hbm_primitive or hbm_primitive_rtl is not None
         self.hbm_axi_domain = bool(hbm_axi_domain)
         self.hbm_experimental_500_1000 = bool(hbm_experimental_500_1000)
+        if hbm_reference_placement and not (
+                hbm_experimental_500_1000 and with_hbm and hbm_primitive and
+                hbm_primitive_rtl is None and hbm_endpoint and hbm_endpoint_traffic and
+                hbm_axi_domain and sys_clk_freq == 250e6 and hbm_axi_clk_freq == 500e6 and
+                not hbm_endpoint_two_port and not hbm_bist and not with_pcie and
+                kwargs.get("cpu_type", "vexriscv") == "vexriscv" and
+                kwargs.get("cpu_variant") in (None, "minimal")):
+            raise ValueError("Reference placement requires the experimental single-PC31 VexRiscv minimal profile")
         if hbm_experimental_500_1000 and not (
                 self.hbm_primitive and hbm_endpoint and hbm_axi_domain and
                 sys_clk_freq == 250e6 and hbm_axi_clk_freq == 500e6 and not hbm_endpoint_two_port):
@@ -1602,6 +1739,10 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                 if hbm_endpoint_two_port:
                     self.csr.add("hbm_endpoint30", 10, use_loc_if_exists=True)
 
+        # Keep the optional LOC preset after all regional and Gray constraints.
+        if hbm_reference_placement:
+            _add_hbm_reference_placement(platform)
+
     def _finalize_bus(self):
         if not (self.hbm_primitive and (hasattr(self, "hbm_bist") or hasattr(self, "hbm_endpoint"))):
             return super()._finalize_bus()
@@ -1675,6 +1816,7 @@ def main():
     parser.add_target_argument("--hbm-endpoint", action="store_true", help="Dedicate PC31 to the processor-driven four-command wide endpoint.")
     parser.add_target_argument("--hbm-axi-domain", action="store_true", help="Independent HBM AXI clock domain (requires primitive BIST or endpoint).")
     parser.add_target_argument("--hbm-experimental-500-1000", action="store_true", help="Unqualified AXI500/HBM1000 overclock; native model remains 1800 MT/s.")
+    parser.add_target_argument("--hbm-reference-placement", action="store_true", help="Use the reviewed experimental single-PC31 placement preset; literal FF copies must match.")
     parser.add_target_argument("--hbm-axi-clk-freq", default=250e6, type=float, choices=[250e6, 400e6, 500e6], help="HBM AXI clock frequency; 500 MHz requires --hbm-experimental-500-1000.")
     parser.add_target_argument("--hbm-channels", default="0,1,2,3",         help="HBM channels to map (comma/range list or all).")
     parser.add_target_argument("--hbm-main-channel", default=0, type=int,   help="Mapped HBM channel used as main RAM.")
@@ -1715,6 +1857,7 @@ def main():
         hbm_axi_domain        = args.hbm_axi_domain,
         hbm_axi_clk_freq      = args.hbm_axi_clk_freq,
         hbm_experimental_500_1000 = args.hbm_experimental_500_1000,
+        hbm_reference_placement = args.hbm_reference_placement,
         **parser.soc_argdict
     )
     builder = Builder(soc, **parser.builder_argdict)
