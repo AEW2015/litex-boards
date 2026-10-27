@@ -929,6 +929,56 @@ if {[dict get $fk33_reference_seed_result status] ne "VALIDATED20_REFERENCE_LOC_
     error "Reference LOC20 scope differs"
 }
 puts "FK33_REFERENCE_CONTROL_LOC20_APPLIED no_BELs=1 no_timing_edits=1 no_clock_edits=1 qualification=NOT_CLAIMED"
+
+# Source-tagged endpoint R capture; source KEEP preserves only this alias.
+# The actual placer property is applied through its supported Tcl interface.
+set capture [fk33_refseed_one [get_nets -hier -filter {HBM_ENDPOINT_R_CAPTURE == hbm_endpoint_pc31}] "Tagged PC31 R-capture net"]
+set segments [get_nets -segments $capture]
+if {[llength [get_clocks -quiet -of_objects $segments]]} {error "Capture tag unexpectedly denotes a clock"}
+set output [fk33_refseed_one [get_pins -leaf -of_objects $segments -filter {DIRECTION == OUT}] "Capture driver"]
+set lut [fk33_refseed_one [get_cells -of_objects $output] "Capture driver cell"]
+set ref [get_property REF_NAME $lut]
+if {![regexp {^LUT[1-6]$} $ref] && $ref ne "LUT6_2"} {error "Capture must be ordinary LUT-driven"}
+if {[get_property REF_PIN_NAME $output] ni {O O5 O6}} {error "Capture output role changed"}
+set driver_net [fk33_refseed_one [get_nets -of_objects $output] "LUT-adjacent capture net"]
+if {[lsort -unique [get_nets -segments -of_objects $output]] ne [lsort -unique $segments]} {error "Capture driver/tag electrical component differs"}
+set protected_cells [list $lut]
+set parent [get_property PARENT $lut]
+while {$parent ne "" && [llength [get_cells -quiet $parent]]} {
+    set object [fk33_refseed_one [get_cells -quiet $parent] "Capture hierarchy"]
+    lappend protected_cells $object
+    set parent [get_property PARENT $object]
+}
+foreach cohort [list $segments $protected_cells] {
+    foreach object $cohort {
+        set value [string toupper [get_property -quiet DONT_TOUCH $object]]
+        if {$value ni {{} FALSE 0 1'B0 1'H0 1'D0 0X0}} {error "Capture has protected/unknown DONT_TOUCH:$object/$value"}
+    }
+}
+set loads [get_pins -leaf -of_objects $segments -filter {DIRECTION == IN}]
+set count 0
+foreach load $loads {
+    set role [get_property REF_PIN_NAME $load]
+    set cell [fk33_refseed_one [get_cells -of_objects $load] "Capture load owner"]
+    set load_ref [get_property REF_NAME $cell]
+    set protection [string toupper [get_property -quiet DONT_TOUCH $cell]]
+    if {$protection ni {{} FALSE 0 1'B0 1'H0 1'D0 0X0}} {error "Capture load is protected/unknown:$cell/$protection"}
+    if {[string toupper [get_property -quiet ASYNC_REG $cell]] ni {{} FALSE 0} ||
+            [get_property -quiet HBM_GRAY_SRC $cell] ne "" || [get_property -quiet HBM_GRAY_DST $cell] ne ""} {error "Capture load is CDC/Gray state:$cell"}
+    if {([regexp {^LUT[1-6]$} $load_ref] || $load_ref eq "LUT6_2") && [regexp {^I[0-5]$} $role]} {continue}
+    if {$load_ref ne "FDRE" || $role ni {D CE}} {error "Capture load must be ordinary LUT input or FDRE D/CE:$load/$load_ref"}
+    set c [fk33_refseed_pin $cell C]
+    set clock [fk33_refseed_one [get_clocks -of_objects $c] "Capture load clock"]
+    if {$clock ne "main_clkout3" || [get_property PERIOD $clock]!=2.0 || [get_property IS_INVERTED $c]} {error "Capture FDRE load must retain positive native500:$cell"}
+    if {$role eq "CE"} {
+        if {[get_property IS_INVERTED $load]} {error "Capture CE polarity differs:$load"}
+        incr count
+    }
+}
+if {!$count} {error "Capture net has no validated native500 CE consumer"}
+set_property FORCE_MAX_FANOUT 8 $driver_net
+if {[get_property FORCE_MAX_FANOUT $driver_net]!=8} {error "Capture force-fanout readback differs"}
+puts [list HBM_ENDPOINT_R_CAPTURE_FORCE8 $capture $driver_net LUT $lut CE_consumers $count physical_effect NOT_MEASURED]
 """
     commands = commands.replace("{", "{{").replace("}", "}}")
     platform.toolchain.pre_placement_commands.append(commands)
