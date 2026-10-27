@@ -289,7 +289,7 @@ proc fk33_cpu_locality_select {pc_regions native_aclk reserve_pc31} {
     set typed_macros [dict create]
     set parents [get_cells -quiet [dict keys $all_children]]
     foreach parent $parents ref [get_property REF_NAME $parents] {
-        if {$ref in {RAM32M RAM32M16 RAM32X1D}} {dict set typed_macros $parent $parent}
+        if {$ref in {RAM32M RAM32M16}} {dict set typed_macros $parent $parent}
     }
     set pruned 0
     set macro_regions [dict create]
@@ -630,7 +630,7 @@ dict for {region members} $region_members {
     }
     puts "FK33_NATIVE_REGION_PBLOCK region=$region slices=[llength $lower] cells=[llength $members] max_y=$middle soft=1"
 }
-# Vivado assigns RAM32M, RAM32M16 and RAM32X1D atomically. Check the parent and the
+# Vivado assigns a RAM32M/M16 atomically. Check its typed parent and the
 # complete indexed sibling cohort together, once per macro, after assignment.
 dict for {macro children} $fk33_cpu_macro_children {
     set expected [list fk33_native_[dict get $cell_regions $macro]]
@@ -731,26 +731,29 @@ class HBMCPUWindowCDC(LiteXModule):
     Separate AW/W counts retain half-writes across STOP and arbitrary channel
     skew. One CPU window permits at most one read and one write outstanding.
     """
-    def __init__(self, master, slave, gray_bus_prefix=None, forward_read_pipeline=False):
+    def __init__(self, master, slave, gray_bus_prefix=None, forward_read_pipeline=False,
+            reverse_read_pipeline=False):
         self.idle = Signal()
         self.fault = Signal()
-        if forward_read_pipeline:
+        if forward_read_pipeline or reverse_read_pipeline:
             from litex.soc.cores.ram.xilinx_usp_hbm2_endpoint import HBMRegisteredReadCDC
             # Reuse the endpoint's registered-current-address FIFO. Keep the
-            # empty/advance decision out of the native RAM read data path.
+            # empty/advance decision out of the RAM read data path.
             self.crossing = LiteXModule()
             for name in ("aw", "w", "ar", "b", "r"):
                 forward = name in ("aw", "w", "ar")
                 source = getattr(master if forward else slave, name)
                 sink = getattr(slave if forward else master, name)
                 prefix = None if gray_bus_prefix is None else f"{gray_bus_prefix}_{name}"
-                if forward:
+                if (forward and forward_read_pipeline) or (not forward and reverse_read_pipeline):
                     crossing = HBMRegisteredReadCDC(source.description,
-                        cd_from="sys", cd_to="axi", gray_bus_prefix=prefix,
+                        cd_from="sys" if forward else "axi",
+                        cd_to="axi" if forward else "sys", gray_bus_prefix=prefix,
                         read_address_max_fanout=16)
                 else:
                     crossing = stream.ClockDomainCrossing(source.description,
-                        cd_from="axi", cd_to="sys", gray_bus_prefix=prefix)
+                        cd_from="sys" if forward else "axi",
+                        cd_to="axi" if forward else "sys", gray_bus_prefix=prefix)
                 setattr(self.crossing, name, crossing)
                 self.comb += [source.connect(crossing.sink), crossing.source.connect(sink)]
         else:
@@ -1290,7 +1293,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                             crossed = axi.AXILiteInterface(data_width=32, address_width=33)
                             crossing = HBMCPUWindowCDC(port, crossed,
                                 gray_bus_prefix=f"hbm_cpu_pc{4*bank + channel:02d}",
-                                forward_read_pipeline=hbm_experimental_500_1000)
+                                forward_read_pipeline=hbm_experimental_500_1000,
+                                reverse_read_pipeline=hbm_experimental_500_1000)
                             self.submodules += crossing
                             cdc_idle_signals.append(crossing.idle)
                             cdc_fault_signals.append(crossing.fault)
