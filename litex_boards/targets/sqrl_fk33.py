@@ -1780,6 +1780,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                             request = getattr(wide, name)
                             buffer = stream.Buffer(request.description,
                                 pipe_valid=True, pipe_ready=True,
+                                pipe_valid_enable_max_fanout=(
+                                    32 if hbm_experimental_500_1000 and name == "w" else None),
                                 pipe_ready_capture_when_empty=hbm_experimental_500_1000,
                                 pipe_ready_valid_max_fanout=64 if hbm_experimental_500_1000 else None)
                             self.submodules += ClockDomainsRenamer(axi_domain)(buffer)
