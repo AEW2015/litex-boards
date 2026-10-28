@@ -18,9 +18,10 @@ See [AMD's HBM controller limits](https://docs.amd.com/r/en-US/ds923-virtex-ultr
 The reference recipe below uses 250 MHz SYS/AXI. The new rated AXI400
 candidate selects SYS200 and is described below; it needs fresh timing closure
 and hardware qualification. There is no implemented AXI450 profile.
-The normal primitive target rejects AXI500 and has no 1000 MHz HBM profile. Earlier
-AXI500 source work is retained on `work/hbm-experimental-overclock` in both
-repositories. An explicit overclock option is deferred to later work.
+The normal primitive target keeps the rated clock policy and defaults unchanged.
+An explicit `--hbm-experimental-500-1000` opt-in is available in the experimental
+source branch documented below; it is not an AMD-rated profile or a normal-build
+recommendation.
 
 ## Reference configuration
 
@@ -301,6 +302,72 @@ temperature age at SYS200. HBM PLL/PHY/MC tables and destructive 800/900 MHz
 profiles are unchanged. This is a separate candidate, not qualification of a
 new programming image; require its source-bound native and hardware results.
 Resume with the same AXI-rate arguments. AXI250 remains the launcher's default.
+
+## Experimental SYS250 / AXI500 / HBM1000 candidate
+
+This separate opt-in candidate uses source branch
+`work/hbm-native500-status-publication` in both repositories:
+
+- LiteX core: `93c19c9c6d2e9ad720648f760c0e2858dd5f9d6f`.
+- litex-boards: `7d6fc10e8ecfb5cbc1f176b1b5b142da4e62828f`.
+
+Use the direct target CLI below with both revisions importable. The portable
+`rebuild/build.py` interface remains limited to its 250/400 MHz profiles and does
+not expose this 500 MHz target configuration. Use a fresh output directory for
+each run. The command keeps synthesis at one thread and implementation at eight,
+with the measured Explore/AggressiveExplore directives:
+
+```text
+python -m litex_boards.targets.sqrl_fk33 --with-hbm --hbm-primitive --hbm-endpoint --hbm-endpoint-traffic --hbm-reference-placement --no-ident-version --hbm-axi-domain --hbm-axi-clk-freq 500e6 --hbm-experimental-500-1000 --sys-clk-freq 250e6 --cpu-type vexriscv --cpu-variant minimal --build --output-dir build/fk33-native500-status-publication --vivado-max-threads 8 --vivado-place-directive Explore --vivado-post-place-phys-opt-directive AggressiveExplore --vivado-route-directive Explore --vivado-post-route-phys-opt-directive AggressiveExplore --vivado-report-level signoff
+```
+
+Provide the RISC-V compiler through the existing `FK33_RISCV_GCC` environment
+setting. The measured dependency was `pythondata_cpu_vexriscv` 1.0.1.post407,
+data revision `5f0c7a7faf6b65c907a93be6e3723e297d37ee71`; its consumed
+`VexRiscv_Min.v` was 198,950 bytes with SHA256
+`758874a989724fe2b92a5413b43265c9a5129638fee9d7358fcd6724992b598f`. The package
+version alone does not identify those source bytes. `--no-ident-version` omits the
+changing build timestamp from the identifier ROM; it does not establish bitwise
+or cross-OS build repeatability.
+
+The candidate uses SYS250 / native AXI500 / software-programmed HBM1000 /
+REF200 / APB100 MHz with native 256-bit AXI3 ports and the PC31 endpoint. It adds
+status-publication stages in the existing runtime path; the normal defaults and
+rated profiles are unchanged. Its image reused an equivalent synthesis result,
+not a fresh synthesis. Two fresh SRAM loads passed 125 bounded hardware jobs in
+total (7 smoke and 118 qualification), including all 16 calibration checks and
+31 CPU-port checks. The source-bound fabric report had +0.002 ns setup WNS,
++0.010 ns hold WHS and zero setup/hold endpoint failures.
+
+This remains an experimental, unqualified candidate. The primitive timing model
+still reports a 2.220 ns minimum period against the 2 ns AXI clock. The reviewed
+98-bit status hold exception depends on the documented protocol and is not an STA
+pass. These results do not establish full-native qualification, whole-HBM address
+coverage, PVT qualification or cross-OS routed repeatability.
+
+Read-only RapidWright analysis also passed on the tested routed checkpoint.
+RapidWright remains an integrated stage of the existing portable build flow.
+For the direct-target command above, run the following analysis separately from
+the boards repository root, using the RapidWright Python environment prepared
+earlier. First generate its readable-EDIF export script:
+
+```text
+python -c "import importlib.util; from pathlib import Path; s=importlib.util.spec_from_file_location('fk33_rw','litex_boards/software/fk33_hbm/rebuild/rapidwright_assist.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); b=Path('build/fk33-native500-status-publication').resolve(); o=b/'rapidwright'; o.mkdir(exist_ok=True); (o/'export.tcl').write_text(m.export_tcl(b/'gateware/sqrl_fk33_route.dcp',o/'readable.edf',o/'native-paths.rpt',o/'native-summary.rpt'))"
+vivado -mode batch -source build/fk33-native500-status-publication/rapidwright/export.tcl
+```
+
+Then run the existing worker with a 4 GiB Java heap. `JAVA_HOME` can select the
+installed JVM as described in the prerequisites:
+
+```text
+python -c "import os,runpy,sys; os.environ['JAVA_TOOL_OPTIONS']='-Xmx4g'; sys.argv=['rapidwright_assist.py']+sys.argv[1:]; runpy.run_path('litex_boards/software/fk33_hbm/rebuild/rapidwright_assist.py',run_name='__main__')" --worker --dcp build/fk33-native500-status-publication/gateware/sqrl_fk33_route.dcp --readable-edif build/fk33-native500-status-publication/rapidwright/readable.edf --timing-report build/fk33-native500-status-publication/rapidwright/native-paths.rpt --hbm-endpoint --checkpoint-stage routed --output build/fk33-native500-status-publication/rapidwright
+```
+
+Inspect `rapidwright/physical-analysis.json` alongside Vivado's final timing,
+route and DRC reports. This worker reads the checkpoint and never repairs
+timing or programs hardware. The normal `--attempt` entry point consumes the
+portable launcher's completed attempt and receipts; direct-target output uses
+the explicit DCP/EDIF commands above.
 
 ## Processor calibration after loading
 
