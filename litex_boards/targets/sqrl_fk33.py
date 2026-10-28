@@ -658,7 +658,7 @@ puts "FK33_STATUS_MAILBOX_BUNDLE pairs=98 max_ns=4.0 hold=EXCEPTED_BUNDLED_PROTO
     platform.toolchain.pre_placement_commands.append(commands)
 
 
-def _add_hbm_native_floorplan(platform, reserve_pc31=False):
+def _add_hbm_native_floorplan(platform, reserve_pc31=False, tracker_tags=False):
     """Guide native channel storage towards its fixed HBM clock region."""
     commands = r"""
 proc fk33_floorplan_one {objects label} {
@@ -765,55 +765,99 @@ if {$fk33_reserve_pc31} {
     }
     puts "FK33_NATIVE_ENDPOINT_LOCALITY pc=31 registers=[llength $endpoint]"
 }
-# Tracker instance numbering is allocation-dependent. Its native AW/AR ready
-# inputs instead identify the first skid state, whose boundary has a known PC.
+# Retained error-net metadata identifies physical PCs even when synthesis
+# rebuilds the hierarchy without AXI pins. Never infer PCs from instance order.
+set tagged_trackers [dict create]
+if {$fk33_tracker_tags} {
+    set tagged_ports [dict create]
+    foreach net [get_nets -hierarchical -filter {HBM_TRACKER_PC != ""}] {
+        set pc [get_property HBM_TRACKER_PC $net]
+        if {![regexp {^(0|[1-9][0-9]*)$} $pc] || $pc > 31} {error "Invalid tracker PC tag: $net/$pc"}
+        set segments [get_nets -segments $net]
+        set q [fk33_floorplan_one [get_pins -leaf -of_objects $segments -filter {DIRECTION == OUT}] "PC$pc error source"]
+        set source [fk33_floorplan_one [get_cells -of_objects $q] "PC$pc error register"]
+        if {![string match FD* [get_property REF_NAME $source]] || [get_property REF_PIN_NAME $q] ne "Q"} {error "PC$pc tracker tag is not register-Q driven"}
+        if {![regexp {(^|/)error_reg$} $source]} {error "PC$pc tag does not identify tracker error state: $source"}
+        set tracker [get_property PARENT $source]
+        set owner [fk33_floorplan_one [get_cells -hierarchical -filter "NAME == $tracker"] "PC$pc tracker"]
+        if {![string match fk33_hbm_quiesce* [get_property REF_NAME $owner]]} {error "PC$pc error source has no tracker owner"}
+        if {[dict exists $tagged_ports $pc] && [dict get $tagged_ports $pc] ne $tracker} {error "Multiple trackers tagged PC$pc"}
+        if {[dict exists $tagged_trackers $tracker] && [dict get $tagged_trackers $tracker] ne $pc} {error "Tracker has conflicting PC tags: $tracker"}
+        dict set tagged_ports $pc $tracker
+        dict set tagged_trackers $tracker $pc
+    }
+    if {[dict size $tagged_ports] != 32} {error "Tracker locality requires all 32 physical PC tags"}
+}
+# The untagged flow retains discovery through the native AW/AR ready inputs.
 set tracker_predicates {}
 set tracker_ports {}
 set trackers [get_cells -hierarchical -filter {REF_NAME =~ fk33_hbm_quiesce* && IS_PRIMITIVE == 0}]
 foreach tracker $trackers {
-    set pcs {}
-    set observed_roles 0
-    foreach role {m_awready m_arready} {
-        set pin [get_pins -quiet ${tracker}/$role]
-        if {[llength $pin] != 1} {continue}
-        if {[get_cells -of_objects $pin] ne $tracker} {error "$pin is not owned by $tracker"}
-        incr observed_roles
-        set outputs [get_pins -leaf -of_objects [get_nets -segments -of_objects $pin] -filter {DIRECTION == OUT}]
-        set drivers [get_cells -of_objects $outputs]
-        set luts [get_cells -of_objects $outputs -filter {REF_NAME =~ LUT*}]
-        if {[llength $luts]} {
-            set inputs [get_pins -of_objects $luts -filter {DIRECTION == IN}]
-            set sources [get_pins -leaf -of_objects [get_nets -segments -of_objects $inputs] -filter {DIRECTION == OUT}]
-            set drivers [concat $drivers [get_cells -of_objects $sources]]
-        }
-        set stems {}
-        foreach driver $drivers {
-            if {![string match FD* [get_property REF_NAME [get_cells $driver]]]} {continue}
-            if {[regexp {([^/]*hbmnativeelasticboundary[0-9]+)_buffer[0-9]+_pipe_ready_valid_reg[^/]*$} $driver -> stem] && [dict exists $boundary_ports $stem] && [dict exists $cell_regions $driver]} {
-                lappend stems $stem
+    if {$fk33_tracker_tags} {
+        if {![dict exists $tagged_trackers $tracker]} {error "Untagged retained tracker: $tracker"}
+        set pc [dict get $tagged_trackers $tracker]
+    } else {
+        set pcs {}
+        set observed_roles 0
+        foreach role {m_awready m_arready} {
+            set pin [get_pins -quiet ${tracker}/$role]
+            if {[llength $pin] != 1} {continue}
+            if {[get_cells -of_objects $pin] ne $tracker} {error "$pin is not owned by $tracker"}
+            incr observed_roles
+            set outputs [get_pins -leaf -of_objects [get_nets -segments -of_objects $pin] -filter {DIRECTION == OUT}]
+            set drivers [get_cells -of_objects $outputs]
+            set luts [get_cells -of_objects $outputs -filter {REF_NAME =~ LUT*}]
+            if {[llength $luts]} {
+                set inputs [get_pins -of_objects $luts -filter {DIRECTION == IN}]
+                set sources [get_pins -leaf -of_objects [get_nets -segments -of_objects $inputs] -filter {DIRECTION == OUT}]
+                set drivers [concat $drivers [get_cells -of_objects $sources]]
             }
+            set stems {}
+            foreach driver $drivers {
+                if {![string match FD* [get_property REF_NAME [get_cells $driver]]]} {continue}
+                if {[regexp {([^/]*hbmnativeelasticboundary[0-9]+)_buffer[0-9]+_pipe_ready_valid_reg[^/]*$} $driver -> stem] && [dict exists $boundary_ports $stem] && [dict exists $cell_regions $driver]} {
+                    lappend stems $stem
+                }
+            }
+            if {[llength [lsort -unique $stems]] == 1} {lappend pcs [dict get $boundary_ports [lindex $stems 0]]}
         }
-        if {[llength [lsort -unique $stems]] == 1} {lappend pcs [dict get $boundary_ports [lindex $stems 0]]}
+        if {!$observed_roles} {puts "FK33_NATIVE_TRACKER_LOCALITY_PENDING tracker=$tracker reason=hierarchy_pins_unavailable"; continue}
+        set pcs [lsort -unique $pcs]
+        if {[llength $pcs] != 1} {error "$tracker AW/AR readiness does not identify one native boundary"}
+        set pc [lindex $pcs 0]
     }
-    if {!$observed_roles} {puts "FK33_NATIVE_TRACKER_LOCALITY_PENDING tracker=$tracker reason=hierarchy_pins_unavailable"; continue}
-    set pcs [lsort -unique $pcs]
-    if {[llength $pcs] != 1} {error "$tracker AW/AR readiness does not identify one native boundary"}
-    set pc [lindex $pcs 0]
     if {$pc in $tracker_ports} {error "Duplicate native tracker for PC$pc"}
     lappend tracker_ports $pc
     set region [dict get $fk33_hard_regions $pc]
     set members [get_cells -hierarchical -filter "REF_NAME =~ FD* && NAME =~ $tracker/*"]
+    if {$fk33_tracker_tags} {
+        set owned {}
+        foreach cell $members {
+            # Rebuilt hierarchy may contain unrelated CPU buffer registers.
+            set leaf [string range $cell [expr {[string length $tracker] + 1}] end]
+            if {![regexp {^(reads|addresses|writes_started|writes_completed|ar_held|aw_held|w_held|w_active|r_pending|b_pending|error)_reg(_rep(lica)?(__?[0-9]+)?)?(\[[0-9]+\])?(_rep(lica)?(__?[0-9]+)?)?$} $leaf]} {
+                puts "FK33_NATIVE_TRACKER_EXCLUDED pc=$pc cell=$cell reason=foreign_or_unreviewed_state"
+                continue
+            }
+            lappend owned $cell
+        }
+        set members $owned
+    }
     if {![llength $members]} {error "$tracker has no retained state"}
     foreach cell $members {
         set clock_pin [fk33_cpu_pin $cell C]
         if {![dict exists $fk33_cpu_clock_pins $clock_pin]} {error "$tracker state is not native-clocked: $cell"}
+        if {[dict exists $cell_regions $cell] && [dict get $cell_regions $cell] ne $region} {error "Tracker storage crosses native regions: $cell"}
         dict set cell_regions $cell $region
         dict lappend region_members $region $cell
         lappend tracker_predicates $cell
     }
     puts "FK33_NATIVE_TRACKER_LOCALITY tracker=$tracker pc=$pc registers=[llength $members]"
 }
-if {[llength $tracker_ports] != 32} {puts "FK33_NATIVE_TRACKER_LOCALITY_PENDING retained_hierarchies=[llength $trackers] bound_ports=[llength $tracker_ports]"}
+if {[llength $tracker_ports] != 32} {
+    if {$fk33_tracker_tags} {error "Not all physical trackers were bound"}
+    puts "FK33_NATIVE_TRACKER_LOCALITY_PENDING retained_hierarchies=[llength $trackers] bound_ports=[llength $tracker_ports]"
+}
 # Guide the measured READY-to-CE cones. Data muxes remain placer-controlled;
 # both payload banks, including direct incoming RDATA FFs, are already grouped.
 # Shared global, cross-region and top-port drivers remain unbound.
@@ -893,7 +937,8 @@ dict for {macro children} $fk33_cpu_macro_children {
 }
 puts "FK33_NATIVE_FLOORPLAN ports=32 boundaries=32 permits=64"
 """
-    commands = _hbm_cpu_locality_commands() + f"\nset fk33_reserve_pc31 {int(reserve_pc31)}\n" + commands
+    commands = (_hbm_cpu_locality_commands() +
+        f"\nset fk33_reserve_pc31 {int(reserve_pc31)}\nset fk33_tracker_tags {int(tracker_tags)}\n" + commands)
     commands = commands.replace("{", "{{").replace("}", "}}")
     platform.toolchain.pre_placement_commands.append(commands)
     platform.toolchain.pre_routing_commands.append("fk33_check_native_floorplan_anchors")
@@ -1473,7 +1518,8 @@ class BaseSoC(SoCCore):
         if hbm_experimental_500_1000:
             _add_hbm_reset_constraints(platform)
             _add_hbm_status_mailbox_constraints(platform)
-            _add_hbm_native_floorplan(platform, reserve_pc31=hbm_endpoint)
+            _add_hbm_native_floorplan(platform, reserve_pc31=hbm_endpoint,
+                tracker_tags=hbm_experimental_500_1000)
         if self.hbm_primitive:
             platform.toolchain.pre_placement_commands += [
                 "create_clock -name jtag_tck -period 66.666667 [get_pins BSCANE2/INTERNAL_TCK]",
@@ -1612,7 +1658,8 @@ puts "HBM_ENDPOINT_GRAY_CONSTRAINTS_APPLIED groups=10 bound_ns=4.0"
                     sys_host_idle=all_host_idle if hbm_axi_domain else None,
                     registered_status=hbm_experimental_500_1000,
                     local_status_pipeline=hbm_experimental_500_1000,
-                    status_publication_pipeline=hbm_experimental_500_1000)
+                    status_publication_pipeline=hbm_experimental_500_1000,
+                    native_tracker_tags=hbm_experimental_500_1000)
                 host_idle_axi = Signal(name="hbm_host_admission_closed_and_idle_axi")
                 observed_idle_axi = Signal(name="hbm_host_observed_idle_axi")
                 endpoint_host_idle_axi = Signal(name="hbm_endpoint_host_idle_axi") if hbm_endpoint else observed_idle_axi
