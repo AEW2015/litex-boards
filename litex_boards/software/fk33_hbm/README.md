@@ -325,7 +325,7 @@ with zero failing endpoints, versus +0.002/+0.001 ns for the prior fresh
 published-source build. The finite Gray/reset/control audits and read-only
 400-path RapidWright analysis passed.
 
-Measured write-enable driver fanout fell in all 31 source buffer groups;
+In the first build, measured write-enable driver fanout fell in all 31 source buffer groups;
 peak logical loads fell from 300 to 88. `MAX_FANOUT=32` is a synthesis hint,
 not a strict final fanout cap. CE setup slack improved in 21 groups; this is
 not a claim that every path improved. The candidate passed seven hardware
@@ -337,10 +337,17 @@ restored. Flash was untouched.
 This remains experimental and unqualified: the hard primitive model retains
 32 clock failures at 2.000 ns against its declared 2.220 ns minimum. The
 98 status paths retain their finite 4 ns bound and protocol-based hold
-waiver, not a hold-STA pass. Margins remain small. This one Windows build and
+waiver, not a hold-STA pass. Margins remain small. These Windows builds and
 bounded smoke do not establish cross-OS, implementation-variation, PVT,
 whole-HBM capacity or aggregate-bandwidth qualification. HBM1000 settings
 were programmed and read back, without independent frequency measurement.
+A second clean build of the same code and settings also passed the complete
+fabric/CDC/control audit and read-only RapidWright, again at +0.006/+0.010 ns
+setup/hold. Its own fresh SRAM load passed all seven smoke jobs, 16 MC/PHY
+calibrations and processor accesses on 31 ports. These two local builds and
+14 total jobs are separate image-bound records. Targeted fanout was measured
+on the first image; the repeat does not add a new fanout-cap claim. Both runs
+remain experimental, with no cross-OS, seed-variation or PVT qualification.
 The older source-publication experiment below is separate historical evidence.
 
 ## Experimental SYS250 / AXI500 / HBM1000 candidate
