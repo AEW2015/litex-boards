@@ -303,6 +303,46 @@ profiles are unchanged. This is a separate candidate, not qualification of a
 new programming image; require its source-bound native and hardware results.
 Resume with the same AXI-rate arguments. AXI250 remains the launcher's default.
 
+## Experimental CPU write-enable fanout build
+
+The boards branch `work/hbm-native500-cpu-enable-fanout` uses LiteX core
+`93c19c9c6d2e9ad720648f760c0e2858dd5f9d6f` from
+`work/hbm-native500-status-publication`. The measured boards code is
+`15ee73efc4a1cf0bbe46b9bad91686d5d19accdc`; later documentation-only commits
+on this branch do not change that code.
+
+The source change is two lines in the FK33 target: pass the existing
+`pipe_valid_enable_max_fanout=32` option for experimental CPU W buffers only.
+Normal configurations pass `None`. No state, pipeline stages, native AXI3
+ports, clocks or timing bounds change. No source or test files were added.
+Use the direct target command below with these paired revisions importable
+and a fresh output directory, such as `build/fk33-native500-cpu-enable-fanout`.
+The existing portable `rebuild/build.py` interface still exposes 250/400 MHz.
+
+A fresh Vivado 2025.2 Windows build completed synthesis and implementation
+without checkpoint reuse. Final fabric setup/hold were +0.006/+0.010 ns,
+with zero failing endpoints, versus +0.002/+0.001 ns for the prior fresh
+published-source build. The finite Gray/reset/control audits and read-only
+400-path RapidWright analysis passed.
+
+Measured write-enable driver fanout fell in all 31 source buffer groups;
+peak logical loads fell from 300 to 88. `MAX_FANOUT=32` is a synthesis hint,
+not a strict final fanout cap. CE setup slack improved in 21 groups; this is
+not a claim that every path improved. The candidate passed seven hardware
+smoke jobs on one fresh SRAM load, all 16 MC/PHY calibrations, and processor
+word/byte accesses on 31 ports. Isolation guards, markers and final STOP/drain
+passed; owned transports closed, revision checking and 15 MHz JTAG were
+restored. Flash was untouched.
+
+This remains experimental and unqualified: the hard primitive model retains
+32 clock failures at 2.000 ns against its declared 2.220 ns minimum. The
+98 status paths retain their finite 4 ns bound and protocol-based hold
+waiver, not a hold-STA pass. Margins remain small. This one Windows build and
+bounded smoke do not establish cross-OS, implementation-variation, PVT,
+whole-HBM capacity or aggregate-bandwidth qualification. HBM1000 settings
+were programmed and read back, without independent frequency measurement.
+The older source-publication experiment below is separate historical evidence.
+
 ## Experimental SYS250 / AXI500 / HBM1000 candidate
 
 This separate opt-in candidate uses source branch
