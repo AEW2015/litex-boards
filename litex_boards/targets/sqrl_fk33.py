@@ -770,7 +770,8 @@ if {$fk33_reserve_pc31} {
 set tagged_trackers [dict create]
 if {$fk33_tracker_tags} {
     set tagged_ports [dict create]
-    foreach net [get_nets -hierarchical -filter {HBM_TRACKER_PC != ""}] {
+    # A text match includes PC0; numeric comparison with empty excludes it.
+    foreach net [get_nets -hierarchical -filter {HBM_TRACKER_PC =~ ?*}] {
         set pc [get_property HBM_TRACKER_PC $net]
         if {![regexp {^(0|[1-9][0-9]*)$} $pc] || $pc > 31} {error "Invalid tracker PC tag: $net/$pc"}
         set segments [get_nets -segments $net]
