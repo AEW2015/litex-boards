@@ -6,7 +6,91 @@ RapidWright analysis is a **required post-route stage** of the build command.
 It analyzes the routed checkpoint; it does not change placement, routing or
 timing exceptions. Vivado remains the timing authority.
 
-## AXI500 / HBM1000 read-address fanout review branch
+## AXI500 / HBM1000 PC31 control-cone review branch
+
+This opt-in experiment adds two post-route combinational reductions to the existing
+single-PC31 AXI500/HBM1000 reference-placement profile. Use branch
+`work/hbm-native500-pc31-control-lut` in both repositories, with this tested source pair
+(later README-only commits describe the same code):
+
+- LiteX core: `aa0df3251b2dc129ac0b84cd6628d9111ab6a71e`.
+- litex-boards: `735f4fcbdcca531b02ec6945cbee972932123e70`.
+
+Use the direct target command with both worktrees importable and a fresh output
+directory for each build:
+
+```text
+python -m litex_boards.targets.sqrl_fk33 --with-hbm --hbm-primitive --hbm-endpoint --hbm-endpoint-traffic --hbm-reference-placement --no-ident-version --hbm-axi-domain --hbm-axi-clk-freq 500e6 --hbm-experimental-500-1000 --sys-clk-freq 250e6 --cpu-type vexriscv --cpu-variant minimal --build --output-dir build/fk33-native500-pc31-control --vivado-max-threads 8 --vivado-place-directive Explore --vivado-post-place-phys-opt-directive AggressiveExplore --vivado-route-directive Explore --vivado-post-route-phys-opt-directive AggressiveExplore --vivado-report-level signoff
+```
+
+Set `FK33_RISCV_GCC` to the RISC-V compiler used for the paired build environment. This
+direct target command is required for the experimental profile; the portable rebuild
+wrapper does not select AXI500.
+
+The core exposes an optional Vivado post-routing command collection. The FK33 target
+registers its command only when the existing reference-placement profile is selected. It
+runs after `route_design` and post-route `phys_opt_design`, before the canonical routed
+DCP, timing reports and bitstream are written. The script validates the original LUT
+shapes and connectivity, exhaustively compares the local synchronous-reset truth tables,
+replaces two control cones, then checks the FF placement/state and clock inventory. The
+valid-cone proof covers 128 input/reset cases; the ready-cone proof covers 64. It
+records original and replacement LUT INIT/connectivity details in the Vivado log.
+
+The transformation leaves the native 256-bit AXI3 ports, SYS250 / AXI500 / HBM1000 /
+REF200 / APB100 clocks, reset architecture and cycle latency unchanged. It adds no
+target option or public source file. The normal defaults and other board targets do not
+register this hook.
+
+One full fresh Vivado 2025.2 Windows build passes the fabric/reset/CDC/control, tracker
+and read-only RapidWright checks. The independent final-DCP truth-table/input/output
+checks also pass. The valid-register path improves from +6 ps to +175 ps; the three
+fixed ready replicas have +177/+179/+186 ps setup margin. Global fabric setup/hold
+remain **+6/+8 ps**, with zero failing fabric endpoints: overall setup margin has not
+increased. All 100,164 FF placements, initializations and fixed flags are preserved
+across the transformation, and one LUT is removed. CPU read-address peak loads remain
+14, matching the tested predecessor.
+
+That source-built image's own SRAM load passes **7/7 hardware smoke jobs**, all 16
+MC/PHY calibrations, processor word/byte accesses on 31 ports and
+deterministic/random/masked native PC31 traffic. All 1,240 guards and 3,751 host markers
+pass. STOP retains calibration, drains all ports, clears READY flags and reports zero
+errors; owned monitor/transports close and JTAG returns to 15 MHz. Flash is untouched.
+The measured BIT SHA256 is
+`98367dba3674ddafe3a51ee67b2645cc9841042915e268ca24e1ea6d2e9fa4ea`.
+
+The local build has 433 captured source inputs and 24 initial generated outputs. This
+command does not run the recorded private final audits or hardware tests; review your
+own resulting image and reports.
+
+The primitive HBM model retains its 32 declared 2.220 ns minimum-period failures at an
+operating 2.000 ns period. The existing 98-bit status bundle hold waiver remains
+protocol-based and is not an STA pass. This experiment does not establish Linux
+reproduction, PVT or implementation-seed robustness, whole-HBM capacity coverage, or
+full-native qualification. Hardware testing requires a separate fresh SRAM load and
+image-bound positive timing/source audits.
+
+### Separate RapidWright analysis
+
+For a direct-target build, run the read-only RapidWright assistance separately from the
+boards repository root, using the prepared RapidWright Python environment. First export
+a readable EDIF from the routed checkpoint:
+
+```text
+python -c "import importlib.util; from pathlib import Path; s=importlib.util.spec_from_file_location('fk33_rw','litex_boards/software/fk33_hbm/rebuild/rapidwright_assist.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); b=Path('build/fk33-native500-pc31-control').resolve(); o=b/'rapidwright'; o.mkdir(exist_ok=True); (o/'export.tcl').write_text(m.export_tcl(b/'gateware/sqrl_fk33_route.dcp',o/'readable.edf',o/'native-paths.rpt',o/'native-summary.rpt'),encoding='utf-8')"
+vivado -mode batch -source build/fk33-native500-pc31-control/rapidwright/export.tcl
+```
+
+Then run the existing worker with a 4 GiB Java heap (set `JAVA_HOME` if needed):
+
+```text
+python -c "import os,runpy,sys; os.environ['JAVA_TOOL_OPTIONS']='-Xmx4g'; sys.argv=['rapidwright_assist.py']+sys.argv[1:]; runpy.run_path('litex_boards/software/fk33_hbm/rebuild/rapidwright_assist.py',run_name='__main__')" --worker --dcp build/fk33-native500-pc31-control/gateware/sqrl_fk33_route.dcp --readable-edif build/fk33-native500-pc31-control/rapidwright/readable.edf --timing-report build/fk33-native500-pc31-control/rapidwright/native-paths.rpt --hbm-endpoint --checkpoint-stage routed --output build/fk33-native500-pc31-control/rapidwright
+```
+
+Review `rapidwright/physical-analysis.json` alongside Vivado timing, route and DRC
+reports. RapidWright reads the routed checkpoint; it does not edit the checkpoint or
+program hardware.
+
+## Previous read-address fanout review branch
 
 Use `work/hbm-native500-cpu-read-address-fanout` in both AEW2015 forks. The
 tested source pair is LiteX `7d3bcb59` and litex-boards `78d00a53`; subsequent
