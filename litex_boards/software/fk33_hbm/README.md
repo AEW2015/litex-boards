@@ -6,6 +6,54 @@ RapidWright analysis is a **required post-route stage** of the build command.
 It analyzes the routed checkpoint; it does not change placement, routing or
 timing exceptions. Vivado remains the timing authority.
 
+## AXI500 / HBM1000 read-address fanout review branch
+
+Use `work/hbm-native500-cpu-read-address-fanout` in both AEW2015 forks. The
+tested source pair is LiteX `7d3bcb59` and litex-boards `78d00a53`; subsequent
+README-only commits describe that source. Activate the LiteX Python environment,
+put Vivado and the RISC-V toolchain on PATH (or set `FK33_RISCV_GCC`), then run:
+
+```sh
+python -m litex_boards.targets.sqrl_fk33 \
+    --with-hbm --hbm-primitive --hbm-endpoint --hbm-endpoint-traffic \
+    --hbm-reference-placement --no-ident-version --hbm-axi-domain \
+    --hbm-axi-clk-freq 500e6 --hbm-experimental-500-1000 \
+    --sys-clk-freq 250e6 --cpu-type vexriscv --cpu-variant minimal \
+    --build --output-dir build/fk33-native500-read-address \
+    --vivado-max-threads 8 --vivado-place-directive Explore \
+    --vivado-post-place-phys-opt-directive AggressiveExplore \
+    --vivado-route-directive Explore \
+    --vivado-post-route-phys-opt-directive AggressiveExplore \
+    --vivado-report-level signoff
+```
+
+This direct target command builds the image. Run the separate experimental
+RapidWright commands below with `build/fk33-native500-read-address` substituted
+for their output path. The portable rebuild wrapper's rated profiles do not
+select this AXI500 recipe, and this command alone does not run the recorded
+private signoff audits or hardware tests.
+
+The operating profile is SYS250 / AXI500 / HBM1000 / REF200 / APB100. This
+revision lowers only the native CPU FIFO read-address fanout hint from 16 to 8;
+the reverse SYS250 hint remains 16. No clock, AXI3 interface or cycle latency
+changes. In the measured routed image, all 93 RAM-backed CPU banks have lower
+peak address-driver loads; the overall peak falls from 22 to 14. The hint is
+not a strict eight-load cap. The three reserved-PC31 CPU pointer banks retain
+registers but have no RAM address loads; count them separately from RAM banks.
+
+One fresh Vivado 2025.2 Windows build passes the fabric/reset/CDC/control and
+read-only RapidWright checks. Fabric margins are +0.006 ns setup / +0.008 ns
+hold: global setup margin has not improved. Its own SRAM load passes seven
+hardware smoke jobs, all 16 MC/PHY calibrations, CPU accesses on 31 ports and
+native PC31 traffic, including guards, markers and STOP/drain cleanup.
+The measured BIT SHA256 is
+`3a680d29b3b177ae6a41beaa99d0cbf231a2d86b4fefb33898650845fd9fe7f8`.
+This remains experimental: the 32 declared primitive-model clock failures and
+existing status-bundle hold waiver remain. This result does not establish
+cross-OS, PVT, full-capacity or all-application qualification. The normal rated
+profiles below are unchanged. The next timing target is native PC31 WREADY
+control placement, not another clock-rate change.
+
 ## Normal-build clock policy
 
 Normal FK33 builds follow AMD DS923 controller limits. For this -2L device,
