@@ -1121,6 +1121,154 @@ puts [list HBM_ENDPOINT_R_CAPTURE_FORCE8 $capture $driver_net LUT $lut CE_consum
 """
     commands = commands.replace("{", "{{").replace("}", "}}")
     platform.toolchain.pre_placement_commands.append(commands)
+    _add_hbm_pc31_control_luts(platform)
+
+
+def _add_hbm_pc31_control_luts(platform):
+    # Preserve the reviewed native500 placement; collapse only these two cones.
+    commands = r"""
+proc fk33_pc31_ff_placement {} {
+    set cells [get_cells -hier -filter {REF_NAME =~ FD*}]
+    set rows {}
+    foreach name [get_property NAME $cells] ref [get_property REF_NAME $cells] init [get_property INIT $cells] loc [get_property LOC $cells] bel [get_property BEL $cells] loc_fixed [get_property IS_LOC_FIXED $cells] bel_fixed [get_property IS_BEL_FIXED $cells] {
+        lappend rows [list $name $ref $init $loc $bel $loc_fixed $bel_fixed]
+    }
+    return [lsort -index 0 $rows]
+}
+proc fk33_pc31_component {cell role} {
+    return [lsort -unique [get_nets -segments -of_objects [fk33_refseed_pin $cell $role]]]
+}
+proc fk33_pc31_inputs {cell} {
+    set rows {}
+    foreach pin [lsort [get_pins -of_objects $cell -filter {DIRECTION == IN}]] {
+        lappend rows [list [get_property REF_PIN_NAME $pin] [lsort -unique [get_nets -segments -of_objects $pin]]]
+    }
+    return $rows
+}
+proc fk33_pc31_init {cell} {
+    set init [get_property INIT $cell]
+    if {![regsub {^[0-9]+'h} $init 0x value]} {error "PC31 LUT INIT must be hexadecimal: $cell/$init"}
+    return $value
+}
+proc fk33_pc31_replace {cell reference init inputs} {
+    set destination "[get_property LOC $cell]/[get_property BEL $cell]"
+    set output [fk33_refseed_one [get_nets -of_objects [fk33_refseed_pin $cell O]] "PC31 output net"]
+    set name "${cell}[expr {$reference eq "LUT6" ? "_eco_lut6" : "_eco_flat"}]"
+    remove_cell $cell
+    create_cell -reference $reference $name
+    set replacement [fk33_refseed_one [get_cells $name] "PC31 replacement"]
+    set_property INIT $init $replacement
+    set index 0
+    foreach input $inputs {
+        connect_net -hierarchical -net $input -objects [fk33_refseed_pin $replacement I$index]
+        incr index
+    }
+    connect_net -hierarchical -net $output -objects [fk33_refseed_pin $replacement O]
+    place_cell [list $replacement $destination]
+    return $replacement
+}
+proc fk33_pc31_control_luts {} {
+    set shared [fk33_refseed_one [get_cells -hier -filter {NAME == hbm_0/main_hbmnativeelasticboundary31_buffer156_pipe_ready_valid_i_2}] "PC31 shared LUT"]
+    set valid [fk33_refseed_one [get_cells -hier -filter {NAME == fk33_hbm_quiesce_31/main_hbmnativeelasticboundary31_buffer156_pipe_valid_source_valid_i_1}] "PC31 valid LUT"]
+    set ready [fk33_refseed_one [get_cells -hier -filter {NAME == hbm_0/main_hbmnativeelasticboundary31_buffer156_pipe_ready_valid_i_1}] "PC31 ready LUT"]
+    set capture [fk33_refseed_one [get_cells -hier -filter {NAME == main_hbmnativeelasticboundary31_buffer156_pipe_valid_source_valid_reg}] "PC31 valid capture"]
+    set hard [fk33_refseed_one [get_cells -of_objects [get_sites BLI_HBM_AXI_INTF_X31Y0] -filter {REF_NAME == HBM_SNGLBLI_INTF_AXI}] "PC31 hard interface"]
+    foreach {cell reference init} [list $shared LUT3 8'h8F $valid LUT5 32'h8BFF8B00 $ready LUT3 8'h23] {
+        if {[get_property REF_NAME $cell] ne $reference || [get_property INIT $cell] ne $init} {error "PC31 original LUT shape differs: $cell"}
+    }
+    foreach {left role right other} [list $shared I2 $valid I4 $shared O $valid I3 $shared O $ready I1 $valid I1 $ready I0 $valid I2 $ready I2 $valid O $capture D $shared I1 $hard WREADY_PIPE] {
+        if {[fk33_pc31_component $left $role] ne [fk33_pc31_component $right $other]} {error "PC31 electrical identity differs: $left/$role and $right/$other"}
+    }
+    set shared_loads [get_pins -leaf -of_objects [get_nets -segments -of_objects [fk33_refseed_pin $shared O]] -filter {DIRECTION == IN}]
+    if {[lsort $shared_loads] ne [lsort [list [fk33_refseed_pin $valid I3] [fk33_refseed_pin $ready I1]]]} {error "PC31 shared LUT has additional consumers"}
+    set ready_loads [get_pins -leaf -of_objects [get_nets -segments -of_objects [fk33_refseed_pin $ready O]] -filter {DIRECTION == IN}]
+    if {[llength $ready_loads]!=3} {error "PC31 requires three ready-state replicas"}
+    set state [list $capture]
+    foreach pin $ready_loads {
+        set cell [fk33_refseed_one [get_cells -of_objects $pin] "PC31 ready capture"]
+        if {[get_property REF_PIN_NAME $pin] ne "D" || ![get_property IS_LOC_FIXED $cell] || [get_property LOC $cell] ne "SLICE_X204Y14"} {error "PC31 ready replica differs"}
+        lappend state $cell
+    }
+    set state_before {}
+    foreach cell $state {
+        if {[get_property REF_NAME $cell] ne "FDRE" || [string tolower [get_property INIT $cell]] ne "1'b0"} {error "PC31 capture type/INIT differs"}
+        set row [list $cell [get_property LOC $cell] [get_property BEL $cell]]
+        foreach role {C CE R} {lappend row [list $role [fk33_pc31_component $cell $role]]}
+        lappend state_before $row
+    }
+    set fixed_before {}
+    set fixed [get_cells -hier -filter {REF_NAME =~ FD* && IS_LOC_FIXED == 1}]
+    if {[llength $fixed]!=20} {error "PC31 requires the existing twenty fixed FFs"}
+    foreach cell $fixed {lappend fixed_before [list $cell [get_property LOC $cell] [get_property BEL $cell]]}
+    set clocks_before {}
+    foreach clock [get_clocks] {lappend clocks_before [list $clock [get_property PERIOD $clock] [get_property WAVEFORM $clock]]}
+    set ff_count [llength [get_cells -hier -filter {REF_NAME =~ FD*}]]
+    set ff_placement_before [fk33_pc31_ff_placement]
+    # Both replacements need the full LUT resource; validate before editing.
+    foreach cell [list $valid $ready] {
+        set letter [string index [lindex [split [get_property BEL $cell] .] end] 0]
+        set paired [fk33_refseed_one [get_bels [get_property LOC $cell]/${letter}5LUT] "PC31 paired BEL"]
+        set occupant [get_cells -quiet -of_objects $paired]
+        if {[llength $occupant] && $occupant ne $cell} {error "PC31 full LUT resource is shared: $cell/$occupant"}
+    }
+    set valid_inputs {}
+    foreach {cell role} [list $valid I0 $valid I1 $valid I2 $valid I4 $shared I0 $shared I1] {lappend valid_inputs [fk33_refseed_one [get_nets -of_objects [fk33_refseed_pin $cell $role]] "PC31 valid input"]}
+    set ready_inputs {}
+    foreach {cell role} [list $shared I0 $shared I1 $shared I2 $ready I0 $ready I2] {lappend ready_inputs [fk33_refseed_one [get_nets -of_objects [fk33_refseed_pin $cell $role]] "PC31 ready input"]}
+    set shared_init [fk33_pc31_init $shared]
+    set valid_init [fk33_pc31_init $valid]
+    set ready_init [fk33_pc31_init $ready]
+    # Exhaustive original-to-new local proofs include synchronous reset.
+    for {set bits 0} {$bits<64} {incr bits} {
+        set a [expr {$bits&1}]; set b [expr {($bits>>1)&1}]; set c [expr {($bits>>2)&1}]
+        set v [expr {($bits>>3)&1}]; set p [expr {($bits>>4)&1}]; set w [expr {($bits>>5)&1}]
+        set shared_value [expr {($shared_init>>($p|($w<<1)|($v<<2)))&1}]
+        set old [expr {($valid_init>>($a|($b<<1)|($c<<2)|($shared_value<<3)|($v<<4)))&1}]
+        set new [expr {(0x8B8BFF8BFF8BFF8B>>$bits)&1}]
+        foreach reset {0 1} {if {[expr {$reset?0:$old}]!=[expr {$reset?0:$new}]} {error "PC31 valid truth table differs"}}
+    }
+    for {set bits 0} {$bits<32} {incr bits} {
+        set p [expr {$bits&1}]; set w [expr {($bits>>1)&1}]; set v [expr {($bits>>2)&1}]
+        set b [expr {($bits>>3)&1}]; set c [expr {($bits>>4)&1}]
+        set shared_value [expr {($shared_init>>($p|($w<<1)|($v<<2)))&1}]
+        set old [expr {($ready_init>>($b|($shared_value<<1)|($c<<2)))&1}]
+        set new [expr {(0x70007070>>$bits)&1}]
+        foreach reset {0 1} {if {[expr {$reset?0:$old}]!=[expr {$reset?0:$new}]} {error "PC31 ready truth table differs"}}
+    }
+    puts [list FK33_PC31_CONTROL_CONE VALID ORIGINALS [list $shared [get_property INIT $shared] $valid [get_property INIT $valid]] ORIGINAL_INPUTS [list [fk33_pc31_inputs $shared] [fk33_pc31_inputs $valid]] INPUT_MAP {skid_d_valid ready_valid admission primary_valid permit WREADY} INPUT_NETS $valid_inputs NEW_INIT 64'h8B8BFF8BFF8BFF8B PROOF_INPUT_RESET_CASES 128 PROOF PASS]
+    puts [list FK33_PC31_CONTROL_CONE READY ORIGINALS [list $shared [get_property INIT $shared] $ready [get_property INIT $ready]] ORIGINAL_INPUTS [list [fk33_pc31_inputs $shared] [fk33_pc31_inputs $ready]] INPUT_MAP {permit WREADY primary_valid ready_valid admission} INPUT_NETS $ready_inputs NEW_INIT 32'h70007070 PROOF_INPUT_RESET_CASES 64 PROOF PASS]
+    set valid [fk33_pc31_replace $valid LUT6 64'h8B8BFF8BFF8BFF8B $valid_inputs]
+    set ready [fk33_pc31_replace $ready LUT5 32'h70007070 $ready_inputs]
+    if {[llength [get_pins -quiet -leaf -of_objects [get_nets -segments -of_objects [fk33_refseed_pin $shared O]] -filter {DIRECTION == IN}]]} {error "PC31 shared LUT still has consumers"}
+    remove_cell $shared
+    route_design -preserve -no_psir
+    foreach {cell inputs} [list $valid $valid_inputs $ready $ready_inputs] {
+        set index 0
+        foreach input $inputs {
+            if {[lsort -unique [get_nets -segments $input]] ne [fk33_pc31_component $cell I$index]} {error "PC31 replacement connectivity differs"}
+            incr index
+        }
+        puts [list FK33_PC31_CONTROL_REPLACEMENT $cell REF [get_property REF_NAME $cell] INIT [get_property INIT $cell] INPUTS [fk33_pc31_inputs $cell] OUTPUT [fk33_pc31_component $cell O] LOC [get_property LOC $cell] BEL [get_property BEL $cell]]
+    }
+    set state_after {}
+    foreach cell $state {
+        set row [list $cell [get_property LOC $cell] [get_property BEL $cell]]
+        foreach role {C CE R} {lappend row [list $role [fk33_pc31_component $cell $role]]}
+        lappend state_after $row
+    }
+    set fixed_after {}
+    foreach cell $fixed {lappend fixed_after [list $cell [get_property LOC $cell] [get_property BEL $cell]]}
+    set clocks_after {}
+    foreach clock [get_clocks] {lappend clocks_after [list $clock [get_property PERIOD $clock] [get_property WAVEFORM $clock]]}
+    if {$state_before ne $state_after || $fixed_before ne $fixed_after || $clocks_before ne $clocks_after || $ff_count!=[llength [get_cells -hier -filter {REF_NAME =~ FD*}]]} {error "PC31 state/placement/clock inventory changed"}
+    if {$ff_placement_before ne [fk33_pc31_ff_placement]} {error "PC31 transformation changed an FF placement or initialization"}
+    puts [list FK33_PC31_PRESERVED_FF_PLACEMENTS $ff_count INITIALIZATIONS_FIXEDNESS_CLOCKS_CONTROLS_UNCHANGED]
+    puts FK33_PC31_DUAL_CONTROL_LUTS_COMPLETE
+}
+fk33_pc31_control_luts
+"""
+    commands = commands.replace("{", "{{").replace("}", "}}")
+    platform.toolchain.post_routing_commands.append(commands)
 
 
 # BaseSoC ------------------------------------------------------------------------------------------
