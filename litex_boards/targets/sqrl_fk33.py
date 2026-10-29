@@ -1226,7 +1226,7 @@ class HBMCPUWindowCDC(LiteXModule):
                     crossing = HBMRegisteredReadCDC(source.description,
                         cd_from="sys" if forward else "axi",
                         cd_to="axi" if forward else "sys", gray_bus_prefix=prefix,
-                        read_address_max_fanout=16)
+                        read_address_max_fanout=8 if forward else 16)
                 else:
                     crossing = stream.ClockDomainCrossing(source.description,
                         cd_from="sys" if forward else "axi",
