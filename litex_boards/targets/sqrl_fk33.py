@@ -1123,6 +1123,7 @@ puts [list HBM_ENDPOINT_R_CAPTURE_FORCE8 $capture $driver_net LUT $lut CE_consum
     platform.toolchain.pre_placement_commands.append(commands)
     _add_hbm_pc31_control_luts(platform)
     _add_hbm_margin_locality(platform)
+    _add_hbm_pc18_we_clone(platform)
 
 
 def _add_hbm_pc31_control_luts(platform):
@@ -1467,6 +1468,196 @@ proc fk33_margin_locality {} {
     puts [list FK33_MARGIN_LOCALITY_COMPLETE FF_COUNT 100164 PRESERVED_OTHER_FFS 100163 DECLARED_FF_MOVE $pointer FIXED_FF 21 LUT_COUNT 58059 DECLARED_LUT_MOVE $data DECLARED_LUT_ADD $clone CLOCK_RESET_PROTOCOL_LATENCY_UNCHANGED 1 QUALIFICATION NOT_CLAIMED]
 }
 fk33_margin_locality
+"""
+    commands = commands.replace("{", "{{").replace("}", "}}")
+    platform.toolchain.post_routing_commands.append(commands)
+
+
+def _add_hbm_pc18_we_clone(platform):
+    """Clone only the reviewed eight-leaf native500 PC18 RAM-WE branch."""
+    commands = r"""
+proc fk33_pc18_we_cell {name} {
+    return [fk33_refseed_one [get_cells -hier -filter "NAME == $name"] PC18_cell]
+}
+proc fk33_pc18_we_pin {cell role} {
+    return [fk33_refseed_pin [fk33_pc18_we_cell $cell] $role]
+}
+proc fk33_pc18_we_snapshot {filter excluded properties} {
+    set cells [lsort [get_cells -hier -filter $filter]]
+    if {$excluded ne ""} {set cells [lsearch -all -inline -not -exact $cells $excluded]}
+    set columns {}
+    foreach property $properties {
+        # Sparse active protection maps avoid per-FF name lookups for custom
+        # properties that are absent on most FFs. Full pin census stays offline.
+        if {$property in {ASYNC_REG DONT_TOUCH KEEP HBM_GRAY_SRC HBM_GRAY_DST}} {
+            if {$property in {ASYNC_REG DONT_TOUCH KEEP}} {
+                set active_filter [format {(%s) && %s == 1} $filter $property]
+            } else {
+                set active_filter [format {(%s) && %s != ""} $filter $property]
+            }
+            set active [lsort [get_cells -hier -quiet -filter $active_filter]]
+            set names {}; set values {}
+            if {[llength $active]} {
+                set names [get_property NAME $active]
+                set values [get_property $property $active]
+                if {[llength $names]!=[llength $active] || [llength $values]!=[llength $active]} {error "PC18 active property column differs: $property"}
+            }
+            lappend columns $property [list $names $values]
+            continue
+        }
+        set values [get_property -quiet $property $cells]
+        if {[llength $values]!=[llength $cells]} {error "PC18 primitive property column differs: $property"}
+        lappend columns $property $values
+    }
+    return [list $cells $columns]
+}
+proc fk33_pc18_we_initialization {excluded} {
+    # One INIT per FF/LUT/distributed RAM leaf, plus composite memory fields.
+    # Constants/carry/mux/clock/I/O primitives have no functional INIT property.
+    set cells [lsort [get_cells -hier -filter {IS_PRIMITIVE == 1 && (REF_NAME =~ FD* || REF_NAME =~ LUT* || REF_NAME =~ RAMD* || REF_NAME =~ RAMS* || REF_NAME == RAM32X1D || REF_NAME =~ SRL*)}]]
+    if {$excluded ne ""} {set cells [lsearch -all -inline -not -exact $cells $excluded]}
+    set names [get_property NAME $cells]
+    set values [get_property INIT $cells]
+    if {[llength $names]!=[llength $cells] || [llength $values]!=[llength $cells]} {error "PC18 functional INIT column differs"}
+    foreach value $values {if {$value eq ""} {error "PC18 missing functional INIT"}}
+    set result [list $names $values]
+    foreach family {RAMB18E2 RAMB36E2 RAM32M16 RAM32M} {
+        set memories [lsort [get_cells -hier -filter "IS_PRIMITIVE == 1 && REF_NAME == $family"]]
+        if {![llength $memories]} {continue}
+        set names [get_property NAME $memories]
+        set example [fk33_pc18_we_cell [lindex $memories 0]]
+        foreach property [lsort [list_property $example]] {
+            if {![regexp {^INIT($|_|P|[0-9])} $property]} {continue}
+            set values [get_property $property $memories]
+            if {[llength $values]!=[llength $memories]} {error "PC18 memory INIT column differs: $family/$property"}
+            lappend result [list $family $property $names $values]
+        }
+    }
+    return $result
+}
+proc fk33_pc18_we_bounded {names} {
+    set rows {}
+    foreach name [lsort -unique $names] {
+        set cell [fk33_pc18_we_cell $name]
+        set row [list $name]
+        foreach property {REF_NAME INIT LOC BEL IS_LOC_FIXED IS_BEL_FIXED ASYNC_REG DONT_TOUCH HBM_GRAY_SRC HBM_GRAY_DST KEEP} {
+            lappend row $property [get_property -quiet $property $cell]
+        }
+        foreach pin [lsort [get_pins -of_objects $cell]] {
+            # The only permitted RAM pin edit is the declared public WE branch.
+            if {[string match RAM* [get_property REF_NAME $cell]] && [get_property REF_PIN_NAME $pin] eq "WE"} {continue}
+            lappend row [list $pin [get_property DIRECTION $pin] [get_property -quiet IS_INVERTED $pin] [lsort [get_nets -of_objects $pin]]]
+        }
+        lappend rows $row
+    }
+    return $rows
+}
+proc fk33_pc18_we_ordinary {cell} {
+    foreach property {ASYNC_REG DONT_TOUCH HBM_GRAY_SRC HBM_GRAY_DST} {
+        if {[string toupper [get_property -quiet $property $cell]] ni {{} FALSE 0 1'B0}} {error "PC18 protected output cell: $cell/$property"}
+    }
+}
+proc fk33_pc18_we_clone {} {
+    set clone_name fk33_pc18_we_clone_pilot
+    set output_name ${clone_name}_output
+    if {[llength [get_cells -quiet $clone_name]] || [llength [get_nets -quiet $output_name]]} {error "PC18 clone objects already exist"}
+    set original [fk33_pc18_we_cell storage_127_reg_0_3_0_13_i_1]
+    if {[get_property REF_NAME $original] ne "LUT4" || [get_property INIT $original] ne "16'hE400" || [get_property LOC $original] ne "SLICE_X128Y37"} {error "PC18 original WE LUT differs"}
+    fk33_pc18_we_ordinary $original
+    set ff_properties {REF_NAME INIT LOC BEL IS_LOC_FIXED IS_BEL_FIXED ASYNC_REG DONT_TOUCH HBM_GRAY_SRC HBM_GRAY_DST KEEP}
+    set geometry_properties {REF_NAME LOC BEL IS_LOC_FIXED IS_BEL_FIXED}
+    set before_ff [fk33_pc18_we_snapshot {IS_PRIMITIVE == 1 && REF_NAME =~ FD*} {} $ff_properties]
+    set before_geometry [fk33_pc18_we_snapshot {IS_PRIMITIVE == 1} {} $geometry_properties]
+    set before_initialization [fk33_pc18_we_initialization {}]
+    set clocks [fk33_margin_clocks]
+    if {[llength [lindex $before_ff 0]]!=100164 || [llength [lindex $before_geometry 0]]!=169601 || [llength [get_cells -hier -filter {REF_NAME =~ LUT*}]]!=58059 || [llength [get_cells -hier -filter {REF_NAME =~ FD* && IS_LOC_FIXED == 1}]]!=21} {error "PC18 requires the post-margin-locality inventory"}
+    if {[get_property PERIOD [fk33_refseed_one [get_clocks main_clkout3] native_clock]]!=2.0} {error "PC18 requires native AXI500"}
+    set all_loads [fk33_margin_loads $original O]
+    set targets {}; set remaining {}; set ram_cells {}
+    foreach load $all_loads {
+        set owner [fk33_refseed_one [get_cells -of_objects $load] RAM_owner]
+        fk33_pc18_we_ordinary $owner
+        if {[get_property REF_PIN_NAME $load] ne "WE" || ![string match RAM* [get_property REF_NAME $owner]]} {error "PC18 output must drive RAM WE leaves only"}
+        lappend ram_cells $owner
+        if {[string match storage_127_reg_0_3_28_33/*/WE $load]} {lappend targets $load} else {lappend remaining $load}
+    }
+    if {[llength $all_loads]!=40 || [llength $targets]!=8 || [llength $remaining]!=32} {error "PC18 forty-leaf macro partition differs"}
+    set macro [fk33_pc18_we_cell storage_127_reg_0_3_28_33]
+    set public_we [fk33_pc18_we_pin $macro WE]
+    if {[get_property REF_NAME $macro] ne "RAM32M" || [fk33_pc31_component $macro WE] ne [fk33_pc31_component $original O]} {error "PC18 public RAM32M WE differs"}
+    set expected_remaining {}
+    foreach name {storage_127_reg_0_3_0_13 storage_127_reg_0_3_14_27} {
+        set parent [fk33_pc18_we_cell $name]
+        if {[get_property REF_NAME $parent] ne "RAM32M16" || [fk33_pc31_component $parent WE] ne [fk33_pc31_component $original O]} {error "PC18 retained RAM32M16 WE differs"}
+        set local {}
+        foreach load $all_loads {if {[string match ${name}/*/WE $load]} {lappend local $load}}
+        if {[llength $local]!=16} {error "PC18 retained macro leaf count differs"}
+        set expected_remaining [concat $expected_remaining $local]
+    }
+    if {[lsort $expected_remaining] ne $remaining} {error "PC18 retained two-macro leaf identity differs"}
+    set drivers {}; set input_owners {}; set input_loads {}; set net_flags {}
+    foreach role {I0 I1 I2 I3} expected {main_buffer20_pipe_ready_valid1_reg/Q main_buffer20_pipe_valid_source_valid1_reg/Q main_buffer20_pipe_ready_sink_d_valid1_reg/Q storage_127_reg_0_3_0_13_i_16/O} {
+        set pin [fk33_pc18_we_pin $original $role]
+        set net [fk33_refseed_one [get_nets -of_objects $pin] PC18_input_net]
+        set driver [fk33_refseed_one [get_pins -leaf -of_objects [fk33_pc31_component $original $role] -filter {DIRECTION == OUT}] PC18_driver]
+        if {$driver ne $expected || [get_property IS_INVERTED $pin]!=0} {error "PC18 input driver/polarity differs"}
+        lappend drivers [list $role $net $driver]
+        lappend input_owners [fk33_refseed_one [get_cells -of_objects $driver] PC18_input_owner]
+        dict set input_loads $role [fk33_margin_loads $original $role]
+        foreach segment [fk33_pc31_component $original $role] {
+            foreach property {DONT_TOUCH ASYNC_REG HBM_GRAY_SRC HBM_GRAY_DST} {dict set net_flags $segment $property [get_property -quiet $property $segment]}
+        }
+    }
+    set bounded_names [concat [list $original] $input_owners $ram_cells]
+    set before_bounded [fk33_pc18_we_bounded $bounded_names]
+    fk33_margin_empty_lut SLICE_X126Y38/A6LUT
+    create_cell -reference LUT4 $clone_name
+    set clone [fk33_pc18_we_cell $clone_name]
+    set_property INIT {16'hE400} $clone
+    foreach row $drivers {
+        lassign $row role net driver
+        connect_net -net $net -objects [fk33_pc18_we_pin $clone $role]
+    }
+    create_net $output_name
+    set output [fk33_refseed_one [get_nets $output_name] PC18_clone_output]
+    connect_net -net $output -objects [fk33_pc18_we_pin $clone O]
+    disconnect_net -net [fk33_refseed_one [get_nets -of_objects $public_we] PC18_public_WE_net] -objects $public_we
+    connect_net -hierarchical -net $output -objects $public_we
+    place_cell [list $clone SLICE_X126Y38/A6LUT]
+    foreach phase {placed routed} {
+        if {$phase eq "routed"} {route_design -preserve -no_psir}
+        fk33_pc18_we_ordinary $clone
+        if {[get_property REF_NAME $clone] ne "LUT4" || [get_property INIT $clone] ne "16'hE400" || [fk33_margin_location $clone] ne "SLICE_X126Y38/A6LUT" || [fk33_margin_loads $original O] ne $remaining || [fk33_margin_loads $clone O] ne $targets || [fk33_pc31_component $macro WE] ne [fk33_pc31_component $clone O]} {error "PC18 actual clone placement/function/partition differs"}
+        foreach row $drivers {
+            lassign $row role net driver
+            set clone_pin [fk33_pc18_we_pin $clone $role]
+            set expected [lsort -unique [concat [dict get $input_loads $role] [list $clone_pin]]]
+            if {[get_property IS_INVERTED $clone_pin]!=0 || [fk33_pc31_component $clone $role] ne [fk33_pc31_component $original $role] || [fk33_margin_loads $original $role] ne $expected} {error "PC18 clone exact input/load mapping differs"}
+        }
+        dict for {net properties} $net_flags {
+            dict for {property value} $properties {if {[get_property -quiet $property $net] ne $value} {error "PC18 input net protection changed"}}
+        }
+        foreach name [list $original $clone] {
+            set cell [fk33_pc18_we_cell $name]
+            if {[llength [get_ports -quiet -of_objects [fk33_pc31_component $cell O]]]} {error "PC18 unexpected output top port"}
+            foreach net [fk33_pc31_component $cell O] {
+                foreach property {DONT_TOUCH ASYNC_REG HBM_GRAY_SRC HBM_GRAY_DST} {
+                    if {[string toupper [get_property -quiet $property $net]] ni {{} FALSE 0 1'B0}} {error "PC18 protected output net"}
+                }
+            }
+        }
+        for {set vector 0} {$vector<16} {incr vector} {
+            set old [expr {([fk33_pc31_init $original] >> $vector)&1}]
+            set new [expr {([fk33_pc31_init $clone] >> $vector)&1}]
+            if {$old!=$new || $old!=((0xE400 >> $vector)&1)} {error "PC18 sixteen-case Boolean mismatch"}
+        }
+        if {$before_bounded ne [fk33_pc18_we_bounded $bounded_names]} {error "PC18 original/source/RAM non-WE pin state changed"}
+    }
+    if {$before_ff ne [fk33_pc18_we_snapshot {IS_PRIMITIVE == 1 && REF_NAME =~ FD*} {} $ff_properties] || $before_geometry ne [fk33_pc18_we_snapshot {IS_PRIMITIVE == 1} $clone_name $geometry_properties] || $before_initialization ne [fk33_pc18_we_initialization $clone_name] || $clocks ne [fk33_margin_clocks]} {error "PC18 existing FF/protection/primitive geometry or clocks changed"}
+    if {[llength [get_cells -hier -filter {IS_PRIMITIVE == 1}]]!=169602 || [llength [get_cells -hier -filter {REF_NAME =~ LUT*}]]!=58060 || [llength [get_cells -hier -filter {REF_NAME =~ FD* && IS_LOC_FIXED == 1}]]!=21} {error "PC18 final primitive inventory differs"}
+    puts [list FK33_PC18_WE_CLONE_COMPLETE CLONE $clone INIT [get_property INIT $clone] DESTINATION SLICE_X126Y38/A6LUT ORIGINAL_LOADS 32 CLONE_LOADS 8 ALL100164_FF_PROPERTIES_PRESERVED 1 EXISTING169601_PRIMITIVES_PRESERVED 1 FULL_OFFLINE_PIN_AND_TIMING_REVIEW_REQUIRED 1 QUALIFICATION NOT_CLAIMED]
+}
+fk33_pc18_we_clone
 """
     commands = commands.replace("{", "{{").replace("}", "}}")
     platform.toolchain.post_routing_commands.append(commands)
