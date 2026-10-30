@@ -1122,6 +1122,7 @@ puts [list HBM_ENDPOINT_R_CAPTURE_FORCE8 $capture $driver_net LUT $lut CE_consum
     commands = commands.replace("{", "{{").replace("}", "}}")
     platform.toolchain.pre_placement_commands.append(commands)
     _add_hbm_pc31_control_luts(platform)
+    _add_hbm_margin_locality(platform)
 
 
 def _add_hbm_pc31_control_luts(platform):
@@ -1266,6 +1267,206 @@ proc fk33_pc31_control_luts {} {
     puts FK33_PC31_DUAL_CONTROL_LUTS_COMPLETE
 }
 fk33_pc31_control_luts
+"""
+    commands = commands.replace("{", "{{").replace("}", "}}")
+    platform.toolchain.post_routing_commands.append(commands)
+
+
+def _add_hbm_margin_locality(platform):
+    """Apply the reviewed placement-only native500 reference recipe."""
+    commands = r"""
+proc fk33_margin_clocks {} {
+    set rows {}
+    foreach clock [lsort [get_clocks]] {lappend rows [list $clock [get_property PERIOD $clock] [get_property WAVEFORM $clock]]}
+    return $rows
+}
+proc fk33_margin_geometry {} {
+    set cells [lsort [get_cells -hier -filter {IS_PRIMITIVE == 1 && NAME != fk33_pc0_quiesce_local_lut_pilot}]]
+    set columns {}
+    foreach property {NAME REF_NAME INIT LOC BEL IS_LOC_FIXED IS_BEL_FIXED} {
+        set column [get_property -quiet $property $cells]
+        if {[llength $column]!=[llength $cells]} {error "Margin primitive property column differs: $property"}
+        lappend columns $column
+    }
+    lassign $columns names refs inits locs bels loc_flags bel_flags
+    set rows {}
+    foreach name $names ref $refs init $inits loc $locs bel $bels lf $loc_flags bf $bel_flags {
+        lappend rows [list $name $ref $init $loc $bel $lf $bf]
+    }
+    return $rows
+}
+proc fk33_margin_compare {before after allowed} {
+    if {[llength $before]!=[llength $after]} {error "Margin primitive inventory changed"}
+    set changed {}
+    foreach old $before new $after {
+        if {[lrange $old 0 2] ne [lrange $new 0 2]} {error "Margin name/type/INIT changed"}
+        if {$old ne $new} {lappend changed [lindex $old 0]}
+    }
+    if {[lsort $changed] ne [lsort $allowed]} {error "Margin undeclared geometry/fixedness change: $changed"}
+}
+proc fk33_margin_logic {cells} {
+    set rows {}
+    foreach cell [lsort -unique $cells] {
+        set row [list $cell [get_property REF_NAME $cell] [get_property -quiet INIT $cell]]
+        foreach property {ASYNC_REG DONT_TOUCH HBM_GRAY_SRC HBM_GRAY_DST} {lappend row $property [get_property -quiet $property $cell]}
+        foreach object [lsort [get_pins -of_objects $cell]] {
+            lappend row [list [get_property REF_PIN_NAME $object] [get_property DIRECTION $object] [get_property -quiet IS_INVERTED $object] [lsort -unique [get_nets -segments -of_objects $object]]]
+        }
+        lappend rows $row
+    }
+    return $rows
+}
+proc fk33_margin_loads {cell role} {
+    return [lsort -unique [get_pins -leaf -of_objects [fk33_pc31_component $cell $role] -filter {DIRECTION == IN}]]
+}
+proc fk33_margin_empty_lut {destination} {
+    set bel [fk33_refseed_one [get_bels $destination] destination]
+    set paired [fk33_refseed_one [get_bels [string map {6LUT 5LUT} $destination]] paired_LUT]
+    if {[llength [get_cells -quiet -of_objects $bel]] || [llength [get_cells -quiet -of_objects $paired]]} {error "Margin LUT destination is occupied/shared: $destination"}
+}
+proc fk33_margin_location {cell} {
+    return "[get_property LOC $cell]/[lindex [split [get_property BEL $cell] .] end]"
+}
+proc fk33_margin_gray_stem {tag} {
+    set sources [get_cells -hier -filter "HBM_GRAY_SRC == $tag"]
+    if {[llength $sources]!=3} {error "Margin requires three tagged Gray sources: $tag"}
+    set stems {}; set bits {}
+    foreach source $sources {
+        if {[get_property REF_NAME $source] ne "FDRE" || ![regexp {^(.+)_q_reg\[([012])\]$} $source -> stem bit]} {error "Margin Gray source shape differs"}
+        lappend stems $stem; lappend bits $bit
+        set clock [fk33_refseed_one [get_clocks -of_objects [fk33_refseed_pin $source C]] native_clock]
+        if {$clock ne "main_clkout3" || [get_property PERIOD $clock]!=2.0} {error "Margin requires native AXI500"}
+    }
+    if {[lsort $bits] ne {0 1 2}} {error "Margin Gray bit census differs"}
+    return [fk33_refseed_one [lsort -unique $stems] counter_stem]
+}
+proc fk33_margin_locality {} {
+    set clone_name fk33_pc0_quiesce_local_lut_pilot
+    set output_name ${clone_name}_output
+    if {[llength [get_cells -quiet $clone_name]] || [llength [get_nets -quiet $output_name]]} {error "Margin clone already exists"}
+    set initial_ff [fk33_pc31_ff_placement]
+    set initial_geometry [fk33_margin_geometry]
+    set initial_clocks [fk33_margin_clocks]
+    if {[llength $initial_ff]!=100164 || [llength [get_cells -hier -filter {REF_NAME =~ FD* && IS_LOC_FIXED == 1}]]!=20 || [llength [get_cells -hier -filter {REF_NAME =~ LUT*}]]!=58058} {error "Margin requires the post-PC31 reference inventory"}
+
+    # Move only the RAM-driving binary copy selected by the physical PC22 tag.
+    set stem [fk33_margin_gray_stem hbm_cpu_pc22_aw_consume]
+    set name [format {%s_q_binary_reg[0]} $stem]
+    set pointer [fk33_refseed_one [get_cells -hier -filter "NAME == $name"] RAM_pointer]
+    set copies [get_cells -hier -filter "NAME =~ ${stem}_q_binary_reg* && REF_NAME =~ FD*"]
+    if {[llength $copies]!=9 || [get_property IS_LOC_FIXED $pointer] || [get_property IS_BEL_FIXED $pointer]} {error "Margin binary-copy inventory/fixedness differs"}
+    set controls {}
+    foreach role {C CE R} {lappend controls [list $role [fk33_pc31_component $pointer $role] [get_property -quiet IS_INVERTED [fk33_refseed_pin $pointer $role]]]}
+    foreach cell $copies {
+        if {[get_property REF_NAME $cell] ne "FDRE" || [get_property INIT $cell] ne "1'b0"} {error "Margin pointer type/INIT differs"}
+        foreach property {ASYNC_REG HBM_GRAY_SRC HBM_GRAY_DST DONT_TOUCH} {
+            if {[string toupper [get_property -quiet $property $cell]] ni {{} FALSE 0}} {error "Margin must not move protected/Gray state"}
+        }
+        set actual {}
+        foreach role {C CE R} {lappend actual [list $role [fk33_pc31_component $cell $role] [get_property -quiet IS_INVERTED [fk33_refseed_pin $cell $role]]]}
+        if {$actual ne $controls} {error "Margin pointer control parity differs"}
+    }
+    set pointer_loads [fk33_margin_loads $pointer Q]
+    if {[llength $pointer_loads]!=12} {error "Margin pointer requires twelve RAM-only loads"}
+    set rams {}
+    foreach load $pointer_loads {
+        set owner [fk33_refseed_one [get_cells -of_objects $load] RAM_owner]
+        if {[get_property REF_NAME $owner] ne "RAMD32" || [get_property REF_PIN_NAME $load] ne "RADR0"} {error "Margin pointer drives feedback/non-RAM load"}
+        lappend rams $owner
+    }
+    if {![regexp {^(.+)_graycounter[0-9]+$} $stem -> fifo]} {error "Margin FIFO stem differs"}
+    set name [format {%s_pipe_valid_source_payload_addr_reg[27]} $fifo]
+    set capture [fk33_refseed_one [get_cells -hier -filter "NAME == $name"] pointer_capture]
+    set logic_cells [concat $copies $rams [list $capture]]
+    set pointer_logic [fk33_margin_logic $logic_cells]
+    if {[llength [get_cells -quiet -of_objects [fk33_refseed_one [get_bels SLICE_X151Y28/HFF2] pointer_BEL]]]} {error "Margin pointer destination occupied"}
+    place_cell [list $pointer SLICE_X151Y28/HFF2]
+    route_design -preserve -no_psir
+    fk33_margin_compare $initial_ff [fk33_pc31_ff_placement] [list $pointer]
+    fk33_margin_compare $initial_geometry [fk33_margin_geometry] [list $pointer]
+    if {$pointer_logic ne [fk33_margin_logic $logic_cells] || $pointer_loads ne [fk33_margin_loads $pointer Q] || [fk33_margin_location $pointer] ne "SLICE_X151Y28/HFF2" || ![get_property IS_LOC_FIXED $pointer] || ![get_property IS_BEL_FIXED $pointer]} {error "Margin pointer logic/placement differs"}
+    puts [list FK33_MARGIN_LOCALITY_POINTER_COMPLETE TAG hbm_cpu_pc22_aw_consume CELL $pointer DESTINATION SLICE_X151Y28/HFF2 PRESERVED_OTHER_FFS 100163 ORIGINAL20_FIXED_PRESERVED 1]
+
+    # Retain the exact six-input function and both original data captures.
+    set data [fk33_refseed_one [get_cells -hier -filter {NAME == main_buffer61_pipe_valid_source_payload_data[207]_i_1}] data_LUT]
+    set data_loads [fk33_margin_loads $data O]
+    set expected [lsort [list {main_buffer61_pipe_valid_source_payload_data_reg[207]/D} {main_buffer61_pipe_valid_source_payload_data_reg[79]/D}]]
+    if {[get_property REF_NAME $data] ne "LUT6" || [get_property INIT $data] ne "64'h5303500000000000" || $data_loads ne $expected || [get_property IS_LOC_FIXED $data] || [get_property IS_BEL_FIXED $data] || [string toupper [get_property -quiet DONT_TOUCH $data]] in {1 TRUE}} {error "Margin data cone shape/protection differs"}
+    set data_logic [fk33_margin_logic [list $data]]
+    set before_ff [fk33_pc31_ff_placement]
+    set before_geometry [fk33_margin_geometry]
+    fk33_margin_empty_lut SLICE_X124Y8/A6LUT
+    place_cell [list $data SLICE_X124Y8/A6LUT]
+    route_design -preserve -no_psir
+    fk33_margin_compare $before_ff [fk33_pc31_ff_placement] {}
+    fk33_margin_compare $before_geometry [fk33_margin_geometry] [list $data]
+    if {$data_logic ne [fk33_margin_logic [list $data]] || $data_loads ne [fk33_margin_loads $data O] || [fk33_margin_location $data] ne "SLICE_X124Y8/A6LUT"} {error "Margin data LUT mapping/placement differs"}
+    puts [list FK33_MARGIN_LOCALITY_DATA_COMPLETE CELL $data INIT [get_property INIT $data] DESTINATION SLICE_X124Y8/A6LUT LOADS $data_loads ALL100164_FFS_PRESERVED 1]
+
+    # Add one equivalent local AND, leaving both CDC synchronizer chains intact.
+    set original [fk33_refseed_one [get_cells -hier -filter {NAME == main_hbm_pc0_quiesce_request_i_1}] quiesce_LUT]
+    set target [fk33_refseed_one [get_pins -hier -filter {NAME == main_hbm_pc0_quiesce_request_reg_replica_10/D}] quiesce_capture]
+    set quiesce_loads [fk33_margin_loads $original O]
+    if {[get_property REF_NAME $original] ne "LUT3" || [get_property INIT $original] ne "8'h80" || [llength $quiesce_loads]!=12 || $target ni $quiesce_loads || [get_property LOC [get_cells -of_objects $target]] ne "SLICE_X83Y28"} {error "Margin quiesce cone shape differs"}
+    set original_logic [fk33_margin_logic [list $original]]
+    set old_net [fk33_refseed_one [get_nets -of_objects [fk33_refseed_pin $original O]] quiesce_output]
+    set before_ff [fk33_pc31_ff_placement]
+    set before_geometry [fk33_margin_geometry]
+    fk33_margin_empty_lut SLICE_X83Y28/G6LUT
+    set drivers {}; set input_cells {}; set flags {}; set input_loads {}
+    foreach role {I0 I1 I2} {
+        set net [fk33_refseed_one [get_nets -of_objects [fk33_refseed_pin $original $role]] quiesce_input]
+        set driver [fk33_refseed_one [get_pins -leaf -of_objects [fk33_pc31_component $original $role] -filter {DIRECTION == OUT}] quiesce_driver]
+        set owner [fk33_refseed_one [get_cells -of_objects $driver] quiesce_source]
+        if {[get_property REF_NAME $owner] ne "FDRE" || [get_property REF_PIN_NAME $driver] ne "Q"} {error "Margin quiesce input source differs"}
+        lappend drivers [list $role $net $owner $driver]
+        lappend input_cells $owner
+        dict set flags $net [get_property DONT_TOUCH $net]
+        dict set input_loads $role [fk33_margin_loads $owner Q]
+    }
+    set protected_logic [fk33_margin_logic $input_cells]
+    create_cell -reference LUT3 $clone_name
+    set clone [fk33_refseed_one [get_cells $clone_name] local_quiesce_LUT]
+    set_property INIT {8'h80} $clone
+    foreach row $drivers {
+        lassign $row role net owner driver
+        set flag [dict get $flags $net]
+        set release [expr {[string toupper $flag] in {1 TRUE}}]
+        set code [catch {
+            if {$release} {set_property DONT_TOUCH false $net}
+            connect_net -net $net -objects [fk33_refseed_pin $clone $role]
+        } result options]
+        if {$release} {set_property DONT_TOUCH $flag $net}
+        if {$code} {return -options $options $result}
+    }
+    foreach row $drivers {
+        lassign $row role net owner driver
+        set expected [lsort -unique [concat [dict get $input_loads $role] [list [fk33_refseed_pin $clone $role]]]]
+        if {[get_property DONT_TOUCH $net] ne [dict get $flags $net] || [fk33_margin_loads $owner Q] ne $expected || [fk33_pc31_component $clone $role] ne [fk33_pc31_component $original $role]} {error "Margin clone input/source loads/net protection differs before route"}
+    }
+    if {$protected_logic ne [fk33_margin_logic $input_cells]} {error "Margin protected source FF changed before route"}
+    create_net $output_name
+    set new_net [fk33_refseed_one [get_nets $output_name] local_quiesce_output]
+    disconnect_net -net $old_net -objects $target
+    connect_net -net $new_net -objects [list [fk33_refseed_pin $clone O] $target]
+    place_cell [list $clone SLICE_X83Y28/G6LUT]
+    route_design -preserve -no_psir
+    fk33_margin_compare $before_ff [fk33_pc31_ff_placement] {}
+    fk33_margin_compare $before_geometry [fk33_margin_geometry] {}
+    if {$original_logic ne [fk33_margin_logic [list $original]] || $protected_logic ne [fk33_margin_logic $input_cells] || [fk33_margin_loads $original O] ne [lsearch -all -inline -not -exact $quiesce_loads $target] || [fk33_margin_loads $clone O] ne [list $target] || [get_property REF_NAME $clone] ne "LUT3" || [get_property INIT $clone] ne "8'h80" || [fk33_margin_location $clone] ne "SLICE_X83Y28/G6LUT"} {error "Margin final quiesce cone differs"}
+    foreach row $drivers {
+        lassign $row role net owner driver
+        set expected [lsort -unique [concat [dict get $input_loads $role] [list [fk33_refseed_pin $clone $role]]]]
+        if {[get_property DONT_TOUCH $net] ne [dict get $flags $net] || [fk33_margin_loads $owner Q] ne $expected || [fk33_pc31_component $clone $role] ne [fk33_pc31_component $original $role]} {error "Margin clone source/input load/protection differs"}
+    }
+    puts [list FK33_MARGIN_LOCALITY_QUIESCE_COMPLETE CLONE $clone INIT [get_property INIT $clone] DESTINATION SLICE_X83Y28/G6LUT INPUTS [fk33_pc31_inputs $clone] LOADS [list $target] ORIGINAL_LOADS 11 ALL100164_FFS_PRESERVED 1 SOURCE_FF_AND_NET_PROTECTION_PRESERVED 1]
+
+    fk33_margin_compare $initial_ff [fk33_pc31_ff_placement] [list $pointer]
+    fk33_margin_compare $initial_geometry [fk33_margin_geometry] [list $pointer $data]
+    if {$initial_clocks ne [fk33_margin_clocks] || $pointer_logic ne [fk33_margin_logic $logic_cells] || $pointer_loads ne [fk33_margin_loads $pointer Q] || $data_logic ne [fk33_margin_logic [list $data]] || $data_loads ne [fk33_margin_loads $data O] || [llength [get_cells -hier -filter {REF_NAME =~ FD* && IS_LOC_FIXED == 1}]]!=21 || [llength [get_cells -hier -filter {REF_NAME =~ LUT*}]]!=58059} {error "Margin cumulative logic/clock/count proof differs"}
+    puts [list FK33_MARGIN_LOCALITY_COMPLETE FF_COUNT 100164 PRESERVED_OTHER_FFS 100163 DECLARED_FF_MOVE $pointer FIXED_FF 21 LUT_COUNT 58059 DECLARED_LUT_MOVE $data DECLARED_LUT_ADD $clone CLOCK_RESET_PROTOCOL_LATENCY_UNCHANGED 1 QUALIFICATION NOT_CLAIMED]
+}
+fk33_margin_locality
 """
     commands = commands.replace("{", "{{").replace("}", "}}")
     platform.toolchain.post_routing_commands.append(commands)
