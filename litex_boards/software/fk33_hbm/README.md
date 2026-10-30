@@ -1,73 +1,126 @@
 # FK33 primitive HBM build for Wolf
 
 This recipe builds the bundled direct-primitive HBM replacement, processor-driven
-APB initialization/calibration firmware, and 32-port burst test engines. Python
-RapidWright analysis is a **required post-route stage** of the build command.
-It analyzes the routed checkpoint; it does not change placement, routing or
-timing exceptions. Vivado remains the timing authority.
+APB initialization/calibration firmware, and 32-port burst test engines. The
+portable rebuild wrapper includes Python RapidWright analysis after routing.
+For the AXI500 direct-target recipe below, run RapidWright separately using its
+listed commands. It analyzes the routed checkpoint without changing placement,
+routing or timing exceptions. Vivado remains the timing authority.
 
-## AXI500 / HBM1000 PC31 control-cone review branch
+## AXI500 / HBM1000 margin-locality review branch
 
-This opt-in experiment adds two post-route combinational reductions to the existing
-single-PC31 AXI500/HBM1000 reference-placement profile. Use branch
-`work/hbm-native500-pc31-control-lut` in both repositories, with this tested source pair
-(later README-only commits describe the same code):
+Use `work/hbm-native500-margin-locality` in the AEW2015 litex-boards fork,
+with the unchanged LiteX post-routing hook from the paired core below. The
+source pair for this iteration is:
 
-- LiteX core: `aa0df3251b2dc129ac0b84cd6628d9111ab6a71e`.
-- litex-boards: `735f4fcbdcca531b02ec6945cbee972932123e70`.
+- LiteX core: `aa0df3251b2dc129ac0b84cd6628d9111ab6a71e`, available on
+  `work/hbm-native500-pc31-control-lut` in the LiteX fork.
+- litex-boards code: `27fed6d95fc71dc2c35efa1668b53204fefb08fb` on
+  `work/hbm-native500-margin-locality`; a later README-only commit may describe
+  the same code.
 
-Use the direct target command with both worktrees importable and a fresh output
-directory for each build:
+For a fresh checkout, substitute these clones for the reference clone step in
+the setup instructions below:
 
 ```text
-python -m litex_boards.targets.sqrl_fk33 --with-hbm --hbm-primitive --hbm-endpoint --hbm-endpoint-traffic --hbm-reference-placement --no-ident-version --hbm-axi-domain --hbm-axi-clk-freq 500e6 --hbm-experimental-500-1000 --sys-clk-freq 250e6 --cpu-type vexriscv --cpu-variant minimal --build --output-dir build/fk33-native500-pc31-control --vivado-max-threads 8 --vivado-place-directive Explore --vivado-post-place-phys-opt-directive AggressiveExplore --vivado-route-directive Explore --vivado-post-route-phys-opt-directive AggressiveExplore --vivado-report-level signoff
+git clone --branch work/hbm-native500-margin-locality https://github.com/AEW2015/litex-boards.git
+git clone --branch work/hbm-native500-pc31-control-lut https://github.com/AEW2015/litex.git
+git -C litex checkout aa0df3251b2dc129ac0b84cd6628d9111ab6a71e
+cd litex-boards
 ```
 
-Set `FK33_RISCV_GCC` to the RISC-V compiler used for the paired build environment. This
-direct target command is required for the experimental profile; the portable rebuild
-wrapper does not select AXI500.
+Use the Windows or Linux environment setup below. Its requirements file installs
+an older reference LiteX checkout. After installing those dependencies, install
+both paired worktrees with the active build environment's Python:
 
-The core exposes an optional Vivado post-routing command collection. The FK33 target
-registers its command only when the existing reference-placement profile is selected. It
-runs after `route_design` and post-route `phys_opt_design`, before the canonical routed
-DCP, timing reports and bitstream are written. The script validates the original LUT
-shapes and connectivity, exhaustively compares the local synchronous-reset truth tables,
-replaces two control cones, then checks the FF placement/state and clock inventory. The
-valid-cone proof covers 128 input/reset cases; the ready-cone proof covers 64. It
-records original and replacement LUT INIT/connectivity details in the Vivado log.
+```text
+python -m pip install --no-deps -e ../litex -e .
+```
 
-The transformation leaves the native 256-bit AXI3 ports, SYS250 / AXI500 / HBM1000 /
-REF200 / APB100 clocks, reset architecture and cycle latency unchanged. It adds no
-target option or public source file. The normal defaults and other board targets do not
-register this hook.
+Set `FK33_RISCV_GCC` to your local RISC-V compiler and put Vivado on PATH. Use a
+fresh output directory for each complete build:
 
-One full fresh Vivado 2025.2 Windows build passes the fabric/reset/CDC/control, tracker
-and read-only RapidWright checks. The independent final-DCP truth-table/input/output
-checks also pass. The valid-register path improves from +6 ps to +175 ps; the three
-fixed ready replicas have +177/+179/+186 ps setup margin. Global fabric setup/hold
-remain **+6/+8 ps**, with zero failing fabric endpoints: overall setup margin has not
-increased. All 100,164 FF placements, initializations and fixed flags are preserved
-across the transformation, and one LUT is removed. CPU read-address peak loads remain
-14, matching the tested predecessor.
+```text
+python -m litex_boards.targets.sqrl_fk33 --with-hbm --hbm-primitive --hbm-endpoint --hbm-endpoint-traffic --hbm-reference-placement --no-ident-version --hbm-axi-domain --hbm-axi-clk-freq 500e6 --hbm-experimental-500-1000 --sys-clk-freq 250e6 --cpu-type vexriscv --cpu-variant minimal --build --output-dir build/fk33-native500-margin-locality --vivado-max-threads 8 --vivado-place-directive Explore --vivado-post-place-phys-opt-directive AggressiveExplore --vivado-route-directive Explore --vivado-post-route-phys-opt-directive AggressiveExplore --vivado-report-level signoff
+```
 
-That source-built image's own SRAM load passes **7/7 hardware smoke jobs**, all 16
-MC/PHY calibrations, processor word/byte accesses on 31 ports and
-deterministic/random/masked native PC31 traffic. All 1,240 guards and 3,751 host markers
-pass. STOP retains calibration, drains all ports, clears READY flags and reports zero
-errors; owned monitor/transports close and JTAG returns to 15 MHz. Flash is untouched.
-The measured BIT SHA256 is
-`98367dba3674ddafe3a51ee67b2645cc9841042915e268ca24e1ea6d2e9fa4ea`.
+This direct target command selects SYS250 / AXI500 / HBM1000 / REF200 / APB100.
+The portable rebuild wrapper's rated profiles do not select AXI500. Run the
+separate read-only RapidWright commands below after implementation. The direct
+command does not run the recorded private final audits or hardware tests.
 
-The local build has 433 captured source inputs and 24 initial generated outputs. This
-command does not run the recorded private final audits or hardware tests; review your
-own resulting image and reports.
+Only the existing FK33 target changes: 201 added lines, with one call inside the
+existing experimental reference-placement profile and one Tcl helper. The LiteX
+core and normal profiles remain unchanged. After the existing PC31 LUT6/LUT5
+control reductions, the helper performs three bounded stages, routing after each:
 
-The primitive HBM model retains its 32 declared 2.220 ns minimum-period failures at an
-operating 2.000 ns period. The existing 98-bit status bundle hold waiver remains
-protocol-based and is not an STA pass. This experiment does not establish Linux
-reproduction, PVT or implementation-seed robustness, whole-HBM capacity coverage, or
-full-native qualification. Hardware testing requires a separate fresh SRAM load and
-image-bound positive timing/source audits.
+1. Select the physical PC22 AW FIFO by `hbm_cpu_pc22_aw_consume` and move only
+   its original bit0 RAM-driving binary-pointer FF to `SLICE_X151Y28/HFF2`.
+2. Move the existing PC17 AW data LUT6 to `SLICE_X124Y8/A6LUT`, preserving its
+   six-input mapping, INIT and both data captures.
+3. Add one equivalent quiesce LUT3 at `SLICE_X83Y28/G6LUT` for the critical
+   capture, retaining the original LUT's other eleven capture loads. Only
+   originally true input-net `DONT_TOUCH` flags are temporarily cleared for
+   connection and restored before placement/routing. Source FFs and their CDC
+   protection remain unchanged.
+
+The helper runs after normal route/post-route optimization and before the
+canonical routed checkpoint, reports and bitstream. Stage and cumulative checks
+retain 100,164 FFs, preserve the other 100,163 FF placements/INIT/fixed flags,
+and declare exactly one FF relocation, one existing LUT relocation and one LUT
+addition. Final fixed FF count is 21, including the original twenty anchors;
+final LUT count is 58,059, including the earlier PC31 one-LUT reduction. The
+native 256-bit AXI3 ports, clocks, reset architecture, cycle latency, CSR map,
+firmware and operating profile remain unchanged. Generated RTL/CSR/firmware
+comparisons verify the unchanged behavioral source for this attempt. This branch
+does not include the separate proposed Migen `max_fanout=32` experiment.
+
+**New source-build status: COMPLETED.** Full fresh synthesis/implementation
+returns native and wrapper exit 0. Actual final fabric timing is **+0.012 ns
+setup / +0.008 ns hold**, with **zero setup and zero hold failures**. Bounded
+source/image-bound offline checks pass; overall qualification remains
+**INCOMPLETE / UNQUALIFIED**. The source-built image has its own closed timing,
+topology, protection and functional reviews. These verify all 330 Gray groups / 990 finite paths, 330
+bus-skew checks and 128 reset paths; 32 tracker bindings and 400 read-only
+RapidWright native paths also pass their bounded checks.
+
+**This source-built image passes its own 7/7 hardware smoke jobs on the FK33.**
+All sixteen MC/PHY calibrations pass (`0xffff`), with processor word/byte accesses
+on 31 ports (`0x7fffffff`) and deterministic/random/masked native PC31 traffic.
+Actual counts are 3,751 word writes, 3,844 reads, 124 byte writes, 124 byte
+reads, 1,240 guards and 3,751 host markers, with zero errors. STOP retains calibration,
+drains `0xffffffff` and clears READY flags `0x300`. Owned monitor/transports
+close, JTAG returns to 15 MHz and flash is untouched. Observed PL maximum is
+28.2 C; HBM stack maxima are 29/29 C. The independent review binds these results
+to this exact BIT/DCP. This is one fresh SRAM load and a bounded campaign.
+
+The previous PC31-only source at boards `735f4fcb` also passed its own seven
+jobs; its results remain evidence for that earlier image.
+
+Closed source-build evidence (local paths are relative to the LiteHBM workspace):
+
+- Independent offline review: `builds/fk33-native500-20261026/margin-locality-build-20261029-01/final-offline-review.json`, SHA256
+  `0c6ac90af6d5c6efd0e3a660456049be15c91763d6c58d17fa897d2f5ecb71bd`.
+- Captured source inputs / initial generated outputs: 433 / 24.
+- Source-input manifest SHA256: `d00a947003117b15070aeeae3ff79707c50d72a6996c949d70afc4c2aa17acc9`.
+- Generated-output manifest SHA256: `6fbbde152692cb4d0a6cfcb79fcfa837f2a87bc1605f1c217c1f3fd7e2bddba3`.
+- Routed DCP SHA256: `eb70969f45525d5b0df0f3b6221623fe38dab7ed3252b8cb708309838fa0f2fc`.
+- BIT SHA256: `4f0183bd1ea8ac8590f15b9e00c766cdfd53e9a3238303e63976993cc6c891c1`.
+- Independent hardware review: `builds/fk33-native500-20261026/margin-locality-build-20261029-01/smoke-independent-review.json`, SHA256
+  `6adf7405e3dc56a4f6cf3f97a8a8ab1d3b8638b471f93d90238a16ad29062f5b`.
+- Final campaign report: `builds/fk33-native500-20261026/margin-locality-build-20261029-01/candidate-report.md`.
+- Separately sealed evidence manifest: `builds/fk33-native500-20261026/margin-locality-build-20261029-01/evidence-manifest.json`.
+  The campaign report and manifest are sealed after this README snapshot;
+  their final hashes are recorded separately to avoid circular bindings.
+
+This remains an **INCOMPLETE / UNQUALIFIED** experimental clock profile. The
+32 primitive-model minimum-period failures remain 2.220 ns modeled versus
+2.000 ns operating AXI period. The 98-bit status-bundle hold waiver is
+protocol-based and is not an STA pass. Fabric margins are tiny; the available
+evidence does not establish cross-OS reproduction, PVT or implementation-seed
+robustness, whole-HBM capacity coverage or full-native qualification. Actual
+HBM frequency was not independently measured. Review your own resulting image
+and reports before a separate hardware campaign.
 
 ### Separate RapidWright analysis
 
@@ -76,14 +129,14 @@ boards repository root, using the prepared RapidWright Python environment. First
 a readable EDIF from the routed checkpoint:
 
 ```text
-python -c "import importlib.util; from pathlib import Path; s=importlib.util.spec_from_file_location('fk33_rw','litex_boards/software/fk33_hbm/rebuild/rapidwright_assist.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); b=Path('build/fk33-native500-pc31-control').resolve(); o=b/'rapidwright'; o.mkdir(exist_ok=True); (o/'export.tcl').write_text(m.export_tcl(b/'gateware/sqrl_fk33_route.dcp',o/'readable.edf',o/'native-paths.rpt',o/'native-summary.rpt'),encoding='utf-8')"
-vivado -mode batch -source build/fk33-native500-pc31-control/rapidwright/export.tcl
+python -c "import importlib.util; from pathlib import Path; s=importlib.util.spec_from_file_location('fk33_rw','litex_boards/software/fk33_hbm/rebuild/rapidwright_assist.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); b=Path('build/fk33-native500-margin-locality').resolve(); o=b/'rapidwright'; o.mkdir(exist_ok=True); (o/'export.tcl').write_text(m.export_tcl(b/'gateware/sqrl_fk33_route.dcp',o/'readable.edf',o/'native-paths.rpt',o/'native-summary.rpt'),encoding='utf-8')"
+vivado -mode batch -source build/fk33-native500-margin-locality/rapidwright/export.tcl
 ```
 
 Then run the existing worker with a 4 GiB Java heap (set `JAVA_HOME` if needed):
 
 ```text
-python -c "import os,runpy,sys; os.environ['JAVA_TOOL_OPTIONS']='-Xmx4g'; sys.argv=['rapidwright_assist.py']+sys.argv[1:]; runpy.run_path('litex_boards/software/fk33_hbm/rebuild/rapidwright_assist.py',run_name='__main__')" --worker --dcp build/fk33-native500-pc31-control/gateware/sqrl_fk33_route.dcp --readable-edif build/fk33-native500-pc31-control/rapidwright/readable.edf --timing-report build/fk33-native500-pc31-control/rapidwright/native-paths.rpt --hbm-endpoint --checkpoint-stage routed --output build/fk33-native500-pc31-control/rapidwright
+python -c "import os,runpy,sys; os.environ['JAVA_TOOL_OPTIONS']='-Xmx4g'; sys.argv=['rapidwright_assist.py']+sys.argv[1:]; runpy.run_path('litex_boards/software/fk33_hbm/rebuild/rapidwright_assist.py',run_name='__main__')" --worker --dcp build/fk33-native500-margin-locality/gateware/sqrl_fk33_route.dcp --readable-edif build/fk33-native500-margin-locality/rapidwright/readable.edf --timing-report build/fk33-native500-margin-locality/rapidwright/native-paths.rpt --hbm-endpoint --checkpoint-stage routed --output build/fk33-native500-margin-locality/rapidwright
 ```
 
 Review `rapidwright/physical-analysis.json` alongside Vivado timing, route and DRC
